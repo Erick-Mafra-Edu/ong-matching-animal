@@ -1,8 +1,8 @@
-"use client";
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "ONG Matching Animal",
   description: "Sistema de matchmaking dinâmico de animais para adoção",
 };

@@ -4,7 +4,7 @@ import type {
   TutorProfile,
   AnimalProfile,
   MatchingRule,
-} from "../../shared/types/index.js";
+} from "@shared/types";
 
 // Validar variáveis de ambiente
 const SUPABASE_URL = process.env.SUPABASE_URL;

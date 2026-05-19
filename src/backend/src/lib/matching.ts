@@ -4,7 +4,7 @@ import {
   MatchingRule,
   MatchResult,
   ComparatorFunction,
-} from "../../shared/types/index.js";
+} from "@shared/types";
 
 /**
  * Classe responsável pelo cálculo de compatibilidade entre Tutores e Animais
@@ -15,18 +15,18 @@ export class MatchingAlgorithm {
    * Comparadores de valores baseados no operador da regra
    */
   private comparators: Record<string, ComparatorFunction> = {
-    "=": (tutor, animal) => tutor === animal,
-    ">=": (tutor, animal) => {
-      const tutorNum = this.stringToNumber(tutor);
-      const animalNum = this.stringToNumber(animal);
+    "=": (tutor: unknown, animal: unknown) => tutor === animal,
+    ">=": (tutor: unknown, animal: unknown) => {
+      const tutorNum = this.stringToNumber(tutor as string);
+      const animalNum = this.stringToNumber(animal as string);
       return tutorNum >= animalNum;
     },
-    "<=": (tutor, animal) => {
-      const tutorNum = this.stringToNumber(tutor);
-      const animalNum = this.stringToNumber(animal);
+    "<=": (tutor: unknown, animal: unknown) => {
+      const tutorNum = this.stringToNumber(tutor as string);
+      const animalNum = this.stringToNumber(animal as string);
       return tutorNum <= animalNum;
     },
-    contains: (tutor, animal) => {
+    contains: (tutor: unknown, animal: unknown) => {
       if (typeof tutor === "string" && typeof animal === "string") {
         return animal.includes(tutor);
       }

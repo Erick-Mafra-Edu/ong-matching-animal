@@ -1,5 +1,3 @@
-import type { MatchResponse } from "@/types/shared";
-
 export default function Home() {
   return (
     <main>

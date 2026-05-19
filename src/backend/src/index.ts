@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { MatchingAlgorithm } from "./lib/matching.js";
-import type { MatchResponse } from "../../shared/types/index.js";
+import { MatchingAlgorithm } from "./lib/matching";
+import type { MatchResponse } from "@shared/types";
 
 const app = express();
 
