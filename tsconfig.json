@@ -12,5 +12,20 @@
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "node"
-  }
+  },
+  "include": [
+    "api/**/*.ts",
+    "src/backend/src/**/*.ts",
+    "src/frontend/**/*.ts",
+    "src/shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__tests__/**",
+    "src/backend/dist",
+    "src/frontend/.next"
+  ]
 }
