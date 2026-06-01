@@ -1,0 +1,28 @@
+{
+  "name": "ong-matching-animal",
+  "version": "0.1.0",
+  "description": "Sistema de matching entre tutores e animais para ONGs",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix src/backend\" \"npm run dev --prefix src/frontend\"",
+    "dev:vercel": "vercel dev",
+    "build": "npm run build --prefix src/backend && npm run build --prefix src/frontend",
+    "install": "npm install --prefix src/backend && npm install --prefix src/frontend",
+    "start": "npm start --prefix src/frontend",
+    "test": "npm test --prefix src/backend && npm test --prefix src/frontend"
+  },
+  "keywords": [
+    "ong",
+    "matching",
+    "animals",
+    "tutores"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -50,9 +50,9 @@ app.post("/api/match", (req: Request, res: Response) => {
 // ATENCAO AQUI: Em vez de usar app.listen(), voce deve exportar o app
 // Para testar localmente, voce pode usar uma condicional:
 if (process.env.NODE_ENV !== "production") {
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   app.listen(port, () => {
-    console.log(`🚀 Servidor rodando na porta ${port}`);
+    console.log(`🚀 Servidor Backend rodando na porta ${port}`);
     console.log(`📍 http://localhost:${port}/api/health`);
   });
 }

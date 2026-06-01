@@ -1,0 +1,1 @@
+export { default } from "../src/backend/src/index";
