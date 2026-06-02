@@ -1,7 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { MatchingAlgorithm } from "./lib/matching";
-import type { MatchResponse } from "@shared/types";
+import type { MatchResponse } from "@ong-matching-animal/shared/types";
 
 const app = express();
 
@@ -49,7 +48,7 @@ app.post("/api/match", (req: Request, res: Response) => {
 
 // ATENCAO AQUI: Em vez de usar app.listen(), voce deve exportar o app
 // Para testar localmente, voce pode usar uma condicional:
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== "production" && require.main === module) {
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   app.listen(port, () => {
     console.log(`🚀 Servidor Backend rodando na porta ${port}`);

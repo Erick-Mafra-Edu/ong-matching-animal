@@ -4,7 +4,7 @@ import {
   MatchingRule,
   MatchResult,
   ComparatorFunction,
-} from "@shared/types";
+} from "@ong-matching-animal/shared/types";
 
 /**
  * Classe responsável pelo cálculo de compatibilidade entre Tutores e Animais

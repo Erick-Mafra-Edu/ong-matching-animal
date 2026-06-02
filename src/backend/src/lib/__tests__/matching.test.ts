@@ -3,7 +3,7 @@ import type {
   TutorProfile,
   AnimalProfile,
   MatchingRule,
-} from "@shared/types";
+} from "@ong-matching-animal/shared/types";
 
 describe("MatchingAlgorithm", () => {
   let algorithm: MatchingAlgorithm;

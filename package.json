@@ -3,13 +3,23 @@
   "version": "0.1.0",
   "description": "Sistema de matching entre tutores e animais para ONGs",
   "private": true,
+  "workspaces": [
+    "src/backend",
+    "src/frontend",
+    "src/shared"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix src/backend\" \"npm run dev --prefix src/frontend\"",
-    "dev:vercel": "vercel dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --prefix src/backend",
+    "dev:frontend": "npm run dev --prefix src/frontend",
+    "vercel:dev:backend": "vercel dev src/backend --listen 3001",
+    "vercel:dev:frontend": "vercel dev src/frontend --listen 3000",
     "build": "npm run build --prefix src/backend && npm run build --prefix src/frontend",
-    "install": "npm install --prefix src/backend && npm install --prefix src/frontend",
     "start": "npm start --prefix src/frontend",
-    "test": "npm test --prefix src/backend && npm test --prefix src/frontend"
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm test --prefix src/backend -- --runInBand",
+    "test:frontend": "npm run build --prefix src/frontend",
+    "verify": "npm run test && npm run build"
   },
   "keywords": [
     "ong",

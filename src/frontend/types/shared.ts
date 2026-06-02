@@ -12,4 +12,4 @@ export type {
   MatchResult,
   MatchResponse,
   ComparatorFunction,
-} from "../../shared/types/index.js";
+} from "@ong-matching-animal/shared/types";

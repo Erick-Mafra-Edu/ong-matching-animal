@@ -39,14 +39,9 @@ ong-matching-animal/
 │   │   ├── tsconfig.json
 │   │   └── package.json
 │   │
-│   └── shared/                 # ← Novo: Tipos compartilhados
-│       ├── types/
-│       │   └── index.ts
-│       └── README.md
-│
-├── vercel.json                 # Configuração de deploy Vercel
 ├── .env.example                # Template de variáveis de ambiente
-├── tsconfig.json               # (opcional - para IDE)
+├── package.json                # Workspaces npm do monorepo
+├── tsconfig.json               # Configuração TypeScript da raiz
 └── README.md
 ```
 
@@ -83,12 +78,6 @@ Acesse o SQL Editor do Supabase e execute o conteúdo de `src/backend/db/schema.
 ### 3. Instalar Dependências
 
 ```bash
-# Backend (com TypeScript e ts-node)
-cd src/backend
-npm install
-
-# Frontend (com TypeScript)
-cd ../frontend
 npm install
 ```
 
@@ -111,32 +100,42 @@ Isso irá gerar automaticamente:
 
 ### 5. Rodar Localmente
 
+```bash
+# Na raiz do projeto
+npm run dev
+```
+
+Ou execute cada aplicação separadamente:
+
 **Terminal 1 - Backend (com TypeScript):**
 ```bash
 cd src/backend
 npm run dev
-# Servidor na porta 3000 com ts-node (reload automático)
+# Servidor na porta 3001 com ts-node
 ```
 
 **Terminal 2 - Frontend:**
 ```bash
 cd src/frontend
 npm run dev
-# App na porta 3001 (Next.js redireciona automaticamente)
+# App na porta 3000 (Next.js redireciona /api para o backend)
 ```
 
 ### 6. Build para Produção
 
 ```bash
-# Backend
-cd src/backend
+# Na raiz do projeto
 npm run build
-# Gera pasta dist/ com JS compilado
+```
 
-# Frontend
-cd ../frontend
-npm run build
-# Gera .next/ otimizado
+### 7. Executar Testes
+
+```bash
+# Testes do backend e validação de build do frontend
+npm test
+
+# Testes e builds de todo o monorepo
+npm run verify
 ```
 
 ## 📊 Modelo de Dados
@@ -198,8 +197,6 @@ npm run build
 
 ## ⚙️ Arquitetura
 
-## ⚙️ Arquitetura
-
 ### Backend (Express + TypeScript)
 
 O backend é escrito em **TypeScript** e preparado para rodar na Vercel como Serverless Functions:
@@ -210,8 +207,8 @@ O backend é escrito em **TypeScript** e preparado para rodar na Vercel como Ser
 export default app;
 
 // Mas também pode rodar localmente
-if (process.env.NODE_ENV !== "production") {
-  app.listen(3000);
+if (process.env.NODE_ENV !== "production" && require.main === module) {
+  app.listen(3001);
 }
 ```
 
@@ -231,7 +228,7 @@ Os tipos estão centralizados em `src/shared/types/index.ts` para evitar duplica
 
 ```typescript
 // Backend
-import type { TutorProfile, AnimalProfile } from "../../shared/types/index.js";
+import type { TutorProfile, AnimalProfile } from "@ong-matching-animal/shared/types";
 
 // Frontend
 import type { TutorProfile, AnimalProfile } from "@/types/shared";
@@ -272,7 +269,33 @@ Veja [src/shared/README.md](src/shared/README.md) para mais detalhes.
 
 **Por que?** Isolamento de responsabilidades, escalabilidade independente.
 
-**Deploy:** Ambos na mesma organização Vercel, mas builds separados.
+**Deploy:** Crie dois projetos na mesma organização Vercel, conectados ao mesmo repositório:
+
+| Projeto | Root Directory | Framework |
+| --- | --- | --- |
+| Backend | `src/backend` | Express (`src/backend/vercel.json`) |
+| Frontend | `src/frontend` | Next.js (`src/frontend/vercel.json`) |
+
+A Vercel detecta os frameworks e executa os builds separadamente. Não use `builds` no
+`vercel.json` da raiz: essa configuração é legada. Configure no frontend a URL do
+backend para chamadas feitas em produção.
+
+O procedimento completo de configuração, validação e deploy está em
+[docs/VERCEL_MONOREPO.md](docs/VERCEL_MONOREPO.md).
+
+## 🧪 Scripts Úteis
+
+| Comando | Finalidade |
+| --- | --- |
+| `npm run dev` | Inicia backend e frontend localmente |
+| `npm run dev:backend` | Inicia apenas o Express em `http://localhost:3001` |
+| `npm run dev:frontend` | Inicia apenas o Next.js em `http://localhost:3000` |
+| `npm run vercel:dev:backend` | Inicia o backend usando o runtime local da Vercel |
+| `npm run vercel:dev:frontend` | Inicia o frontend usando o runtime local da Vercel |
+| `npm run test:backend` | Executa a suíte Jest do backend |
+| `npm run test:frontend` | Valida o frontend com build Next.js |
+| `npm test` | Executa as validações de backend e frontend |
+| `npm run verify` | Executa testes e builds completos |
 
 ## 🛠️ Scripts Úteis
 
