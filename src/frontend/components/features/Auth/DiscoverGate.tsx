@@ -27,7 +27,7 @@ export function DiscoverGate({ children }: DiscoverGateProps) {
         }
         setAllowed(true);
       } catch {
-        router.replace("/login");
+        router.replace("/onboarding");
       }
     }
 

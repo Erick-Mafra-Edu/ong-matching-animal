@@ -17,6 +17,7 @@ export function OnboardingForm() {
   const [user, setUser] = useState<User | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     async function loadQuestions() {
@@ -30,7 +31,8 @@ export function OnboardingForm() {
         setQuestions(await fetchOnboardingQuestions(getSupabaseBrowserClient()));
         setLoading(false);
       } catch {
-        router.replace("/login");
+        setLoading(false);
+        setLoadError(true);
       }
     }
 
@@ -74,6 +76,10 @@ export function OnboardingForm() {
 
   if (loading) {
     return <p className="animate-loading-pulse py-16 text-center text-sm uppercase tracking-[0.25em] text-cyan-100">Carregando perguntas...</p>;
+  }
+
+  if (loadError) {
+    return <p className="rounded-2xl border border-pink-400/40 bg-pink-400/10 p-5 text-sm leading-6 text-pink-100" role="alert">Não foi possível carregar as perguntas. Verifique se a migration de onboarding foi aplicada no Supabase e tente novamente.</p>;
   }
 
   return (
