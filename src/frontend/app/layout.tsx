@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ONG Matching Animal",
-  description: "Sistema de matchmaking dinâmico de animais para adoção",
+  title: "Match Pet | ONG Matching Animal",
+  description: "Encontre um novo companheiro para adoção",
 };
 
 interface RootLayoutProps {
