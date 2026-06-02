@@ -17,7 +17,15 @@ export function ProfileSummary({ pet, compact = false }: ProfileSummaryProps) {
         {pet.verified && <VerifiedIcon className="h-4 w-4" />}
       </div>
       <div className={`flex flex-wrap gap-1.5 ${compact ? "md:hidden" : ""}`}>
-        {pet.traits.map((trait) => <Badge key={trait}>{trait}</Badge>)}
+        {pet.traits.map((trait, index) => (
+          <span
+            className="animate-badge-enter"
+            key={trait}
+            style={{ animationDelay: `${280 + index * 70}ms` }}
+          >
+            <Badge>{trait}</Badge>
+          </span>
+        ))}
       </div>
     </section>
   );

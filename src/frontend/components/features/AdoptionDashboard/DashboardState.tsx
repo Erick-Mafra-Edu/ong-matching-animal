@@ -14,7 +14,7 @@ export function DashboardState({ status }: DashboardStateProps) {
   const [title, description] = messages[status];
   return (
     <section className="grid min-h-screen w-full place-items-center px-6 text-center" aria-live="polite">
-      <div className="max-w-sm space-y-3">
+      <div className={`animate-state-enter max-w-sm space-y-3 ${status === "loading" ? "animate-loading-pulse" : ""}`}>
         <h1 className="text-2xl font-bold text-cyan-100">{title}</h1>
         <p className="text-sm text-slate-400">{description}</p>
         {status === "error" && <Button className="mt-4">Tentar novamente</Button>}

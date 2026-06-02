@@ -6,6 +6,7 @@ export interface PetProfile {
   age: number;
   verified: boolean;
   photoUrl: string;
+  photoUrls?: string[];
   traits: string[];
 }
 

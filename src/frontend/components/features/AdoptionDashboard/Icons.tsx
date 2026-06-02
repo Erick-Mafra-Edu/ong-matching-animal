@@ -18,6 +18,14 @@ export function UndoIcon({ className = "" }: IconProps) {
   return <span className={className} aria-hidden="true">↶</span>;
 }
 
+export function ChevronIcon({ className = "" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function VerifiedIcon({ className = "" }: IconProps) {
   return (
     <span className={`inline-grid place-items-center rounded-full bg-cyan-500 text-[9px] font-black text-white ${className}`} aria-label="Perfil verificado">
