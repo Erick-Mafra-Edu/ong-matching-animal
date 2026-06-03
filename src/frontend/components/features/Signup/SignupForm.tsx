@@ -20,7 +20,7 @@ export function SignupForm() {
   useEffect(() => {
     async function loadQuestions() {
       try {
-        const response = await fetch("/api/onboarding-questions");
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/onboarding-questions`);
         const data = await response.json();
 
         if (!response.ok) {
