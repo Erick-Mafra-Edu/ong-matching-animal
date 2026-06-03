@@ -8,8 +8,12 @@ config({ path: path.resolve(__dirname, "../../../.env.local") });
 
 const app = express();
 
+const corsOptions = {
+  origin: process.env.NEXT_PUBLIC_FRONTEND_URL, // Domínio permitido
+  optionsSuccessStatus: 200 // Suporta navegadores mais antigos
+};
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Health check
