@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { hasCompletedOnboarding, saveOnboardingAnswersFromMetadata } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function AuthCallbackHandler() {
@@ -13,6 +13,14 @@ export function AuthCallbackHandler() {
       const params = new URLSearchParams(window.location.hash.slice(1));
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
+      const authError = params.get("error");
+      const authErrorCode = params.get("error_code");
+
+      if (authError) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        router.replace(`/login?auth_error=${encodeURIComponent(authErrorCode ?? authError)}`);
+        return;
+      }
 
       if (!accessToken || !refreshToken) return;
 
@@ -29,7 +37,8 @@ export function AuthCallbackHandler() {
       }
 
       try {
-        router.replace(await hasCompletedOnboarding(supabase, data.user.id) ? "/discover" : "/onboarding");
+        const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);
+        router.replace(completed ? "/discover" : "/onboarding");
       } catch {
         router.replace("/onboarding");
       }

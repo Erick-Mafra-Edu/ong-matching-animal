@@ -1,4 +1,7 @@
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../../.env.local") });
 const { createClient } = require("@supabase/supabase-js");
+const ws = require("ws");
 const { faker } = require("@faker-js/faker/locale/pt_BR");
 
 // Validar variáveis de ambiente
@@ -14,7 +17,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 
 // Criar cliente Supabase
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  realtime: {
+    transport: ws,
+  },
+});
 
 // Dados mock dos tutores
 function generateTutors(count = 10) {

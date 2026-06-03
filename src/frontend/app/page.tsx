@@ -8,7 +8,10 @@ export default function Home() {
         <div className="absolute -right-36 bottom-0 -z-10 h-[460px] w-[460px] rounded-full bg-pink-500/15 blur-3xl" />
         <nav className="mx-auto flex max-w-6xl items-center justify-between">
           <Link className="text-lg font-black tracking-tight text-cyan-100" href="/">MATCH<span className="text-pink-400">PET</span></Link>
-          <Link className="rounded-full border border-white/15 px-5 py-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-50 transition hover:border-cyan-200 hover:bg-cyan-200/10" href="/login">Entrar</Link>
+          <div className="flex items-center gap-2">
+            <Link className="rounded-full border border-white/15 px-5 py-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-50 transition hover:border-cyan-200 hover:bg-cyan-200/10" href="/cadastro">Cadastrar</Link>
+            <Link className="rounded-full border border-white/15 px-5 py-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-50 transition hover:border-cyan-200 hover:bg-cyan-200/10" href="/login">Entrar</Link>
+          </div>
         </nav>
         <div className="mx-auto grid max-w-6xl items-center gap-12 py-20 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
           <div className="animate-details-enter space-y-7">
@@ -16,7 +19,7 @@ export default function Home() {
             <h1 className="max-w-3xl text-5xl font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">Encontre uma conexão que cabe na sua vida.</h1>
             <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">O MatchPet aproxima adotantes e animais acolhidos por ONGs usando preferências reais, rotina e compatibilidade. Menos escolhas por impulso. Mais encontros duradouros.</p>
             <div className="flex flex-wrap gap-3">
-              <Link className="rounded-full bg-cyan-200 px-6 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-100" href="/login">Encontrar meu match</Link>
+              <Link className="rounded-full bg-cyan-200 px-6 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-100" href="/cadastro">Encontrar meu match</Link>
               <a className="rounded-full border border-white/15 px-6 py-3 text-xs font-black uppercase tracking-[0.16em] text-slate-200 transition hover:border-white/40" href="#como-funciona">Como funciona</a>
             </div>
           </div>

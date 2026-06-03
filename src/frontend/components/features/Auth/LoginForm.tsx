@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { hasCompletedOnboarding, saveOnboardingAnswersFromMetadata } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -33,7 +33,8 @@ export function LoginForm() {
         return;
       }
 
-      router.push(await hasCompletedOnboarding(supabase, data.user.id) ? "/discover" : "/onboarding");
+      const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);
+      router.push(completed ? "/discover" : "/onboarding");
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Não foi possível conectar ao Supabase.");
     } finally {
