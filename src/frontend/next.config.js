@@ -16,8 +16,16 @@ const nextConfig = {
           },
         ],
       };
+    }else{
+      return {
+        beforeFiles: [
+          {
+            source: '/api/:path*',
+            destination: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/:path*`,
+          },
+        ],
+      };
     }
-    return [];
   },
 };
 
