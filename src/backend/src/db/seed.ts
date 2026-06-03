@@ -6,6 +6,8 @@ import type {
   MatchingRule,
 } from "@ong-matching-animal/shared/types";
 
+const ws = require("ws");
+
 // Validar variáveis de ambiente
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,7 +21,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 
 // Criar cliente Supabase
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  realtime: {
+    transport: ws,
+  },
+});
 
 // Gerar dados fake de tutores
 function generateTutors(count: number = 10): Omit<TutorProfile, "id">[] {

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { AuthCallbackHandler } from "@/components/features/Auth/AuthCallbackHandler";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ONG Matching Animal",
-  description: "Sistema de matchmaking dinâmico de animais para adoção",
+  title: "Match Pet | ONG Matching Animal",
+  description: "Encontre um novo companheiro para adoção",
 };
 
 interface RootLayoutProps {
@@ -14,7 +15,10 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <AuthCallbackHandler />
+        {children}
+      </body>
     </html>
   );
 }

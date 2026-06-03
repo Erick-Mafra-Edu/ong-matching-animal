@@ -1,42 +1,13 @@
--- Extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS postgis;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'tutors_auth_user_id_key'
+  ) THEN
+    ALTER TABLE tutors ADD CONSTRAINT tutors_auth_user_id_key UNIQUE (auth_user_id);
+  END IF;
+END $$;
 
--- Tutors
-CREATE TABLE tutors (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  auth_user_id UUID UNIQUE REFERENCES auth.users(id),
-  name TEXT NOT NULL,
-  location geography(POINT),
-  custom_fields JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Animals
-CREATE TABLE animals (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  owner_id UUID REFERENCES tutors(id),
-  name TEXT NOT NULL,
-  species TEXT NOT NULL,
-  location geography(POINT),
-  custom_fields JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Matching rules
-CREATE TABLE matching_rules (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  rule_name TEXT NOT NULL,
-  tutor_field TEXT NOT NULL,
-  animal_field TEXT NOT NULL,
-  comparison_operator TEXT DEFAULT '=',
-  weight INT DEFAULT 10,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Dynamic onboarding questions configured by the ONG
-CREATE TABLE onboarding_questions (
+CREATE TABLE IF NOT EXISTS onboarding_questions (
   id TEXT PRIMARY KEY,
   label TEXT NOT NULL,
   description TEXT,
@@ -55,26 +26,38 @@ INSERT INTO onboarding_questions (id, label, description, placeholder, type, opt
   ('has_children', 'Há crianças na residência?', NULL, NULL, 'boolean', NULL, true, 30),
   ('preferred_energy', 'Qual nível de energia combina com sua rotina?', NULL, NULL, 'radio', '[{"label":"Tranquilo","value":"baixo"},{"label":"Equilibrado","value":"medio"},{"label":"Ativo","value":"alto"}]'::jsonb, true, 40),
   ('preferences', 'O que você procura em um novo companheiro?', 'Escolha uma ou mais opções.', NULL, 'multiselect', '[{"label":"Companhia","value":"companhia"},{"label":"Passeios","value":"passeios"},{"label":"Convívio com outros animais","value":"outros_animais"},{"label":"Perfil independente","value":"independente"}]'::jsonb, true, 50),
-  ('notes', 'Quer contar algo importante para a ONG?', NULL, 'Ex.: já tenho um gato adulto em casa', 'text', NULL, false, 60);
+  ('notes', 'Quer contar algo importante para a ONG?', NULL, 'Ex.: já tenho um gato adulto em casa', 'text', NULL, false, 60)
+ON CONFLICT (id) DO UPDATE SET
+  label = EXCLUDED.label,
+  description = EXCLUDED.description,
+  placeholder = EXCLUDED.placeholder,
+  type = EXCLUDED.type,
+  options = EXCLUDED.options,
+  required = EXCLUDED.required,
+  sort_order = EXCLUDED.sort_order;
 
 ALTER TABLE tutors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE onboarding_questions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read active onboarding questions" ON onboarding_questions;
 CREATE POLICY "Authenticated users can read active onboarding questions"
   ON onboarding_questions FOR SELECT
   TO authenticated
   USING (is_active = true);
 
+DROP POLICY IF EXISTS "Tutors can read their own profile" ON tutors;
 CREATE POLICY "Tutors can read their own profile"
   ON tutors FOR SELECT
   TO authenticated
   USING (auth.uid() = auth_user_id);
 
+DROP POLICY IF EXISTS "Tutors can create their own profile" ON tutors;
 CREATE POLICY "Tutors can create their own profile"
   ON tutors FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = auth_user_id);
 
+DROP POLICY IF EXISTS "Tutors can update their own profile" ON tutors;
 CREATE POLICY "Tutors can update their own profile"
   ON tutors FOR UPDATE
   TO authenticated

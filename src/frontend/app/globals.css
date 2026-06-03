@@ -1,35 +1,221 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    margin: 0;
+    background: #0e0e12;
+    font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  .form-control {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.055);
+    padding: 0.8rem 0.9rem;
+    color: #ecfeff;
+    outline: none;
+    transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+  }
+
+  .form-control:focus {
+    border-color: rgba(165, 243, 252, 0.9);
+    background: rgba(255, 255, 255, 0.075);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+  }
+
+  .form-control::placeholder {
+    color: #64748b;
+  }
+
+  select.form-control option {
+    background: #17171d;
+  }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+@layer utilities {
+  .animate-card-enter {
+    animation: card-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-details-enter {
+    animation: details-enter 650ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-actions-enter {
+    animation: actions-enter 550ms 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-mobile-enter {
+    animation: mobile-enter 500ms 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-photo-change {
+    animation: photo-change 350ms ease-out both, photo-breathe 14s ease-in-out infinite alternate;
+  }
+
+  .animate-progress-fill {
+    transform-origin: left;
+    animation: progress-fill 5s linear both;
+  }
+
+  .animate-state-enter {
+    animation: state-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-loading-pulse {
+    animation: loading-pulse 1.4s ease-in-out infinite;
+  }
+
+  .animate-notification {
+    animation: notification-pulse 2s ease-in-out infinite;
+  }
+
+  .animate-badge-enter {
+    animation: badge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
 
-body {
-  background: #fff;
-  color: #333;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(-28px, 0, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
 
-main {
-  padding: 2rem;
+@keyframes details-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-h1 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+@keyframes actions-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-p {
-  font-size: 1.1rem;
-  line-height: 1.6;
+@keyframes mobile-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes photo-breathe {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.045);
+  }
+}
+
+@keyframes photo-change {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes state-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes loading-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes notification-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(103, 232, 249, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(103, 232, 249, 0);
+  }
+}
+
+@keyframes badge-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
