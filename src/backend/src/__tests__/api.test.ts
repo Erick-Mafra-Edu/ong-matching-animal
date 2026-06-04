@@ -35,6 +35,27 @@ describe("API Endpoints", () => {
     });
   });
 
+  describe("OpenAPI documentation", () => {
+    it("should expose the OpenAPI document", async () => {
+      const response = await request(app).get("/api/openapi.json");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("swagger", "2.0");
+      expect(response.body).toHaveProperty("basePath", "/api");
+      expect(response.body.paths).toHaveProperty("/health");
+      expect(response.body.paths).toHaveProperty("/tutors");
+      expect(response.body.paths).toHaveProperty("/animals/{id}/photos");
+      expect(response.body.paths).toHaveProperty("/animals/{id}/photos/signed-url");
+    });
+
+    it("should expose Swagger UI", async () => {
+      const response = await request(app).get("/api/docs/");
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain("Swagger UI");
+    });
+  });
+
   describe("GET /api/onboarding-questions", () => {
     it("should list active onboarding questions", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -144,6 +165,103 @@ describe("API Endpoints", () => {
     });
   });
 
+  describe("Admin endpoints", () => {
+    it("should require admin access (401 when no token)", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+
+      const response = await request(app).get("/api/admin/tutors");
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty("message");
+    });
+
+    it("should list an admin resource for active admins", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", name: "Tutor Teste" }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/admin/tutors")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/rest/v1/tutors"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+    });
+
+    it("should create an auth user before inserting an admin user", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: async () => JSON.stringify({ id: "new-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "new-admin-row", auth_user_id: "new-auth-123", email: "new@example.com", is_active: true }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/admin-users")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          email: "new@example.com",
+          password: "temporary-password",
+          full_name: "Novo Admin",
+          is_active: true,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("auth_user_id", "new-auth-123");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/auth/v1/admin/users",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"email\":\"new@example.com\""),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        "https://example.supabase.co/rest/v1/admin_users",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"created_by\":\"admin-auth-123\""),
+        }),
+      );
+    });
+  });
+
   describe("GET /api/tutors/:id", () => {
     it("should get tutor by id", async () => {
       const response = await request(app).get("/api/tutors/123");
@@ -154,11 +272,45 @@ describe("API Endpoints", () => {
   });
 
   describe("GET /api/animals", () => {
-    it("should list animals", async () => {
+    it("should list animals with photo URLs", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {
+            id: "animal-123",
+            owner_id: "tutor-123",
+            name: "Yolo",
+            species: "Cachorro",
+            custom_fields: { age: 2, traits: ["Calmo"], verified: true },
+            animal_photos: [
+              {
+                id: "photo-123",
+                animal_id: "animal-123",
+                public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+                is_primary: true,
+                created_at: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+          },
+        ],
+      }) as jest.Mock;
+
       const response = await request(app).get("/api/animals");
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty("message");
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toHaveProperty("photoUrl", "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp");
+      expect(response.body[0]).toHaveProperty("photoUrls");
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/rest/v1/animals"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
     });
   });
 
@@ -169,6 +321,191 @@ describe("API Endpoints", () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty("message");
       expect(response.body.message).toContain("sucesso");
+    });
+  });
+
+  describe("GET /api/animals/:id/photos", () => {
+    it("should list animal photos by animal id", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {
+            id: "photo-123",
+            animal_id: "animal-123",
+            bucket_id: "animal-photos",
+            storage_path: "animals/animal-123/photo-123.webp",
+            public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+            content_type: "image/webp",
+            size_bytes: 1024,
+            is_primary: false,
+          },
+        ],
+      }) as jest.Mock;
+
+      const response = await request(app).get("/api/animals/animal-123/photos");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toHaveProperty("animal_id", "animal-123");
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/rest/v1/animal_photos"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            apikey: "service-key",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("POST /api/animals/:id/photos", () => {
+    it("should require an authenticated user", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+
+      const response = await request(app)
+        .post("/api/animals/animal-123/photos")
+        .attach("photo", Buffer.from("jpeg"), { filename: "pet.jpg", contentType: "image/jpeg" });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty("message");
+    });
+
+    it("should reject missing files and return 400 after admin check", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-123", auth_user_id: "user-123", is_active: true }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/animals/animal-123/photos")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toContain("photo");
+    });
+
+    it("should upload a valid image (multipart) and persist metadata", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-123", auth_user_id: "user-123", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: async () => JSON.stringify({ Key: "animals/animal-123/photo.webp" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "photo-123",
+            animal_id: "animal-123",
+            bucket_id: "animal-photos",
+            storage_path: "animals/animal-123/photo-123.webp",
+            public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+            content_type: "image/webp",
+            size_bytes: 4,
+            is_primary: false,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/animals/animal-123/photos")
+        .set("Authorization", "Bearer access-token")
+        .attach("photo", Buffer.from("webp"), { filename: "pet.webp", contentType: "image/webp" });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("animal_id", "animal-123");
+    });
+
+    it("should register a photo via JSON (metadata only)", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-123", auth_user_id: "user-123", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "photo-json-123",
+            animal_id: "animal-123",
+            bucket_id: "animal-photos",
+            storage_path: "animals/animal-123/photo.jpg",
+            public_url: "http://example.com/photo.jpg",
+            content_type: "image/jpeg",
+            size_bytes: 100,
+            is_primary: false,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/animals/animal-123/photos")
+        .set("Authorization", "Bearer access-token")
+        .set("Content-Type", "application/json")
+        .send({
+          id: "photo-json-123",
+          storage_path: "animals/animal-123/photo.jpg",
+          public_url: "http://example.com/photo.jpg",
+          content_type: "image/jpeg",
+          size_bytes: 100,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("id", "photo-json-123");
+    });
+  });
+
+  describe("POST /api/animals/:id/photos/signed-url", () => {
+    it("should generate a signed upload URL", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-123", auth_user_id: "user-123", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ url: "/object/upload/sign/mock-token" }),
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/animals/animal-123/photos/signed-url")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          contentType: "image/jpeg",
+          fileName: "pet.jpg",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.uploadUrl).toContain("/object/upload/sign/mock-token");
+      expect(response.body).toHaveProperty("photoId");
     });
   });
 

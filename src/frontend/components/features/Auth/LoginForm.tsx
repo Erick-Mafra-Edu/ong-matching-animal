@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { hasCompletedOnboarding, saveOnboardingAnswersFromMetadata } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +35,8 @@ export function LoginForm() {
       }
 
       const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);
-      router.push(completed ? "/discover" : "/onboarding");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || (completed ? "/discover" : "/onboarding"));
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Não foi possível conectar ao Supabase.");
     } finally {
