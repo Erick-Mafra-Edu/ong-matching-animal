@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { backendApiUrl } from "@/lib/backend";
 import { saveOnboardingAnswers } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { OnboardingAnswer, OnboardingAnswers, OnboardingQuestion } from "@/types/onboarding";
@@ -20,7 +21,7 @@ export function SignupForm() {
   useEffect(() => {
     async function loadQuestions() {
       try {
-        const response = await fetch("/api/onboarding-questions");
+        const response = await fetch(backendApiUrl("/api/onboarding-questions"));
         const data = await response.json();
 
         if (!response.ok) {

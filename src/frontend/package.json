@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "security:urls": "node scripts/security-url-check.mjs",
     "start": "next start",
     "lint": "next lint"
   },
@@ -14,6 +15,7 @@
     "dotenv": "^17.4.2",
     "next": "^14.2.3",
     "react": "^18.3.1",
+    "react-admin": "^5.14.7",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {

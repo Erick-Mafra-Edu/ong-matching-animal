@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { LoginForm } from "@/components/features/Auth/LoginForm";
 
 interface LoginPageProps {
@@ -35,7 +36,9 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             <p className="text-sm leading-6 text-slate-400">Após o login, você responderá algumas perguntas para personalizar seus matches.</p>
           </div>
           {authErrorMessage && <p className="rounded-xl border border-pink-400/40 bg-pink-400/10 p-3 text-sm leading-6 text-pink-100" role="alert">{authErrorMessage}</p>}
-          <LoginForm />
+          <Suspense fallback={<div className="h-64 animate-pulse rounded-md bg-white/5" />}>
+            <LoginForm />
+          </Suspense>
           <p className="text-center text-xs text-slate-500">Ainda nao tem conta? <Link className="text-cyan-200 hover:text-cyan-100" href="/cadastro">Cadastre-se</Link></p>
         </div>
       </section>

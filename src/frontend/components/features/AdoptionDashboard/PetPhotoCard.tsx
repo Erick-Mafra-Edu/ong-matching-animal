@@ -8,13 +8,14 @@ import { ProfileSummary } from "./ProfileSummary";
 
 interface PetPhotoCardProps {
   action?: CardAction | null;
+  onActionComplete?: (direction: SwipeDirection) => void;
   pet: PetProfile;
 }
 
 const SWIPE_THRESHOLD = 90;
 const EXIT_DISTANCE = 560;
 
-export function PetPhotoCard({ action, pet }: PetPhotoCardProps) {
+export function PetPhotoCard({ action, onActionComplete, pet }: PetPhotoCardProps) {
   const photos = pet.photoUrls?.length ? pet.photoUrls : [pet.photoUrl];
   const [activePhoto, setActivePhoto] = useState(0);
   const [dragX, setDragX] = useState(0);
@@ -29,6 +30,12 @@ export function PetPhotoCard({ action, pet }: PetPhotoCardProps) {
     setActivePhoto((current) => (current + offset + photos.length) % photos.length);
   }
 
+  useEffect(() => {
+    setActivePhoto(0);
+    setDragX(0);
+    setIsExiting(false);
+  }, [pet.id]);
+
   const animateDecision = useCallback((direction: SwipeDirection) => {
     if (isExiting) return;
     setIsDragging(false);
@@ -37,8 +44,9 @@ export function PetPhotoCard({ action, pet }: PetPhotoCardProps) {
     resetTimer.current = setTimeout(() => {
       setDragX(0);
       setIsExiting(false);
+      onActionComplete?.(direction);
     }, 420);
-  }, [isExiting]);
+  }, [isExiting, onActionComplete]);
 
   useEffect(() => {
     if (!action || processedActionId.current === action.id) return;

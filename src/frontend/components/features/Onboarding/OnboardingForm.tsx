@@ -28,7 +28,7 @@ export function OnboardingForm() {
           return;
         }
         setUser(data.user);
-        setQuestions(await fetchOnboardingQuestions(getSupabaseBrowserClient()));
+        setQuestions(await fetchOnboardingQuestions());
         setLoading(false);
       } catch {
         setLoading(false);

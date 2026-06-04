@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { backendApiUrl } from "@/lib/backend";
 import type { Database } from "@/lib/supabase/client";
 import type { OnboardingAnswers, OnboardingQuestion, QuestionOption, QuestionType } from "@/types/onboarding";
 import type { TutorProfile } from "@/types/shared";
@@ -73,14 +74,23 @@ export function buildTutorCustomFields(answers: OnboardingAnswers): TutorCustomF
   return customFields;
 }
 
-export async function fetchOnboardingQuestions(supabase: SupabaseClient<Database>): Promise<OnboardingQuestion[]> {
-  const { data, error } = await supabase
-    .from("onboarding_questions")
-    .select("id,label,description,placeholder,required,type,options")
-    .eq("is_active", true)
-    .order("sort_order");
+export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> {
+  const response = await fetch(backendApiUrl("/api/onboarding-questions"));
 
-  if (error) throw error;
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(body?.message ?? "Nao foi possivel carregar as perguntas.");
+  }
+
+  const data = await response.json() as Array<{
+    id: string;
+    label: string;
+    description: string | null;
+    placeholder: string | null;
+    required: boolean;
+    type: string;
+    options: unknown;
+  }>;
   return data.map((question) => ({
     id: question.id,
     label: question.label,
@@ -93,15 +103,29 @@ export async function fetchOnboardingQuestions(supabase: SupabaseClient<Database
 }
 
 export async function hasCompletedOnboarding(supabase: SupabaseClient<Database>, userId: string) {
-  const { data, error } = await supabase
-    .from("tutors")
-    .select("custom_fields")
-    .eq("auth_user_id", userId)
-    .maybeSingle();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-  if (error) throw error;
-  const customFields = data?.custom_fields as Record<string, unknown> | undefined;
-  return customFields?.onboarding_complete === true;
+  if (sessionError || !sessionData.session?.access_token) {
+    throw sessionError ?? new Error("Sessao ausente para verificar onboarding.");
+  }
+
+  if (sessionData.session.user.id !== userId) {
+    throw new Error("Nao e permitido verificar onboarding de outro usuario.");
+  }
+
+  const response = await fetch(backendApiUrl("/api/tutors/me/onboarding-status"), {
+    headers: {
+      authorization: `Bearer ${sessionData.session.access_token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(body?.message ?? "Nao foi possivel verificar onboarding.");
+  }
+
+  const body = await response.json() as { onboarding_complete?: boolean };
+  return body.onboarding_complete === true;
 }
 
 export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, user: User, answers: OnboardingAnswers) {
@@ -113,7 +137,7 @@ export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, 
     throw sessionError ?? new Error("Sessao ausente para salvar o tutor.");
   }
 
-  const response = await fetch("/api/tutors", {
+  const response = await fetch(backendApiUrl("/api/tutors"), {
     method: "POST",
     headers: {
       authorization: `Bearer ${sessionData.session.access_token}`,
