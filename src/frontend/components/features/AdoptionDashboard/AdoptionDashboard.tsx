@@ -88,7 +88,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     setCardAction({ direction, id: Date.now() });
   }
 
-  function handleActionComplete(direction: SwipeDirection) {
+  function handleActionComplete(_direction: SwipeDirection) {
     const [current, ...remaining] = pets;
     if (current) {
       setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
