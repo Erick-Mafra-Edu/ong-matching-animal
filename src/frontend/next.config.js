@@ -71,20 +71,17 @@ const nextConfig = {
           },
         ],
       };
-    }
-
-    if (backendUrl) {
+    }else{
       return {
         beforeFiles: [
           {
             source: '/api/:path*',
-            destination: `${backendUrl}/api/:path*`,
+            destination: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/:path*`,
           },
         ],
       };
     }
 
-    return [];
   },
 };
 

@@ -81,7 +81,6 @@ function normalizeOrigin(origin?: string) {
     return origin.replace(/\/+$/, "");
   }
 }
-
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_FRONTEND_URL,
   process.env.FRONTEND_URL,
@@ -101,6 +100,7 @@ const corsOptions: CorsOptions = {
     callback(null, allowedOrigins.length === 0 || allowedOrigins.includes(normalizeOrigin(origin) ?? origin));
   },
   optionsSuccessStatus: 200,
+
 };
 // Middlewares
 app.use(cors(corsOptions));

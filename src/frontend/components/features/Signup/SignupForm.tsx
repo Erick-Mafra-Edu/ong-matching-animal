@@ -22,6 +22,7 @@ export function SignupForm() {
     async function loadQuestions() {
       try {
         const response = await fetch(backendApiUrl("/api/onboarding-questions"));
+
         const data = await response.json();
 
         if (!response.ok) {
