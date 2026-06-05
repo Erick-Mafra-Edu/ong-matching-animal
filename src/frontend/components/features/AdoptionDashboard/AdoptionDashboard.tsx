@@ -48,6 +48,8 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   const [actionMessage, setActionMessage] = useState("");
   const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
 
+  const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
+
   useEffect(() => {
     if (status !== "ready") {
       setLoadStatus(status);
@@ -95,28 +97,44 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     if (!featuredPet || isRegisteringInterest) return;
 
     setIsRegisteringInterest(true);
+    setLastActionMessageId(featuredPet.id);
     setActionMessage("Registrando interesse...");
 
     try {
       await registrarInteresse(featuredPet.id);
-      setActionMessage("Interesse registrado para analise da ONG.");
+      setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+      // Se falhou, limpamos o ID para permitir nova tentativa (via swipe ou botão)
+      setLastActionMessageId(null);
     } finally {
       setIsRegisteringInterest(false);
     }
   }
 
-  function handleActionComplete(_direction: SwipeDirection) {
+  async function handleActionComplete(direction: SwipeDirection) {
     const [current, ...remaining] = pets;
-    if (current) {
-      setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
-      setPets(remaining);
-      setCardAction(null);
-      if (remaining.length === 0) {
-        setLoadStatus("empty");
+    if (!current) return;
+
+    // Se for swipe para a direita e ainda não processamos este pet (não foi via botão)
+    if (direction === "right" && lastActionMessageId !== current.id) {
+      setActionMessage("Registrando interesse...");
+      try {
+        await registrarInteresse(current.id);
+        setActionMessage(`Interesse registrado para ${current.name}!`);
+      } catch (error) {
+        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
       }
+    } else if (direction === "left") {
+      setActionMessage(""); // Limpa mensagens anteriores no swipe para esquerda
+    }
+
+    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
+    setPets(remaining);
+    setCardAction(null);
+    if (remaining.length === 0) {
+      setLoadStatus("empty");
     }
   }
 
