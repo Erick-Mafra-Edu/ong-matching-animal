@@ -309,6 +309,102 @@ describe("API Endpoints", () => {
         }),
       );
     });
+
+    it("should list calendar events for admins", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "event-123",
+            title: "Visita de adocao",
+            starts_at: "2026-06-10T14:00:00.000Z",
+            ends_at: "2026-06-10T15:00:00.000Z",
+            status: "scheduled",
+            tutor: { id: "tutor-123", name: "Tutor Admin" },
+            animal: { id: "animal-123", name: "Yolo", species: "Cachorro" },
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/calendar-events")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toMatchObject({
+        id: "event-123",
+        title: "Visita de adocao",
+        tutor_name: "Tutor Admin",
+        animal_name: "Yolo",
+      });
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/rest/v1/calendar_events"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+    });
+
+    it("should create a calendar event for admins", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "event-123",
+            title: "Visita de adocao",
+            starts_at: "2026-06-10T14:00:00.000Z",
+            ends_at: "2026-06-10T15:00:00.000Z",
+            status: "scheduled",
+            created_by: "admin-row-123",
+          }],
+        }) as jest.Mock;
+
+      const payload = {
+        title: "Visita de adocao",
+        starts_at: "2026-06-10T14:00:00.000Z",
+        ends_at: "2026-06-10T15:00:00.000Z",
+        status: "scheduled",
+      };
+
+      const response = await request(app)
+        .post("/api/calendar-events")
+        .set("Authorization", "Bearer access-token")
+        .send(payload);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("id", "event-123");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/calendar_events",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"created_by\":\"admin-row-123\""),
+        }),
+      );
+    });
   });
 
   describe("Interest endpoints", () => {

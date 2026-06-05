@@ -90,6 +90,37 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "is_active", label: "Administrador ativo", type: "boolean" },
     ],
   },
+  "service-configs": {
+    id: "service-configs",
+    description: "Configure credenciais de servicos externos como Google e Microsoft.",
+    emptyTitle: "Nenhum servico configurado.",
+    primaryField: "id",
+    secondaryFields: ["service_type", "provider", "is_active"],
+    searchFields: ["id", "service_type", "provider"],
+    createDefaults: { id: "", service_type: "calendar", provider: "google", config: [], is_active: true },
+    fields: [
+      { name: "id", label: "Identificador unico", type: "text", createOnly: true, required: true, helper: "Ex.: google_calendar_main" },
+      {
+        name: "service_type",
+        label: "Tipo de servico",
+        type: "select",
+        required: true,
+        options: [{ label: "Calendario", value: "calendar" }],
+      },
+      {
+        name: "provider",
+        label: "Provedor",
+        type: "select",
+        required: true,
+        options: [
+          { label: "Google", value: "google" },
+          { label: "Microsoft", value: "microsoft" },
+        ],
+      },
+      { name: "config", label: "Configuracoes (JSON)", type: "keyValue", helper: "Credenciais e IDs necessarios para integracao." },
+      { name: "is_active", label: "Ativo", type: "boolean" },
+    ],
+  },
   tutors: {
     id: "tutors",
     description: "Perfis de tutores cadastrados e dados usados no matching.",
@@ -182,6 +213,62 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "animal_name", label: "Animal", type: "text" },
       { name: "animal_species", label: "Especie", type: "text" },
       { name: "data_registro", label: "Data do registro", type: "text" },
+    ],
+  },
+  "calendar-events": {
+    id: "calendar-events",
+    description: "Agenda administrativa de visitas, conversas e retornos de adocao.",
+    emptyTitle: "Nenhum evento cadastrado.",
+    primaryField: "title",
+    secondaryFields: ["starts_at", "status", "animal_name"],
+    searchFields: ["title", "description", "location", "tutor_name", "animal_name", "status"],
+    createDefaults: {
+      tutor_id: "",
+      animal_id: "",
+      interest_id: "",
+      title: "",
+      description: "",
+      location: "",
+      starts_at: "",
+      ends_at: "",
+      status: "scheduled",
+      provider: "",
+      external_event_id: "",
+      external_event_url: "",
+      metadata: [],
+    },
+    fields: [
+      { name: "title", label: "Titulo", type: "text", required: true },
+      { name: "starts_at", label: "Inicio", type: "text", required: true, placeholder: "2026-06-10T14:00:00-03:00" },
+      { name: "ends_at", label: "Fim", type: "text", required: true, placeholder: "2026-06-10T15:00:00-03:00" },
+      {
+        name: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { label: "Agendado", value: "scheduled" },
+          { label: "Concluido", value: "completed" },
+          { label: "Cancelado", value: "cancelled" },
+        ],
+      },
+      { name: "tutor_id", label: "ID do tutor", type: "text" },
+      { name: "animal_id", label: "ID do animal", type: "text" },
+      { name: "interest_id", label: "ID do interesse", type: "text" },
+      { name: "location", label: "Local", type: "text" },
+      { name: "description", label: "Descricao", type: "textarea" },
+      {
+        name: "provider",
+        label: "Calendario externo",
+        type: "select",
+        options: [
+          { label: "Nenhum", value: "" },
+          { label: "Google", value: "google" },
+          { label: "Microsoft", value: "microsoft" },
+        ],
+      },
+      { name: "external_event_id", label: "ID externo", type: "text" },
+      { name: "external_event_url", label: "URL externa", type: "text" },
+      { name: "metadata", label: "Metadados", type: "keyValue" },
     ],
   },
   "animal-photos": {
@@ -345,22 +432,28 @@ const adminDataProvider = {
   },
 };
 
-function toRaRecord(record: Record<string, unknown>): AdminRecord {
-  return { ...record, id: String(record.id) };
-}
-
-export function AdminPanel() {
+export function AdminPanel({ showCalendarConfig = false }: { showCalendarConfig?: boolean }) {
   return (
     <AdminContext dataProvider={adminDataProvider as DataProvider}>
-      <AdminWorkspace />
+      <AdminWorkspace showCalendarConfig={showCalendarConfig} />
     </AdminContext>
   );
 }
 
-function AdminWorkspace() {
+function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean }) {
   const router = useRouter();
   const dataProvider = useDataProvider();
   const [activeResource, setActiveResource] = useState<AdminResource>("admin-users");
+
+  const visibleResources = useMemo(() => {
+    return visibleAdminResources.filter(r => {
+      if (r.id === "calendar-events" || r.id === "service-configs") {
+        return showCalendarConfig;
+      }
+      return true;
+    });
+  }, [showCalendarConfig]);
+// ...
   const [rows, setRows] = useState<AdminRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("edit");
@@ -527,12 +620,15 @@ function AdminWorkspace() {
             <p className="text-xs font-semibold uppercase text-cyan-200">Administracao</p>
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
-          <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
+          <div className="flex flex-wrap gap-3">
+            <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
+            <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
+          </div>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
           <aside className="space-y-3">
-            {visibleAdminResources.map((resource) => (
+            {visibleResources.map((resource) => (
               <button
                 aria-current={resource.id === activeResource ? "page" : undefined}
                 className={`block w-full rounded-md border px-4 py-3 text-left transition disabled:cursor-wait disabled:opacity-65 ${resource.id === activeResource ? "border-cyan-200 bg-cyan-200 text-slate-950" : "border-white/10 bg-white/[0.035] text-slate-200 hover:bg-white/[0.07]"}`}

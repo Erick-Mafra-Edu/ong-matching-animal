@@ -61,6 +61,13 @@ const adminTables = {
     updateFields: [],
     idField: "uuid_registro",
   },
+  "calendar-events": {
+    table: "calendar_events",
+    select: "id,tutor_id,animal_id,interest_id,title,description,location,starts_at,ends_at,status,provider,external_event_id,external_event_url,metadata,created_by,created_at,updated_at,tutor:tutors(id,name),animal:animals(id,name,species)",
+    order: "starts_at.asc",
+    createFields: ["tutor_id", "animal_id", "interest_id", "title", "description", "location", "starts_at", "ends_at", "status", "provider", "external_event_id", "external_event_url", "metadata", "created_by"],
+    updateFields: ["tutor_id", "animal_id", "interest_id", "title", "description", "location", "starts_at", "ends_at", "status", "provider", "external_event_id", "external_event_url", "metadata", "updated_at"],
+  },
   "custom-fields": {
     table: "custom_fields",
     select: "id,entity_type,field_key,label,field_type,options,is_active,sort_order,created_at,updated_at",
@@ -81,6 +88,13 @@ const adminTables = {
     order: "created_at.desc",
     createFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_active"],
     updateFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_active"],
+  },
+  "service-configs": {
+    table: "service_configs",
+    select: "id,service_type,provider,config,is_active,updated_at",
+    order: "service_type.asc,provider.asc",
+    createFields: ["id", "service_type", "provider", "config", "is_active"],
+    updateFields: ["config", "is_active"],
   },
 } as const;
 
@@ -354,6 +368,87 @@ function normalizeInterestSummary(rawInterest: any) {
   };
 }
 
+function normalizeCalendarEvent(rawEvent: any) {
+  const tutor = rawEvent.tutor && typeof rawEvent.tutor === "object" ? rawEvent.tutor : {};
+  const animal = rawEvent.animal && typeof rawEvent.animal === "object" ? rawEvent.animal : {};
+
+  return {
+    id: rawEvent.id,
+    tutor_id: rawEvent.tutor_id,
+    animal_id: rawEvent.animal_id,
+    interest_id: rawEvent.interest_id,
+    title: rawEvent.title,
+    description: rawEvent.description,
+    location: rawEvent.location,
+    starts_at: rawEvent.starts_at,
+    ends_at: rawEvent.ends_at,
+    status: rawEvent.status,
+    provider: rawEvent.provider,
+    external_event_id: rawEvent.external_event_id,
+    external_event_url: rawEvent.external_event_url,
+    metadata: rawEvent.metadata && typeof rawEvent.metadata === "object" ? rawEvent.metadata : {},
+    created_by: rawEvent.created_by,
+    created_at: rawEvent.created_at,
+    updated_at: rawEvent.updated_at,
+    tutor_name: tutor.name ?? "",
+    animal_name: animal.name ?? "",
+    animal_species: animal.species ?? "",
+  };
+}
+
+function buildCalendarEventPayload(source: Record<string, unknown>, adminId?: string, isUpdate = false) {
+  const payload = pickFields(source, [
+    "tutor_id",
+    "animal_id",
+    "interest_id",
+    "title",
+    "description",
+    "location",
+    "starts_at",
+    "ends_at",
+    "status",
+    "provider",
+    "external_event_id",
+    "external_event_url",
+    "metadata",
+  ]);
+
+  if (!isUpdate) payload.created_by = adminId;
+  if (isUpdate) payload.updated_at = new Date().toISOString();
+
+  for (const field of ["tutor_id", "animal_id", "interest_id", "description", "location", "provider", "external_event_id", "external_event_url"]) {
+    if (payload[field] === "") payload[field] = null;
+  }
+
+  if (!payload.status) payload.status = "scheduled";
+  if (!payload.metadata || typeof payload.metadata !== "object" || Array.isArray(payload.metadata)) payload.metadata = {};
+
+  return payload;
+}
+
+function validateCalendarEventPayload(payload: Record<string, unknown>, isUpdate = false) {
+  if (!isUpdate && !payload.title) return "Informe o titulo do evento.";
+  if (!isUpdate && !payload.starts_at) return "Informe a data de inicio do evento.";
+  if (!isUpdate && !payload.ends_at) return "Informe a data de fim do evento.";
+
+  const startsAt = payload.starts_at ? new Date(String(payload.starts_at)) : null;
+  const endsAt = payload.ends_at ? new Date(String(payload.ends_at)) : null;
+
+  if (startsAt && Number.isNaN(startsAt.getTime())) return "Data de inicio invalida.";
+  if (endsAt && Number.isNaN(endsAt.getTime())) return "Data de fim invalida.";
+  if (startsAt && endsAt && endsAt <= startsAt) return "A data de fim deve ser posterior ao inicio.";
+
+  if (payload.status && !["scheduled", "completed", "cancelled"].includes(String(payload.status))) {
+    return "Status de evento invalido.";
+  }
+
+  if (payload.provider && !["google", "microsoft"].includes(String(payload.provider))) {
+    return "Provider de calendario invalido.";
+  }
+
+  return null;
+}
+
 app.get("/api/admin/me", async (req: Request, res: Response) => {
   try {
     const context = await requireAdmin(req, res);
@@ -379,7 +474,21 @@ app.get("/api/admin/:resource", async (req: Request, res: Response) => {
     const context = await requireAdmin(req, res);
     if (!context) return;
 
-    const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?select=${config.select}&order=${config.order}`, {
+    let url = `${context.supabaseUrl}/rest/v1/${config.table}?select=${config.select}&order=${config.order}`;
+    const q = req.query.q as string;
+    if (q) {
+      if (req.params.resource === "tutors" || req.params.resource === "animals") {
+        url += `&name=ilike.*${encodeURIComponent(q)}*`;
+      } else if (req.params.resource === "admin-users") {
+        url += `&email=ilike.*${encodeURIComponent(q)}*`;
+      } else if (req.params.resource === "calendar-events") {
+        url += `&title=ilike.*${encodeURIComponent(q)}*`;
+      } else if (req.params.resource === "tutor-interessados") {
+        url += `&or=(tutor.name.ilike.*${encodeURIComponent(q)}*,animal.name.ilike.*${encodeURIComponent(q)}*)`;
+      }
+    }
+
+    const response = await fetch(url, {
       headers: {
         apikey: context.serviceRoleKey,
         authorization: `Bearer ${context.serviceRoleKey}`,
@@ -399,6 +508,11 @@ app.get("/api/admin/:resource", async (req: Request, res: Response) => {
 
     if (Array.isArray(body) && req.params.resource === "tutor-interessados") {
       res.json(body.map(normalizeInterestSummary));
+      return;
+    }
+
+    if (Array.isArray(body) && req.params.resource === "calendar-events") {
+      res.json(body.map(normalizeCalendarEvent));
       return;
     }
 
@@ -497,7 +611,16 @@ app.post("/api/admin/:resource", async (req: Request, res: Response) => {
     const context = await requireAdmin(req, res);
     if (!context) return;
 
-    const payload = pickFields(req.body ?? {}, config.createFields);
+    const payload = req.params.resource === "calendar-events"
+      ? buildCalendarEventPayload(req.body ?? {}, context.admin.id)
+      : pickFields(req.body ?? {}, config.createFields);
+    if (req.params.resource === "calendar-events") {
+      const validationMessage = validateCalendarEventPayload(payload);
+      if (validationMessage) {
+        res.status(400).json({ message: validationMessage });
+        return;
+      }
+    }
     const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}`, {
       method: "POST",
       headers: {
@@ -535,7 +658,16 @@ app.put("/api/admin/:resource/:id", async (req: Request, res: Response) => {
     const context = await requireAdmin(req, res);
     if (!context) return;
 
-    const payload = pickFields(req.body ?? {}, config.updateFields);
+    const payload = req.params.resource === "calendar-events"
+      ? buildCalendarEventPayload(req.body ?? {}, context.admin.id, true)
+      : pickFields(req.body ?? {}, config.updateFields);
+    if (req.params.resource === "calendar-events") {
+      const validationMessage = validateCalendarEventPayload(payload, true);
+      if (validationMessage) {
+        res.status(400).json({ message: validationMessage });
+        return;
+      }
+    }
     if (req.params.resource === "admin-users") payload.updated_at = new Date().toISOString();
 
     const idField = "idField" in config ? config.idField : "id";
@@ -596,6 +728,234 @@ app.delete("/api/admin/:resource/:id", async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({
       message: "Nao foi possivel conectar ao Supabase",
+      details: error instanceof Error ? error.message : "Erro desconhecido",
+    });
+  }
+});
+
+app.get("/api/calendar-events", async (req: Request, res: Response) => {
+  try {
+    const context = await requireAdmin(req, res);
+    if (!context) return;
+
+    const query = new URLSearchParams({
+      select: "id,tutor_id,animal_id,interest_id,title,description,location,starts_at,ends_at,status,provider,external_event_id,external_event_url,metadata,created_by,created_at,updated_at,tutor:tutors(id,name),animal:animals(id,name,species)",
+      order: "starts_at.asc",
+    });
+
+    if (typeof req.query.from === "string" && req.query.from) query.set("starts_at", `gte.${req.query.from}`);
+    if (typeof req.query.to === "string" && req.query.to) query.set("ends_at", `lte.${req.query.to}`);
+
+    const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?${query.toString()}`, {
+      headers: {
+        apikey: context.serviceRoleKey,
+        authorization: `Bearer ${context.serviceRoleKey}`,
+      },
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      res.status(response.status).json({ message: "Nao foi possivel listar os eventos do calendario.", details: body });
+      return;
+    }
+
+    res.json(Array.isArray(body) ? body.map(normalizeCalendarEvent) : []);
+  } catch (error) {
+    res.status(500).json({
+      message: "Nao foi possivel carregar o calendario.",
+      details: error instanceof Error ? error.message : "Erro desconhecido",
+    });
+  }
+});
+
+import { createCalendarAdapterFromDB } from "./lib/calendar";
+
+// ... (existing imports)
+
+function normalizeCalendarEvent(event: any) {
+  return {
+    ...event,
+    tutor_name: event.tutor?.name,
+    animal_name: event.animal?.name,
+    animal_species: event.animal?.species,
+  };
+}
+
+// ... (existing functions)
+
+app.post("/api/calendar-events", async (req: Request, res: Response) => {
+  try {
+    const context = await requireAdmin(req, res);
+    if (!context) return;
+
+    const payload = buildCalendarEventPayload(req.body ?? {}, context.admin.id);
+    const validationMessage = validateCalendarEventPayload(payload);
+    if (validationMessage) {
+      res.status(400).json({ message: validationMessage });
+      return;
+    }
+
+    // Sync with external provider if configured
+    let externalEventId = null;
+    let externalEventUrl = null;
+    let provider = null;
+
+    const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
+    if (adapter) {
+      try {
+        const externalEvent = await adapter.createEvent({
+          title: payload.title,
+          description: payload.description || undefined,
+          location: payload.location || undefined,
+          startsAt: { dateTime: payload.starts_at, timeZone: "America/Sao_Paulo" },
+          endsAt: { dateTime: payload.ends_at, timeZone: "America/Sao_Paulo" },
+        });
+        externalEventId = externalEvent.id;
+        externalEventUrl = externalEvent.url || undefined;
+        provider = (adapter as any).provider || "google";
+      } catch (syncError) {
+        console.error("Erro ao sincronizar com calendario externo:", syncError);
+      }
+    }
+
+    const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events`, {
+      method: "POST",
+      headers: {
+        apikey: context.serviceRoleKey,
+        authorization: `Bearer ${context.serviceRoleKey}`,
+        "content-type": "application/json",
+        prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        ...payload,
+        external_event_id: externalEventId,
+        external_event_url: externalEventUrl,
+        provider,
+      }),
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      res.status(response.status).json({ message: "Nao foi possivel criar o evento do calendario.", details: body });
+      return;
+    }
+
+    res.status(201).json(normalizeCalendarEvent(Array.isArray(body) ? body[0] : body));
+  } catch (error) {
+    res.status(500).json({
+      message: "Nao foi possivel criar o evento do calendario.",
+      details: error instanceof Error ? error.message : "Erro desconhecido",
+    });
+  }
+});
+
+app.put("/api/calendar-events/:id", async (req: Request, res: Response) => {
+  try {
+    const context = await requireAdmin(req, res);
+    if (!context) return;
+
+    const { id } = req.params;
+    const payload = buildCalendarEventPayload(req.body ?? {}, context.admin.id, true);
+    const validationMessage = validateCalendarEventPayload(payload, true);
+    if (validationMessage) {
+      res.status(400).json({ message: validationMessage });
+      return;
+    }
+
+    // Fetch existing event to get external_event_id
+    const existingResponse = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}&select=*`, {
+      headers: { apikey: context.serviceRoleKey, authorization: `Bearer ${context.serviceRoleKey}` },
+    });
+    const existingBody = await existingResponse.json();
+    const existingEvent = Array.isArray(existingBody) ? existingBody[0] : null;
+
+    if (existingEvent?.external_event_id) {
+      const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
+      if (adapter) {
+        try {
+          await adapter.updateEvent(existingEvent.external_event_id, {
+            title: payload.title || existingEvent.title,
+            description: payload.description || existingEvent.description || undefined,
+            location: payload.location || existingEvent.location || undefined,
+            startsAt: { dateTime: payload.starts_at || existingEvent.starts_at, timeZone: "America/Sao_Paulo" },
+            endsAt: { dateTime: payload.ends_at || existingEvent.ends_at, timeZone: "America/Sao_Paulo" },
+          });
+        } catch (syncError) {
+          console.error("Erro ao atualizar calendario externo:", syncError);
+        }
+      }
+    }
+
+    const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: context.serviceRoleKey,
+        authorization: `Bearer ${context.serviceRoleKey}`,
+        "content-type": "application/json",
+        prefer: "return=representation",
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      res.status(response.status).json({ message: "Nao foi possivel atualizar o evento do calendario.", details: body });
+      return;
+    }
+
+    res.json(normalizeCalendarEvent(Array.isArray(body) ? body[0] : body));
+  } catch (error) {
+    res.status(500).json({
+      message: "Nao foi possivel atualizar o evento do calendario.",
+      details: error instanceof Error ? error.message : "Erro desconhecido",
+    });
+  }
+});
+
+app.delete("/api/calendar-events/:id", async (req: Request, res: Response) => {
+  try {
+    const context = await requireAdmin(req, res);
+    if (!context) return;
+
+    const { id } = req.params;
+
+    // Fetch existing event to get external_event_id
+    const existingResponse = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}&select=external_event_id`, {
+      headers: { apikey: context.serviceRoleKey, authorization: `Bearer ${context.serviceRoleKey}` },
+    });
+    const existingBody = await existingResponse.json();
+    const existingEvent = Array.isArray(existingBody) ? existingBody[0] : null;
+
+    if (existingEvent?.external_event_id) {
+      const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
+      if (adapter) {
+        try {
+          await adapter.deleteEvent(existingEvent.external_event_id);
+        } catch (syncError) {
+          console.error("Erro ao remover do calendario externo:", syncError);
+        }
+      }
+    }
+
+    const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        apikey: context.serviceRoleKey,
+        authorization: `Bearer ${context.serviceRoleKey}`,
+        prefer: "return=representation",
+      },
+    });
+    const body = await readJsonResponse(response);
+
+    if (!response.ok) {
+      res.status(response.status).json({ message: "Nao foi possivel remover o evento do calendario.", details: body });
+      return;
+    }
+
+    res.status(200).json({ deleted: true, rows: body });
+  } catch (error) {
+    res.status(500).json({
+      message: "Nao foi possivel remover o evento do calendario.",
       details: error instanceof Error ? error.message : "Erro desconhecido",
     });
   }

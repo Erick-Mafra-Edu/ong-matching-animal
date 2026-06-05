@@ -104,6 +104,41 @@ CREATE INDEX tutor_interessados_tutor_id_idx
 CREATE INDEX tutor_interessados_animal_id_idx
   ON tutor_interessados (animal_id);
 
+-- Calendar events for adoption follow-ups and meetings
+CREATE TABLE calendar_events (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tutor_id UUID REFERENCES tutors(id) ON DELETE SET NULL,
+  animal_id UUID REFERENCES animals(id) ON DELETE SET NULL,
+  interest_id UUID REFERENCES tutor_interessados(uuid_registro) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  location TEXT,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
+  provider TEXT CHECK (provider IN ('google', 'microsoft')),
+  external_event_id TEXT,
+  external_event_url TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CHECK (ends_at > starts_at)
+);
+
+CREATE INDEX calendar_events_starts_at_idx
+  ON calendar_events (starts_at);
+
+CREATE INDEX calendar_events_tutor_id_idx
+  ON calendar_events (tutor_id);
+
+CREATE INDEX calendar_events_animal_id_idx
+  ON calendar_events (animal_id);
+
+CREATE UNIQUE INDEX calendar_events_provider_external_idx
+  ON calendar_events (provider, external_event_id)
+  WHERE provider IS NOT NULL AND external_event_id IS NOT NULL;
+
 -- Custom fields catalog used by admin forms and matching rules
 CREATE TABLE custom_fields (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -175,6 +210,7 @@ ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tutor_interessados ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matching_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE onboarding_questions ENABLE ROW LEVEL SECURITY;
@@ -276,6 +312,12 @@ CREATE POLICY "Tutors can create their own interest records"
         AND tutors.auth_user_id = auth.uid()
     )
   );
+
+CREATE POLICY "Admins can manage calendar events"
+  ON calendar_events FOR ALL
+  TO authenticated
+  USING (is_admin())
+  WITH CHECK (is_admin());
 
 CREATE POLICY "Authenticated users can read active custom fields"
   ON custom_fields FOR SELECT

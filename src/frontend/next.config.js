@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
 require('dotenv').config({ path: '../../.env.local' });
 // Carrega as variáveis da raiz do monorepo
 
@@ -82,6 +83,10 @@ const nextConfig = {
       };
     }
 
+  },
+  webpack(config) {
+    config.resolve.alias['@vercel/flags-definitions'] = path.resolve(__dirname, 'lib/flags-definitions.ts');
+    return config;
   },
 };
 
