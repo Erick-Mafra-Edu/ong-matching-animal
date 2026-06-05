@@ -260,6 +260,173 @@ describe("API Endpoints", () => {
         }),
       );
     });
+
+    it("should list tutor interest records with tutor and animal labels for admins", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "interest-uuid-123",
+            uuid_registro: "interest-uuid-123",
+            tutor_id: "tutor-123",
+            animal_id: "animal-123",
+            data_registro: "2026-06-05T12:00:00.000Z",
+            tutor: { id: "tutor-123", name: "Tutor Admin" },
+            animal: { id: "animal-123", name: "Yolo", species: "Cachorro" },
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/admin/tutor-interessados")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toMatchObject({
+        id: "interest-uuid-123",
+        uuid_registro: "interest-uuid-123",
+        tutor_name: "Tutor Admin",
+        animal_name: "Yolo",
+        detail_url: "/interessados/interest-uuid-123",
+      });
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/rest/v1/tutor_interessados"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Interest endpoints", () => {
+    it("should create an interest record for an authenticated tutor", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", auth_user_id: "user-123", name: "Tutor Teste" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            uuid_registro: "interest-uuid-123",
+            tutor_id: "tutor-123",
+            animal_id: "animal-123",
+            data_registro: "2026-06-05T12:00:00.000Z",
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/interessados")
+        .set("Authorization", "Bearer access-token")
+        .send({ animal_id: "animal-123" });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("uuid_registro", "interest-uuid-123");
+      expect(response.body).toHaveProperty("detail_url", "/interessados/interest-uuid-123");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/tutor_interessados",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ tutor_id: "tutor-123", animal_id: "animal-123" }),
+        }),
+      );
+    });
+
+    it("should require admin access to view an interest detail", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/interessados/interest-uuid-123")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain("administrativo");
+    });
+
+    it("should return tutor and animal data for admin interest detail", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            uuid_registro: "interest-uuid-123",
+            tutor_id: "tutor-123",
+            animal_id: "animal-123",
+            data_registro: "2026-06-05T12:00:00.000Z",
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "tutor-123",
+            auth_user_id: "user-123",
+            name: "Tutor Teste",
+            custom_fields: { tamanho_casa: "apartamento" },
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "animal-123",
+            owner_id: "owner-123",
+            name: "Yolo",
+            species: "Cachorro",
+            custom_fields: { nivel_energia: "baixo" },
+            animal_photos: [{ id: "photo-123", public_url: "https://example.com/pet.webp", is_primary: true }],
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/interessados/interest-uuid-123")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        uuid_registro: "interest-uuid-123",
+        tutor: { id: "tutor-123", name: "Tutor Teste" },
+        animal: { id: "animal-123", name: "Yolo", species: "Cachorro" },
+      });
+      expect(response.body.animal.photoUrl).toBe("https://example.com/pet.webp");
+    });
   });
 
   describe("GET /api/tutors/:id", () => {

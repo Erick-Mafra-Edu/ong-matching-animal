@@ -55,7 +55,7 @@ const adminTables = {
   },
   "tutor-interessados": {
     table: "tutor_interessados",
-    select: "id:uuid_registro,uuid_registro,tutor_id,animal_id,data_registro",
+    select: "id:uuid_registro,uuid_registro,tutor_id,animal_id,data_registro,tutor:tutors(id,name,auth_user_id),animal:animals(id,name,species)",
     order: "data_registro.desc",
     createFields: ["tutor_id", "animal_id"],
     updateFields: [],
@@ -337,6 +337,23 @@ function normalizeTutor(rawTutor: any) {
   };
 }
 
+function normalizeInterestSummary(rawInterest: any) {
+  const tutor = rawInterest.tutor && typeof rawInterest.tutor === "object" ? rawInterest.tutor : {};
+  const animal = rawInterest.animal && typeof rawInterest.animal === "object" ? rawInterest.animal : {};
+
+  return {
+    id: rawInterest.id ?? rawInterest.uuid_registro,
+    uuid_registro: rawInterest.uuid_registro,
+    tutor_id: rawInterest.tutor_id,
+    animal_id: rawInterest.animal_id,
+    data_registro: rawInterest.data_registro,
+    tutor_name: tutor.name ?? "",
+    animal_name: animal.name ?? "",
+    animal_species: animal.species ?? "",
+    detail_url: rawInterest.uuid_registro ? `/interessados/${rawInterest.uuid_registro}` : "",
+  };
+}
+
 app.get("/api/admin/me", async (req: Request, res: Response) => {
   try {
     const context = await requireAdmin(req, res);
@@ -375,7 +392,17 @@ app.get("/api/admin/:resource", async (req: Request, res: Response) => {
       return;
     }
 
-    res.json(Array.isArray(body) && req.params.resource === "animals" ? body.map(normalizeAnimal) : body);
+    if (Array.isArray(body) && req.params.resource === "animals") {
+      res.json(body.map(normalizeAnimal));
+      return;
+    }
+
+    if (Array.isArray(body) && req.params.resource === "tutor-interessados") {
+      res.json(body.map(normalizeInterestSummary));
+      return;
+    }
+
+    res.json(body);
   } catch (error) {
     res.status(500).json({
       message: "Nao foi possivel conectar ao Supabase",
