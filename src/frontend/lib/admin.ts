@@ -6,6 +6,8 @@ export type AdminResource =
   | "tutors"
   | "animals"
   | "animal-photos"
+  | "tutor-interessados"
+  | "custom-fields"
   | "onboarding-questions"
   | "matching-rules";
 
@@ -49,6 +51,27 @@ export const adminResources: AdminResourceConfig[] = [
       content_type: "image/webp",
       size_bytes: 1,
       is_primary: false,
+    },
+  },
+  {
+    id: "tutor-interessados",
+    label: "Interessados",
+    createTemplate: {
+      tutor_id: "",
+      animal_id: "",
+    },
+  },
+  {
+    id: "custom-fields",
+    label: "Campos customizados",
+    createTemplate: {
+      entity_type: "tutor",
+      field_key: "",
+      label: "",
+      field_type: "text",
+      options: null,
+      is_active: true,
+      sort_order: 0,
     },
   },
   {

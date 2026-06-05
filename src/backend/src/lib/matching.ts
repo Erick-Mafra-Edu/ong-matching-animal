@@ -16,6 +16,7 @@ export class MatchingAlgorithm {
    */
   private comparators: Record<string, ComparatorFunction> = {
     "=": (tutor: unknown, animal: unknown) => tutor === animal,
+    "!=": (tutor: unknown, animal: unknown) => tutor !== animal,
     ">=": (tutor: unknown, animal: unknown) => {
       const tutorNum = this.stringToNumber(tutor as string);
       const animalNum = this.stringToNumber(animal as string);

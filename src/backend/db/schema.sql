@@ -90,6 +90,52 @@ CREATE UNIQUE INDEX animal_photos_one_primary_per_animal_idx
   ON animal_photos (animal_id)
   WHERE is_primary;
 
+-- Tutor interest records created when a logged tutor chooses to adopt an animal
+CREATE TABLE tutor_interessados (
+  tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,
+  animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+  data_registro TIMESTAMPTZ DEFAULT NOW(),
+  uuid_registro UUID DEFAULT uuid_generate_v4() PRIMARY KEY
+);
+
+CREATE INDEX tutor_interessados_tutor_id_idx
+  ON tutor_interessados (tutor_id);
+
+CREATE INDEX tutor_interessados_animal_id_idx
+  ON tutor_interessados (animal_id);
+
+-- Custom fields catalog used by admin forms and matching rules
+CREATE TABLE custom_fields (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('tutor', 'animal')),
+  field_key TEXT NOT NULL CHECK (field_key ~ '^[a-z][a-z0-9_]*$'),
+  label TEXT NOT NULL,
+  field_type TEXT NOT NULL DEFAULT 'text' CHECK (field_type IN ('text', 'number', 'boolean', 'select', 'multiselect')),
+  options JSONB,
+  is_active BOOLEAN DEFAULT true,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (entity_type, field_key)
+);
+
+CREATE INDEX custom_fields_entity_active_sort_idx
+  ON custom_fields (entity_type, is_active, sort_order, label);
+
+INSERT INTO custom_fields (entity_type, field_key, label, field_type, options, is_active, sort_order) VALUES
+  ('tutor', 'pref_energia', 'Energia desejada', 'select', '["baixo","medio","alto"]'::jsonb, true, 10),
+  ('tutor', 'tem_criancas', 'Tem crianças', 'boolean', NULL, true, 20),
+  ('tutor', 'tamanho_casa', 'Tamanho da casa', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande","pequeno","medio","grande"]'::jsonb, true, 30),
+  ('tutor', 'tem_quintal', 'Tem quintal', 'boolean', NULL, true, 40),
+  ('tutor', 'renda_mensal', 'Renda mensal', 'select', '["ate_1000","1000_3000","3000_6000","6000_acima"]'::jsonb, true, 50),
+  ('tutor', 'disponibilidade_tempo', 'Disponibilidade de tempo', 'select', '["meio_periodo","integral"]'::jsonb, true, 60),
+  ('animal', 'nivel_energia', 'Nível de energia', 'select', '["baixo","medio","alto"]'::jsonb, true, 10),
+  ('animal', 'aceita_criancas', 'Aceita crianças', 'boolean', NULL, true, 20),
+  ('animal', 'espaco_necessario', 'Espaço necessário', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande"]'::jsonb, true, 30),
+  ('animal', 'tamanho', 'Tamanho', 'select', '["pequeno","medio","grande"]'::jsonb, true, 40),
+  ('animal', 'requer_espaco', 'Espaço necessário', 'select', '["apartamento","casa_pequena","casa_grande"]'::jsonb, true, 50),
+  ('animal', 'vacinado', 'Vacinado', 'boolean', NULL, true, 60);
+
 -- Matching rules
 CREATE TABLE matching_rules (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -128,6 +174,8 @@ ALTER TABLE tutors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tutor_interessados ENABLE ROW LEVEL SECURITY;
+ALTER TABLE custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matching_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE onboarding_questions ENABLE ROW LEVEL SECURITY;
 
@@ -211,6 +259,34 @@ CREATE POLICY "Admins can delete animal photos"
   ON animal_photos FOR DELETE
   TO authenticated
   USING (is_admin());
+
+CREATE POLICY "Admins can read interest records"
+  ON tutor_interessados FOR SELECT
+  TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "Tutors can create their own interest records"
+  ON tutor_interessados FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM tutors
+      WHERE tutors.id = tutor_interessados.tutor_id
+        AND tutors.auth_user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Authenticated users can read active custom fields"
+  ON custom_fields FOR SELECT
+  TO authenticated
+  USING (is_active = true OR is_admin());
+
+CREATE POLICY "Admins can manage custom fields"
+  ON custom_fields FOR ALL
+  TO authenticated
+  USING (is_admin())
+  WITH CHECK (is_admin());
 
 CREATE POLICY "Authenticated users can read active matching rules"
   ON matching_rules FOR SELECT

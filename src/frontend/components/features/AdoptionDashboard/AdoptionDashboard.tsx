@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
+import { registrarInteresse } from "@/lib/interessados";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
@@ -44,6 +45,8 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   const [pets, setPets] = useState<AnimalListItem[]>([]);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
   const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
+  const [actionMessage, setActionMessage] = useState("");
+  const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
 
   useEffect(() => {
     if (status !== "ready") {
@@ -88,6 +91,23 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     setCardAction({ direction, id: Date.now() });
   }
 
+  async function handleAdopt() {
+    if (!featuredPet || isRegisteringInterest) return;
+
+    setIsRegisteringInterest(true);
+    setActionMessage("Registrando interesse...");
+
+    try {
+      await registrarInteresse(featuredPet.id);
+      setActionMessage("Interesse registrado para analise da ONG.");
+      requestCardAction("right");
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+    } finally {
+      setIsRegisteringInterest(false);
+    }
+  }
+
   function handleActionComplete(_direction: SwipeDirection) {
     const [current, ...remaining] = pets;
     if (current) {
@@ -111,7 +131,8 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
   const actions = (
     <MatchActions
-      onAdopt={() => requestCardAction("right")}
+      disabled={isRegisteringInterest}
+      onAdopt={handleAdopt}
       onReject={() => requestCardAction("left")}
       onUndo={history.length > 0 ? handleUndo : undefined}
     />
@@ -139,6 +160,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           <div className="md:hidden">
             <div className="animate-actions-enter bg-black px-5 py-3">
               {actions}
+              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}
             </div>
             <MobileNavigation items={navigationItems} />
           </div>
@@ -147,6 +169,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           <ProfileSummary pet={featuredPet} />
           <div className="animate-actions-enter">
             {actions}
+            {actionMessage && <p className="mt-4 text-sm text-cyan-100">{actionMessage}</p>}
           </div>
         </section>
       </div>
