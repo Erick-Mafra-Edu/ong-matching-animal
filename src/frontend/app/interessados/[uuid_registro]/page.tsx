@@ -43,9 +43,11 @@ export default function InteresseDetalhePage() {
 
   const tutor = useMemo(() => asObject(record?.tutor), [record]);
   const animal = useMemo(() => asObject(record?.animal), [record]);
-  const animalCustomFields = asObject(animal.custom_fields);
-  const tutorCustomFields = asObject(tutor.custom_fields);
+  const animalMatchingFields = getMatchingFields(asObject(animal.custom_fields));
+  const tutorMatchingFields = getMatchingFields(asObject(tutor.custom_fields));
   const photoUrl = Array.isArray(animal.photoUrls) ? String(animal.photoUrls[0] ?? "") : String(animal.photoUrl ?? "");
+  const tutorName = String(tutor.name ?? "Tutor");
+  const animalName = String(animal.name ?? "Animal");
 
   if (status === "loading") {
     return (
@@ -73,7 +75,7 @@ export default function InteresseDetalhePage() {
         <header className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase text-cyan-200">Registro de interesse</p>
-            <h1 className="text-2xl font-semibold text-white">{String(record?.uuid_registro ?? uuidRegistro)}</h1>
+            <h1 className="text-2xl font-semibold text-white">{tutorName} quer adotar {animalName}</h1>
             <p className="mt-2 text-sm text-slate-400">{formatDate(record?.data_registro)}</p>
           </div>
           <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/admin">Voltar ao painel</Link>
@@ -84,13 +86,11 @@ export default function InteresseDetalhePage() {
             eyebrow="Tutor"
             fields={[
               ["Nome", tutor.name],
-              ["ID", tutor.id],
-              ["Usuario Auth", tutor.auth_user_id],
               ["Cadastro", formatDate(tutor.created_at)],
             ]}
-            title={String(tutor.name ?? "Tutor")}
+            title={tutorName}
           >
-            <CustomFieldGrid fields={tutorCustomFields} />
+            <MatchingInfoGrid fields={tutorMatchingFields} />
           </ComparisonPanel>
 
           <ComparisonPanel
@@ -98,10 +98,9 @@ export default function InteresseDetalhePage() {
             fields={[
               ["Nome", animal.name],
               ["Especie", animal.species],
-              ["ID", animal.id],
               ["Cadastro", formatDate(animal.created_at)],
             ]}
-            title={String(animal.name ?? "Animal")}
+            title={animalName}
           >
             {photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -110,7 +109,7 @@ export default function InteresseDetalhePage() {
             <div className="mb-4 flex flex-wrap gap-2">
               {Array.isArray(animal.traits) && animal.traits.map((trait) => <Badge key={String(trait)}>{String(trait)}</Badge>)}
             </div>
-            <CustomFieldGrid fields={animalCustomFields} />
+            <MatchingInfoGrid fields={animalMatchingFields} />
           </ComparisonPanel>
         </div>
       </div>
@@ -146,14 +145,14 @@ function ComparisonPanel({
   );
 }
 
-function CustomFieldGrid({ fields }: { fields: Record<string, unknown> }) {
+function MatchingInfoGrid({ fields }: { fields: Record<string, unknown> }) {
   const entries = Object.entries(fields);
 
-  if (!entries.length) return <p className="text-sm text-slate-500">Sem campos customizados.</p>;
+  if (!entries.length) return <p className="text-sm text-slate-500">Sem informacoes de matching.</p>;
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-100">Campos customizados</h3>
+      <h3 className="text-sm font-semibold text-slate-100">Informacoes de matching</h3>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         {entries.map(([key, value]) => (
           <div className="rounded-md bg-white/[0.045] p-3" key={key}>
@@ -169,6 +168,17 @@ function CustomFieldGrid({ fields }: { fields: Record<string, unknown> }) {
 function asObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
+}
+
+function getMatchingFields(fields: Record<string, unknown>) {
+  const hiddenKeys = new Set(["onboarding_complete", "verified", "verificado", "traits", "caracteristicas"]);
+
+  return Object.entries(fields).reduce<Record<string, unknown>>((matchingFields, [key, value]) => {
+    if (hiddenKeys.has(key)) return matchingFields;
+    if (value === null || value === undefined || value === "") return matchingFields;
+    matchingFields[key] = value;
+    return matchingFields;
+  }, {});
 }
 
 function formatDate(value: unknown) {
