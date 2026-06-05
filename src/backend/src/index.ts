@@ -8,6 +8,7 @@ import path from "path";
 import swaggerUi from "swagger-ui-express";
 import type { MatchResponse } from "@ong-matching-animal/shared/types";
 import { apiDoc, openApiOperations } from "./openapi";
+import { createCalendarAdapterFromDB } from "./lib/calendar";
 
 config({ path: path.resolve(__dirname, "../../../.env.local") });
 const app = express();
@@ -768,21 +769,6 @@ app.get("/api/calendar-events", async (req: Request, res: Response) => {
   }
 });
 
-import { createCalendarAdapterFromDB } from "./lib/calendar";
-
-// ... (existing imports)
-
-function normalizeCalendarEvent(event: any) {
-  return {
-    ...event,
-    tutor_name: event.tutor?.name,
-    animal_name: event.animal?.name,
-    animal_species: event.animal?.species,
-  };
-}
-
-// ... (existing functions)
-
 app.post("/api/calendar-events", async (req: Request, res: Response) => {
   try {
     const context = await requireAdmin(req, res);
@@ -804,14 +790,14 @@ app.post("/api/calendar-events", async (req: Request, res: Response) => {
     if (adapter) {
       try {
         const externalEvent = await adapter.createEvent({
-          title: payload.title,
-          description: payload.description || undefined,
-          location: payload.location || undefined,
-          startsAt: { dateTime: payload.starts_at, timeZone: "America/Sao_Paulo" },
-          endsAt: { dateTime: payload.ends_at, timeZone: "America/Sao_Paulo" },
+          title: String(payload.title),
+          description: payload.description ? String(payload.description) : undefined,
+          location: payload.location ? String(payload.location) : undefined,
+          start: { dateTime: String(payload.starts_at), timeZone: "America/Sao_Paulo" },
+          end: { dateTime: String(payload.ends_at), timeZone: "America/Sao_Paulo" },
         });
         externalEventId = externalEvent.id;
-        externalEventUrl = externalEvent.url || undefined;
+        externalEventUrl = externalEvent.htmlLink || externalEvent.url || undefined;
         provider = (adapter as any).provider || "google";
       } catch (syncError) {
         console.error("Erro ao sincronizar com calendario externo:", syncError);
@@ -873,12 +859,13 @@ app.put("/api/calendar-events/:id", async (req: Request, res: Response) => {
       const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
       if (adapter) {
         try {
-          await adapter.updateEvent(existingEvent.external_event_id, {
-            title: payload.title || existingEvent.title,
-            description: payload.description || existingEvent.description || undefined,
-            location: payload.location || existingEvent.location || undefined,
-            startsAt: { dateTime: payload.starts_at || existingEvent.starts_at, timeZone: "America/Sao_Paulo" },
-            endsAt: { dateTime: payload.ends_at || existingEvent.ends_at, timeZone: "America/Sao_Paulo" },
+          await adapter.updateEvent({
+            id: String(existingEvent.external_event_id),
+            title: payload.title ? String(payload.title) : String(existingEvent.title),
+            description: payload.description ? String(payload.description) : (existingEvent.description ? String(existingEvent.description) : undefined),
+            location: payload.location ? String(payload.location) : (existingEvent.location ? String(existingEvent.location) : undefined),
+            start: { dateTime: payload.starts_at ? String(payload.starts_at) : String(existingEvent.starts_at), timeZone: "America/Sao_Paulo" },
+            end: { dateTime: payload.ends_at ? String(payload.ends_at) : String(existingEvent.ends_at), timeZone: "America/Sao_Paulo" },
           });
         } catch (syncError) {
           console.error("Erro ao atualizar calendario externo:", syncError);
@@ -930,7 +917,7 @@ app.delete("/api/calendar-events/:id", async (req: Request, res: Response) => {
       const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
       if (adapter) {
         try {
-          await adapter.deleteEvent(existingEvent.external_event_id);
+          await adapter.deleteEvent(String(existingEvent.external_event_id));
         } catch (syncError) {
           console.error("Erro ao remover do calendario externo:", syncError);
         }

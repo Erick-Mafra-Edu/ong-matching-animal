@@ -30,6 +30,7 @@ export interface CalendarEvent {
   description?: string;
   location?: string;
   htmlLink?: string;
+  url?: string;
   start: CalendarDateTime;
   end: CalendarDateTime;
   attendees: CalendarAttendee[];
