@@ -1,9 +1,13 @@
 import express from "express";
 import cors, { CorsOptions } from "cors";
+import { config } from "dotenv";
 import { initialize } from "express-openapi";
+import path from "path";
 import swaggerUi from "swagger-ui-express";
 import { apiDoc, openApiOperations } from "./openapi";
 import { createApiRouter } from "./routes/apiRouter";
+
+config({ path: path.resolve(__dirname, "../../../.env.local") });
 
 function normalizeOrigin(origin?: string) {
   if (!origin) return undefined;
@@ -68,3 +72,7 @@ export function createApp() {
 
   return app;
 }
+
+const app = createApp();
+
+export default app;
