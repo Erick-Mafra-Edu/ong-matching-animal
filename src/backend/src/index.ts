@@ -1,10 +1,4 @@
-import { config } from "dotenv";
-import path from "path";
-import { createApp } from "./app";
-
-config({ path: path.resolve(__dirname, "../../../.env.local") });
-
-const app = createApp();
+import app from "./app";
 
 if (process.env.NODE_ENV !== "production" && require.main === module) {
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
