@@ -139,6 +139,101 @@ function generateMatchingRules() {
   ];
 }
 
+function generateCustomFields() {
+  return [
+    {
+      entity_type: "tutor",
+      field_key: "tamanho_casa",
+      label: "Tamanho da casa",
+      field_type: "select",
+      options: ["pequeno", "medio", "grande"],
+      is_active: true,
+      sort_order: 10,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "tem_quintal",
+      label: "Tem quintal",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 20,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "tem_criancas",
+      label: "Tem criancas",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 30,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "renda_mensal",
+      label: "Renda mensal",
+      field_type: "select",
+      options: ["ate_1000", "1000_3000", "3000_6000", "6000_acima"],
+      is_active: true,
+      sort_order: 40,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "disponibilidade_tempo",
+      label: "Disponibilidade de tempo",
+      field_type: "select",
+      options: ["meio_periodo", "integral"],
+      is_active: true,
+      sort_order: 50,
+    },
+    {
+      entity_type: "animal",
+      field_key: "tamanho",
+      label: "Tamanho",
+      field_type: "select",
+      options: ["pequeno", "medio", "grande"],
+      is_active: true,
+      sort_order: 10,
+    },
+    {
+      entity_type: "animal",
+      field_key: "nivel_energia",
+      label: "Nivel de energia",
+      field_type: "select",
+      options: ["baixo", "medio", "alto"],
+      is_active: true,
+      sort_order: 20,
+    },
+    {
+      entity_type: "animal",
+      field_key: "aceita_criancas",
+      label: "Aceita criancas",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 30,
+    },
+    {
+      entity_type: "animal",
+      field_key: "vacinado",
+      label: "Vacinado",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 40,
+    },
+    {
+      entity_type: "animal",
+      field_key: "requer_espaco",
+      label: "Espaco necessario",
+      field_type: "select",
+      options: ["apartamento", "casa_pequena", "casa_grande"],
+      is_active: true,
+      sort_order: 50,
+    },
+  ];
+}
+
 async function seed() {
   console.log("🌱 Iniciando seed do banco de dados...\n");
 
@@ -146,6 +241,7 @@ async function seed() {
     // 1. Limpar dados existentes
     console.log("🗑️  Limpando dados existentes...");
     await supabase.from("matching_rules").delete().neq("id", "");
+    await supabase.from("custom_fields").delete().neq("id", "");
     await supabase.from("animals").delete().neq("id", "");
     await supabase.from("tutors").delete().neq("id", "");
     console.log("✅ Dados antigos removidos\n");
@@ -178,7 +274,17 @@ async function seed() {
     if (animalError) throw animalError;
     console.log(`✅ ${insertedAnimals.length} animais inseridos\n`);
 
-    // 4. Inserir regras de matching
+    // 4. Inserir campos customizados
+    console.log("📋 Gerando campos customizados...");
+    const { data: insertedCustomFields, error: customFieldError } = await supabase
+      .from("custom_fields")
+      .insert(generateCustomFields())
+      .select();
+
+    if (customFieldError) throw customFieldError;
+    console.log(`✅ ${insertedCustomFields.length} campos customizados inseridos\n`);
+
+    // 5. Inserir regras de matching
     console.log("⚙️  Gerando regras de matching...");
     const rules = generateMatchingRules();
     const { data: insertedRules, error: ruleError } = await supabase
@@ -193,6 +299,7 @@ async function seed() {
     console.log("\n📊 Resumo:");
     console.log(`   - Tutores: ${insertedTutors.length}`);
     console.log(`   - Animais: ${insertedAnimals.length}`);
+    console.log(`   - Campos customizados: ${insertedCustomFields.length}`);
     console.log(`   - Regras: ${insertedRules.length}`);
   } catch (error) {
     console.error("❌ Erro durante o seed:", error.message);

@@ -6,8 +6,12 @@ export type AdminResource =
   | "tutors"
   | "animals"
   | "animal-photos"
+  | "tutor-interessados"
+  | "calendar-events"
+  | "custom-fields"
   | "onboarding-questions"
-  | "matching-rules";
+  | "matching-rules"
+  | "service-configs";
 
 export interface AdminResourceConfig {
   id: AdminResource;
@@ -49,6 +53,57 @@ export const adminResources: AdminResourceConfig[] = [
       content_type: "image/webp",
       size_bytes: 1,
       is_primary: false,
+    },
+  },
+  {
+    id: "tutor-interessados",
+    label: "Interessados",
+    createTemplate: {
+      tutor_id: "",
+      animal_id: "",
+    },
+  },
+  {
+    id: "calendar-events",
+    label: "Calendario",
+    createTemplate: {
+      tutor_id: "",
+      animal_id: "",
+      interest_id: "",
+      title: "",
+      description: "",
+      location: "",
+      starts_at: "",
+      ends_at: "",
+      status: "scheduled",
+      provider: null,
+      external_event_id: "",
+      external_event_url: "",
+      metadata: {},
+    },
+  },
+  {
+    id: "service-configs",
+    label: "Servicos Externos",
+    createTemplate: {
+      id: "",
+      service_type: "calendar",
+      provider: "google",
+      config: {},
+      is_active: true,
+    },
+  },
+  {
+    id: "custom-fields",
+    label: "Campos customizados",
+    createTemplate: {
+      entity_type: "tutor",
+      field_key: "",
+      label: "",
+      field_type: "text",
+      options: null,
+      is_active: true,
+      sort_order: 0,
     },
   },
   {
@@ -110,8 +165,9 @@ export function getAdminMe() {
   return adminFetch<Record<string, unknown>>("/api/admin/me");
 }
 
-export function listAdminResource(resource: AdminResource) {
-  return adminFetch<Record<string, unknown>[]>(`/api/admin/${resource}`);
+export function listAdminResource(resource: AdminResource, q?: string) {
+  const query = q ? `?q=${encodeURIComponent(q)}` : "";
+  return adminFetch<Record<string, unknown>[]>(`/api/admin/${resource}${query}`);
 }
 
 export function createAdminResource(resource: AdminResource, payload: Record<string, unknown>) {

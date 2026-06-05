@@ -1,6 +1,5 @@
-"use client";
-
 import dynamic from "next/dynamic";
+import { showAdminCalendarScreen } from "@/flags";
 
 const AdminPanel = dynamic(
   () => import("@/components/features/Admin/AdminPanel").then((mod) => mod.AdminPanel),
@@ -14,6 +13,9 @@ const AdminPanel = dynamic(
   },
 );
 
-export default function AdminPage() {
-  return <AdminPanel />;
+export default async function AdminPage() {
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const showCalendar = isDevelopment || await showAdminCalendarScreen();
+
+  return <AdminPanel showCalendarConfig={showCalendar} />;
 }

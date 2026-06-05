@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { AdminContext, useDataProvider, type DataProvider, type RaRecord } from "react-admin";
 import {
   adminResources,
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 
 type AdminRecord = RaRecord & Record<string, unknown>;
 type FieldType = "text" | "email" | "password" | "number" | "boolean" | "select" | "textarea" | "keyValue" | "options";
+type CustomFieldEntity = "tutor" | "animal";
 
 interface FieldConfig {
   name: string;
@@ -30,6 +31,8 @@ interface FieldConfig {
   options?: Array<{ label: string; value: string }>;
   placeholder?: string;
   required?: boolean;
+  dynamicOptionsFor?: CustomFieldEntity;
+  customFieldsFor?: CustomFieldEntity;
 }
 
 interface ResourceUiConfig {
@@ -41,13 +44,34 @@ interface ResourceUiConfig {
   fields: FieldConfig[];
   createDefaults: Record<string, unknown>;
   searchFields: string[];
+  readonly?: boolean;
 }
 
 type KeyValueRow = { key: string; value: string };
 type FormState = Record<string, unknown>;
+type CustomFieldRecord = AdminRecord & {
+  entity_type?: CustomFieldEntity;
+  field_key?: string;
+  label?: string;
+  field_type?: string;
+  options?: unknown;
+  is_active?: boolean;
+  sort_order?: number;
+};
+type CustomFieldDefinition = {
+  field_key: string;
+  field_type: string;
+  label: string;
+  options: string[];
+};
 
 const fieldClass =
   "min-h-11 w-full rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-cyan-200 disabled:opacity-40";
+const animalPhotoMaxSizeBytes = 800 * 1024;
+const animalPhotoMaxWidth = 1080;
+const animalPhotoMaxHeight = 1920;
+const animalPhotoAspectRatio = 9 / 16;
+const animalPhotoQualitySteps = [0.75, 0.68, 0.6];
 const visibleAdminResources = adminResources.filter((resource) => resource.id !== "animal-photos");
 
 const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
@@ -66,6 +90,37 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "is_active", label: "Administrador ativo", type: "boolean" },
     ],
   },
+  "service-configs": {
+    id: "service-configs",
+    description: "Configure credenciais de servicos externos como Google e Microsoft.",
+    emptyTitle: "Nenhum servico configurado.",
+    primaryField: "id",
+    secondaryFields: ["service_type", "provider", "is_active"],
+    searchFields: ["id", "service_type", "provider"],
+    createDefaults: { id: "", service_type: "calendar", provider: "google", config: [], is_active: true },
+    fields: [
+      { name: "id", label: "Identificador unico", type: "text", createOnly: true, required: true, helper: "Ex.: google_calendar_main" },
+      {
+        name: "service_type",
+        label: "Tipo de servico",
+        type: "select",
+        required: true,
+        options: [{ label: "Calendario", value: "calendar" }],
+      },
+      {
+        name: "provider",
+        label: "Provedor",
+        type: "select",
+        required: true,
+        options: [
+          { label: "Google", value: "google" },
+          { label: "Microsoft", value: "microsoft" },
+        ],
+      },
+      { name: "config", label: "Configuracoes (JSON)", type: "keyValue", helper: "Credenciais e IDs necessarios para integracao." },
+      { name: "is_active", label: "Ativo", type: "boolean" },
+    ],
+  },
   tutors: {
     id: "tutors",
     description: "Perfis de tutores cadastrados e dados usados no matching.",
@@ -78,7 +133,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "auth_user_id", label: "ID do usuario Auth", type: "text", createOnly: true, required: true },
       { name: "name", label: "Nome", type: "text", required: true },
       { name: "location", label: "Localizacao", type: "text" },
-      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", helper: "Use pares de nome e valor para preferencias, rotina e outros dados." },
+      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "tutor", helper: "Use os campos cadastrados para preferencias, rotina e outros dados." },
     ],
   },
   animals: {
@@ -94,7 +149,126 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "name", label: "Nome", type: "text", required: true },
       { name: "species", label: "Especie", type: "text", required: true },
       { name: "location", label: "Localizacao", type: "text" },
-      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", helper: "Adicione idade, porte, energia, necessidades especiais e outros atributos." },
+      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "animal", helper: "Use os campos cadastrados para idade, porte, energia e outros atributos." },
+    ],
+  },
+  "custom-fields": {
+    id: "custom-fields",
+    description: "Catalogo de campos usados nos cadastros e nas regras de matching.",
+    emptyTitle: "Nenhum campo customizado cadastrado.",
+    primaryField: "label",
+    secondaryFields: ["entity_type", "field_key", "field_type"],
+    searchFields: ["label", "field_key", "entity_type", "field_type"],
+    createDefaults: {
+      entity_type: "tutor",
+      field_key: "",
+      label: "",
+      field_type: "text",
+      options: [],
+      is_active: true,
+      sort_order: 0,
+    },
+    fields: [
+      {
+        name: "entity_type",
+        label: "Aplicar em",
+        type: "select",
+        required: true,
+        options: [
+          { label: "Para tutor", value: "tutor" },
+          { label: "Para animal", value: "animal" },
+        ],
+      },
+      { name: "field_key", label: "Chave do campo", type: "text", required: true, helper: "Use letras minusculas, numeros e underscore. Ex.: nivel_energia." },
+      { name: "label", label: "Label amigavel", type: "text", required: true },
+      {
+        name: "field_type",
+        label: "Tipo do campo",
+        type: "select",
+        required: true,
+        options: [
+          { label: "Texto", value: "text" },
+          { label: "Numero", value: "number" },
+          { label: "Sim ou nao", value: "boolean" },
+          { label: "Lista", value: "select" },
+          { label: "Lista multipla", value: "multiselect" },
+        ],
+      },
+      { name: "options", label: "Opcoes da lista", type: "options", helper: "Uma opcao por linha para campos do tipo lista." },
+      { name: "sort_order", label: "Ordem", type: "number" },
+      { name: "is_active", label: "Campo ativo", type: "boolean" },
+    ],
+  },
+  "tutor-interessados": {
+    id: "tutor-interessados",
+    description: "Registros criados quando um tutor clica em adotar um animal.",
+    emptyTitle: "Nenhum interesse registrado.",
+    primaryField: "animal_name",
+    secondaryFields: ["tutor_name", "animal_species", "data_registro"],
+    searchFields: ["uuid_registro", "tutor_id", "animal_id", "tutor_name", "animal_name", "animal_species"],
+    createDefaults: { tutor_id: "", animal_id: "" },
+    readonly: true,
+    fields: [
+      { name: "tutor_name", label: "Tutor", type: "text" },
+      { name: "animal_name", label: "Animal", type: "text" },
+      { name: "animal_species", label: "Especie", type: "text" },
+      { name: "data_registro", label: "Data do registro", type: "text" },
+    ],
+  },
+  "calendar-events": {
+    id: "calendar-events",
+    description: "Agenda administrativa de visitas, conversas e retornos de adocao.",
+    emptyTitle: "Nenhum evento cadastrado.",
+    primaryField: "title",
+    secondaryFields: ["starts_at", "status", "animal_name"],
+    searchFields: ["title", "description", "location", "tutor_name", "animal_name", "status"],
+    createDefaults: {
+      tutor_id: "",
+      animal_id: "",
+      interest_id: "",
+      title: "",
+      description: "",
+      location: "",
+      starts_at: "",
+      ends_at: "",
+      status: "scheduled",
+      provider: "",
+      external_event_id: "",
+      external_event_url: "",
+      metadata: [],
+    },
+    fields: [
+      { name: "title", label: "Titulo", type: "text", required: true },
+      { name: "starts_at", label: "Inicio", type: "text", required: true, placeholder: "2026-06-10T14:00:00-03:00" },
+      { name: "ends_at", label: "Fim", type: "text", required: true, placeholder: "2026-06-10T15:00:00-03:00" },
+      {
+        name: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { label: "Agendado", value: "scheduled" },
+          { label: "Concluido", value: "completed" },
+          { label: "Cancelado", value: "cancelled" },
+        ],
+      },
+      { name: "tutor_id", label: "ID do tutor", type: "text" },
+      { name: "animal_id", label: "ID do animal", type: "text" },
+      { name: "interest_id", label: "ID do interesse", type: "text" },
+      { name: "location", label: "Local", type: "text" },
+      { name: "description", label: "Descricao", type: "textarea" },
+      {
+        name: "provider",
+        label: "Calendario externo",
+        type: "select",
+        options: [
+          { label: "Nenhum", value: "" },
+          { label: "Google", value: "google" },
+          { label: "Microsoft", value: "microsoft" },
+        ],
+      },
+      { name: "external_event_id", label: "ID externo", type: "text" },
+      { name: "external_event_url", label: "URL externa", type: "text" },
+      { name: "metadata", label: "Metadados", type: "keyValue" },
     ],
   },
   "animal-photos": {
@@ -164,7 +338,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
           { label: "Texto", value: "text" },
           { label: "Numero", value: "number" },
           { label: "Escolha unica", value: "select" },
-          { label: "Multiplas escolhas", value: "multi_select" },
+          { label: "Multiplas escolhas", value: "multiselect" },
+          { label: "Opcoes em radio", value: "radio" },
           { label: "Sim ou nao", value: "boolean" },
         ],
       },
@@ -191,11 +366,10 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     },
     fields: [
       { name: "rule_name", label: "Nome da regra", type: "text", required: true },
-      { name: "tutor_field", label: "Campo do tutor", type: "text", required: true, placeholder: "custom_fields.moradia" },
-      { name: "animal_field", label: "Campo do animal", type: "text", required: true, placeholder: "custom_fields.porte" },
+      { name: "tutor_field", label: "Campo do tutor", type: "select", required: true, dynamicOptionsFor: "tutor" },
       {
         name: "comparison_operator",
-        label: "Comparacao",
+        label: "Condicao",
         type: "select",
         options: [
           { label: "Igual", value: "=" },
@@ -205,6 +379,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
           { label: "Menor ou igual", value: "<=" },
         ],
       },
+      { name: "animal_field", label: "Campo do animal", type: "select", required: true, dynamicOptionsFor: "animal" },
       { name: "weight", label: "Peso", type: "number" },
       { name: "is_active", label: "Regra ativa", type: "boolean" },
     ],
@@ -261,18 +436,28 @@ function toRaRecord(record: Record<string, unknown>): AdminRecord {
   return { ...record, id: String(record.id) };
 }
 
-export function AdminPanel() {
+export function AdminPanel({ showCalendarConfig = false }: { showCalendarConfig?: boolean }) {
   return (
     <AdminContext dataProvider={adminDataProvider as DataProvider}>
-      <AdminWorkspace />
+      <AdminWorkspace showCalendarConfig={showCalendarConfig} />
     </AdminContext>
   );
 }
 
-function AdminWorkspace() {
+function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean }) {
   const router = useRouter();
   const dataProvider = useDataProvider();
   const [activeResource, setActiveResource] = useState<AdminResource>("admin-users");
+
+  const visibleResources = useMemo(() => {
+    return visibleAdminResources.filter(r => {
+      if (r.id === "calendar-events" || r.id === "service-configs") {
+        return showCalendarConfig;
+      }
+      return true;
+    });
+  }, [showCalendarConfig]);
+// ...
   const [rows, setRows] = useState<AdminRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("edit");
@@ -282,6 +467,7 @@ function AdminWorkspace() {
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isResourceLoading, setIsResourceLoading] = useState(false);
+  const [customFields, setCustomFields] = useState<CustomFieldRecord[]>([]);
 
   const activeConfig = resourceUiConfigs[activeResource];
   const selectedRow = useMemo(
@@ -289,6 +475,13 @@ function AdminWorkspace() {
     [rows, selectedId],
   );
   const filteredRows = useMemo(() => filterRows(rows, activeConfig.searchFields, query), [activeConfig.searchFields, query, rows]);
+  const customFieldOptions = useMemo(() => buildCustomFieldOptions(customFields), [customFields]);
+  const customFieldDefinitions = useMemo(() => buildCustomFieldDefinitions(customFields), [customFields]);
+
+  const loadCustomFields = useCallback(async () => {
+    const data = await listAdminResource("custom-fields");
+    setCustomFields(data.map(toRaRecord) as CustomFieldRecord[]);
+  }, []);
 
   const loadResource = useCallback(async (resource: AdminResource, nextSelectedId?: string) => {
     setMessage("");
@@ -321,7 +514,7 @@ function AdminWorkspace() {
     let mounted = true;
 
     getAdminMe()
-      .then(() => loadResource(activeResource))
+      .then(() => Promise.all([loadCustomFields(), loadResource(activeResource)]))
       .then(() => {
         if (mounted) setStatus("ready");
       })
@@ -341,7 +534,7 @@ function AdminWorkspace() {
     return () => {
       mounted = false;
     };
-  }, [activeResource, loadResource, router]);
+  }, [activeResource, loadCustomFields, loadResource, router]);
 
   function changeResource(resource: AdminResource) {
     setIsResourceLoading(true);
@@ -381,6 +574,7 @@ function AdminWorkspace() {
           : null;
 
       await loadResource(activeResource, response?.data?.id ? String(response.data.id) : selectedId ?? undefined);
+      if (activeResource === "custom-fields") await loadCustomFields();
       setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
@@ -397,6 +591,7 @@ function AdminWorkspace() {
     try {
       await dataProvider.delete(activeResource, { id: selectedId, previousData: selectedRow });
       await loadResource(activeResource);
+      if (activeResource === "custom-fields") await loadCustomFields();
       setMessage("Registro removido.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel remover.");
@@ -429,12 +624,15 @@ function AdminWorkspace() {
             <p className="text-xs font-semibold uppercase text-cyan-200">Administracao</p>
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
-          <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
+          <div className="flex flex-wrap gap-3">
+            <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
+            <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
+          </div>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
           <aside className="space-y-3">
-            {visibleAdminResources.map((resource) => (
+            {visibleResources.map((resource) => (
               <button
                 aria-current={resource.id === activeResource ? "page" : undefined}
                 className={`block w-full rounded-md border px-4 py-3 text-left transition disabled:cursor-wait disabled:opacity-65 ${resource.id === activeResource ? "border-cyan-200 bg-cyan-200 text-slate-950" : "border-white/10 bg-white/[0.035] text-slate-200 hover:bg-white/[0.07]"}`}
@@ -476,6 +674,8 @@ function AdminWorkspace() {
                   formState={formState}
                   mode={mode}
                   selectedRow={selectedRow}
+                  customFieldDefinitions={customFieldDefinitions}
+                  customFieldOptions={customFieldOptions}
                   onChange={setFormState}
                   onDelete={handleDelete}
                   onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
@@ -508,7 +708,7 @@ function ResourceHeader({ config, count, isLoading, onCreate }: { config: Resour
         </div>
         <p className="mt-1 text-sm text-slate-400">{config.description}</p>
       </div>
-      <Button className="shrink-0" disabled={isLoading} onClick={onCreate} type="button">Novo registro</Button>
+      {!config.readonly && <Button className="shrink-0" disabled={isLoading} onClick={onCreate} type="button">Novo registro</Button>}
     </div>
   );
 }
@@ -600,6 +800,8 @@ function RecordList({
 
 function RecordForm({
   config,
+  customFieldDefinitions,
+  customFieldOptions,
   disabled,
   formState,
   mode,
@@ -610,6 +812,8 @@ function RecordForm({
   selectedRow,
 }: {
   config: ResourceUiConfig;
+  customFieldDefinitions: Record<CustomFieldEntity, CustomFieldDefinition[]>;
+  customFieldOptions: Record<CustomFieldEntity, Array<{ label: string; value: string }>>;
   disabled: boolean;
   formState: FormState;
   mode: "create" | "edit";
@@ -620,6 +824,7 @@ function RecordForm({
   selectedRow: AdminRecord | null;
 }) {
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
+  const formDisabled = disabled || config.readonly === true;
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.035] p-4">
@@ -630,26 +835,41 @@ function RecordForm({
             <p className="mt-1 text-sm text-slate-400">
               {mode === "create" ? "Preencha os campos abaixo para adicionar um item." : selectedRow ? `Selecionado: ${getRecordTitle(selectedRow, config)}` : "Selecione um item na lista."}
             </p>
+            {config.id === "tutor-interessados" && selectedRow?.uuid_registro && (
+              <Link className="mt-2 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href={`/interessados/${String(selectedRow.uuid_registro)}`}>
+                Abrir comparacao
+              </Link>
+            )}
           </div>
           {mode === "edit" && (
-            <Button className="shrink-0" disabled={disabled} onClick={onDelete} type="button" variant="danger">Excluir</Button>
+            !config.readonly && <Button className="shrink-0" disabled={formDisabled} onClick={onDelete} type="button" variant="danger">Excluir</Button>
           )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           {visibleFields.map((field) => (
             <FieldInput
-              disabled={disabled}
+              disabled={formDisabled}
               field={field}
               key={field.name}
+              customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
+              dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : undefined}
               value={formState[field.name]}
               onChange={(value) => onChange({ ...formState, [field.name]: value })}
             />
           ))}
         </div>
 
+        {config.id === "matching-rules" && (
+          <RuleComparisonPreview
+            animalOptions={customFieldOptions.animal}
+            formState={formState}
+            tutorOptions={customFieldOptions.tutor}
+          />
+        )}
+
         <div className="mt-5 flex justify-end">
-          <Button disabled={disabled} type="submit">{mode === "create" ? "Criar" : "Salvar"}</Button>
+          {!config.readonly && <Button disabled={formDisabled} type="submit">{mode === "create" ? "Criar" : "Salvar"}</Button>}
         </div>
       </form>
 
@@ -660,9 +880,43 @@ function RecordForm({
   );
 }
 
+function RuleComparisonPreview({
+  animalOptions,
+  formState,
+  tutorOptions,
+}: {
+  animalOptions: Array<{ label: string; value: string }>;
+  formState: FormState;
+  tutorOptions: Array<{ label: string; value: string }>;
+}) {
+  const tutorLabel = findOptionLabel(tutorOptions, formState.tutor_field) || "campo_tutor";
+  const animalLabel = findOptionLabel(animalOptions, formState.animal_field) || "campo_animal";
+  const conditionLabel = comparisonOperatorLabel(String(formState.comparison_operator ?? ""));
+
+  return (
+    <div className="mt-5 rounded-md border border-cyan-200/20 bg-cyan-200/[0.06] p-4">
+      <p className="text-xs font-semibold uppercase text-cyan-100">Visualizacao da regra</p>
+      <div className="mt-3 grid items-center gap-3 text-sm md:grid-cols-[1fr_auto_1fr]">
+        <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+          <span className="block text-[11px] uppercase text-slate-500">campo_tutor</span>
+          <span className="font-semibold">{tutorLabel}</span>
+        </div>
+        <div className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center font-semibold text-cyan-100">
+          {conditionLabel}
+        </div>
+        <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+          <span className="block text-[11px] uppercase text-slate-500">campo_animal</span>
+          <span className="font-semibold">{animalLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecord; disabled: boolean; onRefresh: () => Promise<void> }) {
   const [photos, setPhotos] = useState<AdminRecord[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "saving">("loading");
   const [message, setMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -685,6 +939,13 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
     void loadPhotos();
   }, [loadPhotos]);
 
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    setUploadProgress(null);
+    setMessage(file ? "A imagem sera recortada em 9:16 e convertida para WebP antes do envio." : "");
+  }
+
   async function handleUpload(event: FormEvent) {
     event.preventDefault();
     if (!selectedFile) {
@@ -694,17 +955,21 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
 
     setStatus("saving");
     setUploadProgress(0);
-    setMessage("Preparando upload...");
+    setMessage("Recortando e compactando imagem...");
     try {
-      const newPhoto = await uploadAnimalPhoto(animalId, selectedFile, (percent) => {
+      const optimizedFile = await cropAndCompressAnimalPhoto(selectedFile);
+      setMessage(`Imagem otimizada: ${formatFileSize(optimizedFile.size)}. Enviando...`);
+
+      const newPhoto = await uploadAnimalPhoto(animalId, optimizedFile, (percent) => {
         setUploadProgress(percent);
         setMessage(`Enviando imagem: ${percent}%`);
       });
       await makePrimary(String(newPhoto.id), false);
       setSelectedFile(null);
+      setFileInputKey((current) => current + 1);
       await loadPhotos();
       await onRefresh();
-      setMessage("Imagem enviada e definida como principal.");
+      setMessage(`Imagem enviada em WebP 9:16 (${formatFileSize(optimizedFile.size)}) e definida como principal.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel enviar a imagem.");
     } finally {
@@ -762,11 +1027,17 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
           accept="image/avif,image/jpeg,image/png,image/webp"
           className={fieldClass}
           disabled={isBusy}
-          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+          key={fileInputKey}
+          onChange={handleFileChange}
           type="file"
         />
         <Button disabled={isBusy || !selectedFile} type="submit">Enviar imagem</Button>
       </form>
+      {selectedFile && (
+        <p className="mt-2 text-xs text-slate-500">
+          Selecionado: {selectedFile.name} ({formatFileSize(selectedFile.size)}). Saida: WebP vertical 9:16, ate {formatFileSize(animalPhotoMaxSizeBytes)}.
+        </p>
+      )}
 
       {uploadProgress !== null && (
         <div className="mt-4 overflow-hidden rounded-full bg-white/10">
@@ -814,18 +1085,133 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
   );
 }
 
+async function cropAndCompressAnimalPhoto(file: File) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Selecione um arquivo de imagem valido.");
+  }
+
+  const image = await loadImage(file);
+  const crop = getCenteredAspectCrop(image.naturalWidth, image.naturalHeight, animalPhotoAspectRatio);
+  let targetWidth = Math.min(crop.width, animalPhotoMaxWidth);
+  let targetHeight = targetWidth / animalPhotoAspectRatio;
+
+  if (targetHeight > animalPhotoMaxHeight) {
+    targetHeight = animalPhotoMaxHeight;
+    targetWidth = targetHeight * animalPhotoAspectRatio;
+  }
+
+  const attempts = [1, 0.85, 0.7];
+  let smallestBlob: Blob | null = null;
+
+  for (const scale of attempts) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(targetWidth * scale));
+    canvas.height = Math.max(1, Math.round(targetHeight * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Nao foi possivel preparar a imagem para upload.");
+
+    context.drawImage(
+      image,
+      crop.x,
+      crop.y,
+      crop.width,
+      crop.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    for (const quality of animalPhotoQualitySteps) {
+      const blob = await canvasToWebpBlob(canvas, quality);
+      if (!smallestBlob || blob.size < smallestBlob.size) smallestBlob = blob;
+      if (blob.size <= animalPhotoMaxSizeBytes) {
+        return new File([blob], toWebpFileName(file.name), { type: "image/webp", lastModified: Date.now() });
+      }
+    }
+  }
+
+  throw new Error(
+    `A imagem ficou com ${formatFileSize(smallestBlob?.size ?? file.size)} apos a compactacao. Use uma imagem menor para ficar abaixo de ${formatFileSize(animalPhotoMaxSizeBytes)}.`,
+  );
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Nao foi possivel ler a imagem selecionada."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function getCenteredAspectCrop(width: number, height: number, aspectRatio: number) {
+  const sourceAspectRatio = width / height;
+  const cropWidth = sourceAspectRatio > aspectRatio ? height * aspectRatio : width;
+  const cropHeight = sourceAspectRatio > aspectRatio ? height : width / aspectRatio;
+
+  return {
+    x: Math.max(0, (width - cropWidth) / 2),
+    y: Math.max(0, (height - cropHeight) / 2),
+    width: cropWidth,
+    height: cropHeight,
+  };
+}
+
+function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Nao foi possivel converter a imagem para WebP."));
+        return;
+      }
+
+      if (blob.type !== "image/webp") {
+        reject(new Error("Este navegador nao suportou a conversao para WebP."));
+        return;
+      }
+
+      resolve(blob);
+    }, "image/webp", quality);
+  });
+}
+
+function toWebpFileName(fileName: string) {
+  const baseName = fileName.replace(/\.[^/.]+$/, "");
+  return `${baseName || "animal-photo"}.webp`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function FieldInput({
+  customFieldDefinitions,
   disabled,
+  dynamicOptions,
   field,
   onChange,
   value,
 }: {
+  customFieldDefinitions?: CustomFieldDefinition[];
   disabled: boolean;
+  dynamicOptions?: Array<{ label: string; value: string }>;
   field: FieldConfig;
   onChange: (value: unknown) => void;
   value: unknown;
 }) {
   const id = `admin-${field.name}`;
+  const options = dynamicOptions ?? field.options ?? [];
 
   if (field.type === "boolean") {
     return (
@@ -849,7 +1235,7 @@ function FieldInput({
     return (
       <div className="md:col-span-2">
         <FieldLabel field={field} htmlFor={id} />
-        <KeyValueEditor disabled={disabled} rows={normalizeKeyValueRows(value)} onChange={onChange} />
+        <KeyValueEditor customFieldDefinitions={customFieldDefinitions} disabled={disabled} rows={normalizeKeyValueRows(value)} onChange={onChange} />
       </div>
     );
   }
@@ -872,9 +1258,11 @@ function FieldInput({
           disabled={disabled}
           id={id}
           onChange={(event) => onChange(event.target.value)}
+          required={field.required}
           value={String(value ?? "")}
         >
-          {(field.options ?? []).map((option) => (
+          {field.dynamicOptionsFor && <option value="">Selecione um campo</option>}
+          {options.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
@@ -915,7 +1303,17 @@ function FieldLabel({ field, htmlFor }: { field: FieldConfig; htmlFor: string })
   );
 }
 
-function KeyValueEditor({ disabled, onChange, rows }: { disabled: boolean; onChange: (value: KeyValueRow[]) => void; rows: KeyValueRow[] }) {
+function KeyValueEditor({
+  customFieldDefinitions = [],
+  disabled,
+  onChange,
+  rows,
+}: {
+  customFieldDefinitions?: CustomFieldDefinition[];
+  disabled: boolean;
+  onChange: (value: KeyValueRow[]) => void;
+  rows: KeyValueRow[];
+}) {
   function updateRow(index: number, patch: Partial<KeyValueRow>) {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   }
@@ -928,13 +1326,76 @@ function KeyValueEditor({ disabled, onChange, rows }: { disabled: boolean; onCha
     <div className="space-y-2">
       {rows.map((row, index) => (
         <div className="grid gap-2 md:grid-cols-[minmax(140px,220px)_1fr_auto]" key={index}>
-          <input className={fieldClass} disabled={disabled} onChange={(event) => updateRow(index, { key: event.target.value })} placeholder="Campo" value={row.key} />
-          <input className={fieldClass} disabled={disabled} onChange={(event) => updateRow(index, { value: event.target.value })} placeholder="Valor" value={row.value} />
+          {customFieldDefinitions.length ? (
+            <select
+              className={fieldClass}
+              disabled={disabled}
+              onChange={(event) => updateRow(index, { key: event.target.value, value: "" })}
+              value={row.key}
+            >
+              <option value="">Campo</option>
+              {customFieldDefinitions.map((field) => (
+                <option key={field.field_key} value={field.field_key}>{field.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input className={fieldClass} disabled={disabled} onChange={(event) => updateRow(index, { key: event.target.value })} placeholder="Campo" value={row.key} />
+          )}
+          <CustomFieldValueInput
+            definition={customFieldDefinitions.find((field) => field.field_key === row.key)}
+            disabled={disabled}
+            value={row.value}
+            onChange={(value) => updateRow(index, { value })}
+          />
           <Button className="min-h-11 px-4" disabled={disabled} onClick={() => removeRow(index)} type="button" variant="outline">Remover</Button>
         </div>
       ))}
       <Button className="mt-1" disabled={disabled} onClick={() => onChange([...rows, { key: "", value: "" }])} type="button" variant="outline">Adicionar campo</Button>
     </div>
+  );
+}
+
+function CustomFieldValueInput({
+  definition,
+  disabled,
+  onChange,
+  value,
+}: {
+  definition?: CustomFieldDefinition;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  if (definition?.field_type === "boolean") {
+    return (
+      <select className={fieldClass} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+        <option value="">Valor</option>
+        <option value="true">Sim</option>
+        <option value="false">Nao</option>
+      </select>
+    );
+  }
+
+  if ((definition?.field_type === "select" || definition?.field_type === "multiselect") && definition.options.length) {
+    return (
+      <select className={fieldClass} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+        <option value="">Valor</option>
+        {definition.options.map((option) => (
+          <option key={option} value={option}>{humanizeFieldKey(option)}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <input
+      className={fieldClass}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="Valor"
+      type={definition?.field_type === "number" ? "number" : "text"}
+      value={value}
+    />
   );
 }
 
@@ -986,7 +1447,11 @@ function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "c
       payload[field.name] = keyValueRowsToObject(normalizeKeyValueRows(value));
     } else if (field.type === "options") {
       const options = normalizeOptions(value).map((option) => option.trim()).filter(Boolean);
-      payload[field.name] = options.length ? options : null;
+      payload[field.name] = options.length
+        ? config.id === "onboarding-questions"
+          ? options.map((option) => ({ label: humanizeFieldKey(option), value: option }))
+          : options
+        : null;
     } else if (field.type === "number") {
       payload[field.name] = Number(value) || 0;
     } else {
@@ -1017,7 +1482,12 @@ function normalizeKeyValueRows(value: unknown): KeyValueRow[] {
 }
 
 function normalizeOptions(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String);
+  if (Array.isArray(value)) {
+    return value.map((option) => {
+      if (option && typeof option === "object" && "value" in option) return String((option as { value: unknown }).value);
+      return String(option);
+    });
+  }
   if (typeof value === "string" && value.trim()) return value.split("\n").map((option) => option.trim()).filter(Boolean);
   return [];
 }
@@ -1048,8 +1518,73 @@ function getRecordTitle(row: AdminRecord, config: ResourceUiConfig) {
   return String(row[config.primaryField] ?? row.email ?? row.name ?? row.label ?? row.rule_name ?? row.id);
 }
 
+function buildCustomFieldOptions(customFields: CustomFieldRecord[]) {
+  const activeFields = customFields
+    .filter((field) => field.is_active !== false && field.field_key)
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
+
+  return {
+    tutor: activeFields
+      .filter((field) => field.entity_type === "tutor")
+      .map((field) => ({ label: `${field.label ?? field.field_key} (${field.field_key})`, value: String(field.field_key) })),
+    animal: activeFields
+      .filter((field) => field.entity_type === "animal")
+      .map((field) => ({ label: `${field.label ?? field.field_key} (${field.field_key})`, value: String(field.field_key) })),
+  };
+}
+
+function buildCustomFieldDefinitions(customFields: CustomFieldRecord[]) {
+  const activeFields = customFields
+    .filter((field) => field.is_active !== false && field.field_key)
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
+
+  return {
+    tutor: activeFields
+      .filter((field) => field.entity_type === "tutor")
+      .map(toCustomFieldDefinition),
+    animal: activeFields
+      .filter((field) => field.entity_type === "animal")
+      .map(toCustomFieldDefinition),
+  };
+}
+
+function toCustomFieldDefinition(field: CustomFieldRecord): CustomFieldDefinition {
+  return {
+    field_key: String(field.field_key),
+    field_type: String(field.field_type ?? "text"),
+    label: String(field.label ?? field.field_key),
+    options: normalizeOptions(field.options),
+  };
+}
+
+function findOptionLabel(options: Array<{ label: string; value: string }>, value: unknown) {
+  return options.find((option) => option.value === String(value ?? ""))?.label ?? "";
+}
+
+function comparisonOperatorLabel(operator: string) {
+  const labels: Record<string, string> = {
+    "=": "Igual",
+    "!=": "Diferente",
+    contains: "Contem",
+    ">=": "Maior ou igual",
+    "<=": "Menor ou igual",
+  };
+
+  return labels[operator] ?? "condicao";
+}
+
+function humanizeFieldKey(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function formatValue(value: unknown) {
   if (typeof value === "boolean") return value ? "ativo" : "inativo";
+  if (value === "tutor") return "para tutor";
+  if (value === "animal") return "para animal";
   if (!value) return "sem valor";
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return new Date(value).toLocaleDateString("pt-BR");
   return String(value);

@@ -125,6 +125,65 @@ function generateMatchingRules(): Omit<MatchingRule, "id">[] {
   ];
 }
 
+function generateCustomFields() {
+  return [
+    {
+      entity_type: "tutor",
+      field_key: "pref_energia",
+      label: "Energia desejada",
+      field_type: "select",
+      options: ["baixo", "medio", "alto"],
+      is_active: true,
+      sort_order: 10,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "tem_criancas",
+      label: "Tem criancas",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 20,
+    },
+    {
+      entity_type: "tutor",
+      field_key: "tamanho_casa",
+      label: "Tamanho da casa",
+      field_type: "select",
+      options: ["apartamento", "casa_quintal_pequeno", "casa_quintal_grande"],
+      is_active: true,
+      sort_order: 30,
+    },
+    {
+      entity_type: "animal",
+      field_key: "nivel_energia",
+      label: "Nivel de energia",
+      field_type: "select",
+      options: ["baixo", "medio", "alto"],
+      is_active: true,
+      sort_order: 10,
+    },
+    {
+      entity_type: "animal",
+      field_key: "aceita_criancas",
+      label: "Aceita criancas",
+      field_type: "boolean",
+      options: null,
+      is_active: true,
+      sort_order: 20,
+    },
+    {
+      entity_type: "animal",
+      field_key: "espaco_necessario",
+      label: "Espaco necessario",
+      field_type: "select",
+      options: ["apartamento", "casa_quintal_pequeno", "casa_quintal_grande"],
+      is_active: true,
+      sort_order: 30,
+    },
+  ];
+}
+
 async function seed(): Promise<void> {
   console.log("🌱 Iniciando seed do banco de dados...\n");
 
@@ -132,6 +191,7 @@ async function seed(): Promise<void> {
     // 1. Limpar dados existentes
     console.log("🗑️  Limpando dados existentes...");
     await supabase.from("matching_rules").delete().neq("id", "");
+    await supabase.from("custom_fields").delete().neq("id", "");
     await supabase.from("animals").delete().neq("id", "");
     await supabase.from("tutors").delete().neq("id", "");
     console.log("✅ Dados antigos removidos\n");
@@ -171,7 +231,17 @@ async function seed(): Promise<void> {
     if (animalError) throw animalError;
     console.log(`✅ ${insertedAnimals?.length || 0} animais inseridos\n`);
 
-    // 4. Inserir regras de matching
+    // 4. Inserir campos customizados
+    console.log("📋 Gerando campos customizados...");
+    const { data: insertedCustomFields, error: customFieldError } = await supabase
+      .from("custom_fields")
+      .insert(generateCustomFields())
+      .select();
+
+    if (customFieldError) throw customFieldError;
+    console.log(`✅ ${insertedCustomFields?.length || 0} campos customizados inseridos\n`);
+
+    // 5. Inserir regras de matching
     console.log("⚙️  Gerando regras de matching...");
     const rulesData = generateMatchingRules();
     const { data: insertedRules, error: ruleError } = await supabase
@@ -186,6 +256,7 @@ async function seed(): Promise<void> {
     console.log("\n📊 Resumo:");
     console.log(`   - Tutores: ${insertedTutors?.length || 0}`);
     console.log(`   - Animais: ${insertedAnimals?.length || 0}`);
+    console.log(`   - Campos customizados: ${insertedCustomFields?.length || 0}`);
     console.log(`   - Regras: ${insertedRules?.length || 0}`);
   } catch (error) {
     const errorMessage =

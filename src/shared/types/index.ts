@@ -57,7 +57,7 @@ export interface MatchingRule {
   rule_name: string; // Ex: "Compatibilidade de Energia"
   tutor_field: string; // Chave em TutorProfile.custom_fields
   animal_field: string; // Chave em AnimalProfile.custom_fields
-  comparison_operator: "=" | ">=" | "<=" | "contains";
+  comparison_operator: "=" | "!=" | ">=" | "<=" | "contains";
   weight: number; // Pontos a somar se der match (30, 50, etc)
   is_active: boolean;
   created_at?: string;
