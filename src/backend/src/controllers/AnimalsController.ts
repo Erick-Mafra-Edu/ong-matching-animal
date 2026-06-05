@@ -1,0 +1,263 @@
+import { randomUUID } from "crypto";
+import { Request, Response } from "express";
+import multer from "multer";
+import {
+  allowedAnimalPhotoTypes,
+  animalPhotoExtensions,
+  animalPhotosBucket,
+  getSupabaseBackendConfig,
+  maxAnimalPhotoSizeBytes,
+  normalizeAnimal,
+  readJsonResponse,
+  requireAdmin,
+  toPublicStorageUrl,
+} from "./apiSupport";
+
+export class AnimalsController {
+  private readonly uploadAnimalPhoto = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: maxAnimalPhotoSizeBytes, files: 1 },
+  });
+
+  list = async (_req: Request, res: Response) => {
+    const { supabaseUrl, serviceRoleKey } = getSupabaseBackendConfig();
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/animals?select=id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)&order=created_at.desc`, {
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({ message: "Nao foi possivel listar os animais", details: body });
+        return;
+      }
+
+      res.json(Array.isArray(body) ? body.map(normalizeAnimal) : []);
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel conectar ao Supabase",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  create = (_req: Request, res: Response) => {
+    res.status(201).json({ message: "Animal criado com sucesso" });
+  };
+
+  createSignedPhotoUrl = async (req: Request, res: Response) => {
+    try {
+      const context = await requireAdmin(req, res);
+      if (!context) return;
+
+      const { contentType, fileName } = req.body as { contentType?: string; fileName?: string };
+      if (!contentType) {
+        res.status(400).json({ message: "Informe o contentType da imagem." });
+        return;
+      }
+
+      const photoId = randomUUID();
+      const extension = fileName?.split(".").pop() || animalPhotoExtensions[contentType] || "bin";
+      const storagePath = `animals/${req.params.id}/${photoId}.${extension}`;
+      const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
+
+      const supabaseResponse = await fetch(`${context.supabaseUrl}/storage/v1/object/upload/sign/${animalPhotosBucket}/${storagePath}`, {
+        method: "POST",
+        headers: {
+          apikey: context.serviceRoleKey,
+          authorization: `Bearer ${context.serviceRoleKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ expiresIn: 3600 }),
+      });
+      const supabaseBody = await supabaseResponse.json() as { url?: string };
+
+      if (!supabaseResponse.ok) {
+        res.status(supabaseResponse.status).json({ message: "Nao foi possivel gerar a URL assinada", details: supabaseBody });
+        return;
+      }
+
+      res.json({
+        uploadUrl: `${context.supabaseUrl}/storage/v1${supabaseBody.url}`,
+        photoId,
+        storagePath,
+        publicUrl,
+        contentType,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Erro ao gerar URL assinada.",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  listPhotos = async (req: Request, res: Response) => {
+    const { supabaseUrl, serviceRoleKey } = getSupabaseBackendConfig();
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/animal_photos?select=id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at&animal_id=eq.${encodeURIComponent(req.params.id)}&order=is_primary.desc,created_at.asc`, {
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({ message: "Nao foi possivel listar as fotos do animal", details: body });
+        return;
+      }
+
+      res.json(Array.isArray(body) ? body : []);
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel conectar ao Supabase",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  uploadPhoto = async (req: Request, res: Response) => {
+    if (req.header("content-type")?.includes("application/json")) {
+      await this.registerPhotoMetadata(req, res);
+      return;
+    }
+
+    this.uploadAnimalPhoto.single("photo")(req, res, async (uploadError) => {
+      if (uploadError instanceof multer.MulterError) {
+        res.status(400).json({
+          message: uploadError.code === "LIMIT_FILE_SIZE"
+            ? `A imagem deve ter no maximo ${maxAnimalPhotoSizeBytes} bytes.`
+            : "Nao foi possivel receber a imagem.",
+        });
+        return;
+      }
+
+      if (uploadError) {
+        res.status(400).json({ message: "Nao foi possivel receber a imagem." });
+        return;
+      }
+
+      const context = await requireAdmin(req, res);
+      if (!context) return;
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ message: "Envie uma imagem no campo photo." });
+        return;
+      }
+
+      if (!allowedAnimalPhotoTypes.has(file.mimetype)) {
+        res.status(400).json({ message: "Formato invalido. Envie JPEG, PNG, WebP ou AVIF. GIF nao e permitido." });
+        return;
+      }
+
+      if (file.size > maxAnimalPhotoSizeBytes) {
+        res.status(400).json({ message: `A imagem deve ter no maximo ${maxAnimalPhotoSizeBytes} bytes.` });
+        return;
+      }
+
+      const photoId = randomUUID();
+      const extension = animalPhotoExtensions[file.mimetype];
+      const storagePath = `animals/${req.params.id}/${photoId}.${extension}`;
+      const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
+
+      try {
+        const storageResponse = await fetch(`${context.supabaseUrl}/storage/v1/object/${animalPhotosBucket}/${storagePath}`, {
+          method: "POST",
+          headers: {
+            apikey: context.serviceRoleKey,
+            authorization: `Bearer ${context.serviceRoleKey}`,
+            "content-type": file.mimetype,
+            "cache-control": "3600",
+          },
+          body: file.buffer,
+        });
+        const storageBody = await readJsonResponse(storageResponse);
+
+        if (!storageResponse.ok) {
+          res.status(storageResponse.status).json({ message: "Nao foi possivel salvar a imagem no Storage", details: storageBody });
+          return;
+        }
+
+        await this.persistPhotoMetadata(req, res, {
+          id: photoId,
+          animal_id: req.params.id,
+          bucket_id: animalPhotosBucket,
+          storage_path: storagePath,
+          public_url: publicUrl,
+          content_type: file.mimetype,
+          size_bytes: file.size,
+        }, context);
+      } catch (error) {
+        res.status(500).json({
+          message: "Nao foi possivel conectar ao Supabase",
+          details: error instanceof Error ? error.message : "Erro desconhecido",
+        });
+      }
+    });
+  };
+
+  private async registerPhotoMetadata(req: Request, res: Response) {
+    try {
+      const context = await requireAdmin(req, res);
+      if (!context) return;
+
+      const { id, storage_path, public_url, content_type, size_bytes, is_primary = false } = req.body;
+      if (!id || !storage_path || !public_url || !content_type) {
+        res.status(400).json({ message: "Dados da foto incompletos para registro." });
+        return;
+      }
+
+      await this.persistPhotoMetadata(req, res, {
+        id,
+        animal_id: req.params.id,
+        bucket_id: animalPhotosBucket,
+        storage_path,
+        public_url,
+        content_type,
+        size_bytes: size_bytes || 0,
+        is_primary,
+      }, context);
+    } catch (error) {
+      res.status(500).json({
+        message: "Erro ao registrar metadados da foto.",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  }
+
+  private async persistPhotoMetadata(_req: Request, res: Response, metadata: Record<string, unknown>, context: NonNullable<Awaited<ReturnType<typeof requireAdmin>>>) {
+    const metadataResponse = await fetch(`${context.supabaseUrl}/rest/v1/animal_photos`, {
+      method: "POST",
+      headers: {
+        apikey: context.serviceRoleKey,
+        authorization: `Bearer ${context.serviceRoleKey}`,
+        "content-type": "application/json",
+        prefer: "return=representation",
+      },
+      body: JSON.stringify(metadata),
+    });
+    const metadataBody = await metadataResponse.json();
+
+    if (!metadataResponse.ok) {
+      res.status(metadataResponse.status).json({ message: "Nao foi possivel registrar a foto do animal", details: metadataBody });
+      return;
+    }
+
+    res.status(201).json(Array.isArray(metadataBody) ? metadataBody[0] : metadataBody);
+  }
+}

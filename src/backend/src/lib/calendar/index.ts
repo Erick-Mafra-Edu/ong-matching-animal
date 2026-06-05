@@ -19,6 +19,11 @@ export type CalendarAdapterConfig =
   | ({ provider: "google" } & GoogleCalendarAdapterOptions)
   | ({ provider: "microsoft" } & MicrosoftCalendarAdapterOptions);
 
+export function createCalendarAdapter(config: CalendarAdapterConfig): CalendarAdapter {
+  if (config.provider === "google") return new GoogleCalendarAdapter(config);
+  return new MicrosoftCalendarAdapter(config);
+}
+
 export async function createCalendarAdapterFromDB(supabaseUrl: string, serviceRoleKey: string): Promise<CalendarAdapter | null> {
   try {
     const response = await fetch(`${supabaseUrl}/rest/v1/service_configs?service_type=eq.calendar&is_active=eq.true&limit=1`, {

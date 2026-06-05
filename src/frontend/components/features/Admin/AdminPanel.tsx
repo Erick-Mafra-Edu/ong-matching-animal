@@ -432,6 +432,10 @@ const adminDataProvider = {
   },
 };
 
+function toRaRecord(record: Record<string, unknown>): AdminRecord {
+  return { ...record, id: String(record.id) };
+}
+
 export function AdminPanel({ showCalendarConfig = false }: { showCalendarConfig?: boolean }) {
   return (
     <AdminContext dataProvider={adminDataProvider as DataProvider}>

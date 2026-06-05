@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfWeek, addDays, isSameDay, isSameMonth, startOfMonth, endOfMonth, endOfWeek, setHours, setMinutes, setSeconds } from "date-fns";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { format, startOfWeek, addDays, isSameDay, isSameMonth, setHours, setMinutes, setSeconds } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, List, CalendarDays, Search, User, Dog } from "lucide-react";
 import {
@@ -64,7 +64,6 @@ export function CalendarPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | CalendarEventStatus>("all");
   const [status, setStatus] = useState<"loading" | "ready" | "saving" | "denied">("loading");
   const [message, setMessage] = useState("");
-  const [view, setView] = useState<string>("list");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   // Modals state
@@ -310,7 +309,7 @@ export function CalendarPage() {
 
         <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
           <section className="flex flex-col gap-4 rounded-md border border-white/10 bg-black/20 p-4 min-h-[600px]">
-            <Tabs defaultValue="list" className="w-full" onValueChange={setView}>
+            <Tabs defaultValue="list" className="w-full">
               <div className="flex items-center justify-between mb-4">
                 <TabsList>
                   <TabsTrigger value="list" className="gap-2">
