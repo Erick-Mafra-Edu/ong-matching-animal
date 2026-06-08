@@ -33,7 +33,7 @@ export interface AnimalListItem extends PetProfile {
 export interface NavigationItem {
   id: string;
   label: string;
-  icon: "discover" | "messages" | "profile" | "admin";
+  icon: "discover" | "interests" | "messages" | "profile" | "admin";
   active?: boolean;
   href?: string;
   notification?: boolean;

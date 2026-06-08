@@ -9,6 +9,28 @@ export interface InteresseRegistro {
   detail_url: string;
 }
 
+export interface InteresseAgenda {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  status: "scheduled" | "completed" | "cancelled";
+  external_event_url?: string | null;
+}
+
+export interface InteresseComAnimal extends InteresseRegistro {
+  animal?: {
+    id?: string;
+    name?: string;
+    species?: string;
+    photoUrl?: string;
+    photoUrls?: string[];
+    traits?: string[];
+  };
+  schedule: InteresseAgenda[];
+  has_schedule: boolean;
+}
+
 async function getAccessToken() {
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
   if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
@@ -54,4 +76,23 @@ export async function carregarInteresse(uuidRegistro: string) {
   }
 
   return body as Record<string, unknown>;
+}
+
+export async function listarMeusInteresses() {
+  const accessToken = await getAccessToken();
+  const response = await fetch(backendApiUrl("/api/interessados"), {
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "message" in body
+      ? String(body.message)
+      : "Nao foi possivel carregar seus interesses.";
+    throw new Error(message);
+  }
+
+  return body as InteresseComAnimal[];
 }

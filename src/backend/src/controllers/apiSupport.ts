@@ -56,10 +56,10 @@ export const adminTables = {
   },
   "custom-fields": {
     table: "custom_fields",
-    select: "id,entity_type,field_key,label,field_type,options,is_active,sort_order,created_at,updated_at",
+    select: "id,entity_type,field_key,label,field_type,options,source_question_id,is_active,sort_order,created_at,updated_at",
     order: "entity_type.asc,sort_order.asc,label.asc",
-    createFields: ["entity_type", "field_key", "label", "field_type", "options", "is_active", "sort_order"],
-    updateFields: ["entity_type", "field_key", "label", "field_type", "options", "is_active", "sort_order"],
+    createFields: ["entity_type", "field_key", "label", "field_type", "options", "source_question_id", "is_active", "sort_order"],
+    updateFields: ["entity_type", "field_key", "label", "field_type", "options", "source_question_id", "is_active", "sort_order"],
   },
   "onboarding-questions": {
     table: "onboarding_questions",

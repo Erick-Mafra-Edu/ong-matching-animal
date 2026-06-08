@@ -32,6 +32,7 @@ interface FieldConfig {
   placeholder?: string;
   required?: boolean;
   dynamicOptionsFor?: CustomFieldEntity;
+  dynamicOptionsSource?: "onboardingQuestions";
   customFieldsFor?: CustomFieldEntity;
 }
 
@@ -55,6 +56,7 @@ type CustomFieldRecord = AdminRecord & {
   label?: string;
   field_type?: string;
   options?: unknown;
+  source_question_id?: string | null;
   is_active?: boolean;
   sort_order?: number;
 };
@@ -63,6 +65,15 @@ type CustomFieldDefinition = {
   field_type: string;
   label: string;
   options: string[];
+  source_question_id?: string | null;
+};
+type OnboardingQuestionRecord = AdminRecord & {
+  id: string;
+  label?: string;
+  type?: string;
+  options?: unknown;
+  is_active?: boolean;
+  sort_order?: number;
 };
 
 const fieldClass =
@@ -164,6 +175,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       field_key: "",
       label: "",
       field_type: "text",
+      source_question_id: "",
       options: [],
       is_active: true,
       sort_order: 0,
@@ -181,6 +193,13 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       },
       { name: "field_key", label: "Chave do campo", type: "text", required: true, helper: "Use letras minusculas, numeros e underscore. Ex.: nivel_energia." },
       { name: "label", label: "Label amigavel", type: "text", required: true },
+      {
+        name: "source_question_id",
+        label: "Pergunta que preenche",
+        type: "select",
+        dynamicOptionsSource: "onboardingQuestions",
+        helper: "Obrigatorio para campos de tutor. Em campos de animal, deixe vazio.",
+      },
       {
         name: "field_type",
         label: "Tipo do campo",
@@ -468,6 +487,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const [isSaving, setIsSaving] = useState(false);
   const [isResourceLoading, setIsResourceLoading] = useState(false);
   const [customFields, setCustomFields] = useState<CustomFieldRecord[]>([]);
+  const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestionRecord[]>([]);
 
   const activeConfig = resourceUiConfigs[activeResource];
   const selectedRow = useMemo(
@@ -475,12 +495,18 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     [rows, selectedId],
   );
   const filteredRows = useMemo(() => filterRows(rows, activeConfig.searchFields, query), [activeConfig.searchFields, query, rows]);
-  const customFieldOptions = useMemo(() => buildCustomFieldOptions(customFields), [customFields]);
-  const customFieldDefinitions = useMemo(() => buildCustomFieldDefinitions(customFields), [customFields]);
+  const onboardingQuestionOptions = useMemo(() => buildOnboardingQuestionOptions(onboardingQuestions), [onboardingQuestions]);
+  const customFieldOptions = useMemo(() => buildCustomFieldOptions(customFields, onboardingQuestions), [customFields, onboardingQuestions]);
+  const customFieldDefinitions = useMemo(() => buildCustomFieldDefinitions(customFields, onboardingQuestions), [customFields, onboardingQuestions]);
 
   const loadCustomFields = useCallback(async () => {
     const data = await listAdminResource("custom-fields");
     setCustomFields(data.map(toRaRecord) as CustomFieldRecord[]);
+  }, []);
+
+  const loadOnboardingQuestions = useCallback(async () => {
+    const data = await listAdminResource("onboarding-questions");
+    setOnboardingQuestions(data.map(toRaRecord) as OnboardingQuestionRecord[]);
   }, []);
 
   const loadResource = useCallback(async (resource: AdminResource, nextSelectedId?: string) => {
@@ -514,7 +540,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     let mounted = true;
 
     getAdminMe()
-      .then(() => Promise.all([loadCustomFields(), loadResource(activeResource)]))
+      .then(() => Promise.all([loadCustomFields(), loadOnboardingQuestions(), loadResource(activeResource)]))
       .then(() => {
         if (mounted) setStatus("ready");
       })
@@ -534,7 +560,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     return () => {
       mounted = false;
     };
-  }, [activeResource, loadCustomFields, loadResource, router]);
+  }, [activeResource, loadCustomFields, loadOnboardingQuestions, loadResource, router]);
 
   function changeResource(resource: AdminResource) {
     setIsResourceLoading(true);
@@ -575,6 +601,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
 
       await loadResource(activeResource, response?.data?.id ? String(response.data.id) : selectedId ?? undefined);
       if (activeResource === "custom-fields") await loadCustomFields();
+      if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
       setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
@@ -592,6 +619,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       await dataProvider.delete(activeResource, { id: selectedId, previousData: selectedRow });
       await loadResource(activeResource);
       if (activeResource === "custom-fields") await loadCustomFields();
+      if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
       setMessage("Registro removido.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel remover.");
@@ -676,6 +704,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                   selectedRow={selectedRow}
                   customFieldDefinitions={customFieldDefinitions}
                   customFieldOptions={customFieldOptions}
+                  onboardingQuestionOptions={onboardingQuestionOptions}
                   onChange={setFormState}
                   onDelete={handleDelete}
                   onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
@@ -805,6 +834,7 @@ function RecordForm({
   disabled,
   formState,
   mode,
+  onboardingQuestionOptions,
   onChange,
   onDelete,
   onRefresh,
@@ -817,6 +847,7 @@ function RecordForm({
   disabled: boolean;
   formState: FormState;
   mode: "create" | "edit";
+  onboardingQuestionOptions: Array<{ label: string; value: string }>;
   onChange: (state: FormState) => void;
   onDelete: () => void;
   onRefresh: (nextSelectedId?: string) => Promise<void>;
@@ -853,7 +884,7 @@ function RecordForm({
               field={field}
               key={field.name}
               customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
-              dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : undefined}
+              dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
               value={formState[field.name]}
               onChange={(value) => onChange({ ...formState, [field.name]: value })}
             />
@@ -1215,19 +1246,20 @@ function FieldInput({
 
   if (field.type === "boolean") {
     return (
-      <label className="flex min-h-[76px] items-center justify-between gap-4 rounded-md border border-white/10 bg-black/20 px-4 py-3">
-        <span>
-          <span className="block text-sm font-semibold text-slate-100">{field.label}</span>
-          {field.helper && <span className="mt-1 block text-xs text-slate-500">{field.helper}</span>}
-        </span>
-        <input
-          checked={Boolean(value)}
-          className="h-5 w-5 accent-cyan-200"
+      <div>
+        <FieldLabel field={field} htmlFor={id} />
+        <select
+          className={fieldClass}
           disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-          type="checkbox"
-        />
-      </label>
+          id={id}
+          onChange={(event) => onChange(event.target.value === "true")}
+          required={field.required}
+          value={toBooleanSelectValue(value)}
+        >
+          <option value="true">Sim</option>
+          <option value="false">Nao</option>
+        </select>
+      </div>
     );
   }
 
@@ -1261,7 +1293,7 @@ function FieldInput({
           required={field.required}
           value={String(value ?? "")}
         >
-          {field.dynamicOptionsFor && <option value="">Selecione um campo</option>}
+          {(field.dynamicOptionsFor || field.dynamicOptionsSource) && <option value="">{field.dynamicOptionsFor ? "Selecione um campo" : "Selecione uma pergunta"}</option>}
           {options.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -1454,6 +1486,8 @@ function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "c
         : null;
     } else if (field.type === "number") {
       payload[field.name] = Number(value) || 0;
+    } else if (field.name === "source_question_id") {
+      payload[field.name] = value ? String(value) : null;
     } else {
       payload[field.name] = value;
     }
@@ -1507,6 +1541,12 @@ function formatEditableValue(value: unknown) {
   return Array.isArray(value) ? value.join(", ") : String(value);
 }
 
+function toBooleanSelectValue(value: unknown) {
+  if (value === "false") return "false";
+  if (value === "true") return "true";
+  return String(Boolean(value));
+}
+
 function filterRows(rows: AdminRecord[], fields: string[], query: string) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return rows;
@@ -1518,30 +1558,47 @@ function getRecordTitle(row: AdminRecord, config: ResourceUiConfig) {
   return String(row[config.primaryField] ?? row.email ?? row.name ?? row.label ?? row.rule_name ?? row.id);
 }
 
-function buildCustomFieldOptions(customFields: CustomFieldRecord[]) {
+function buildOnboardingQuestionOptions(onboardingQuestions: OnboardingQuestionRecord[]) {
+  return onboardingQuestions
+    .filter((question) => question.is_active !== false && question.id)
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")))
+    .map((question) => ({ label: `${question.label ?? question.id} (${question.id})`, value: String(question.id) }));
+}
+
+function buildCustomFieldOptions(customFields: CustomFieldRecord[], onboardingQuestions: OnboardingQuestionRecord[] = []) {
   const activeFields = customFields
     .filter((field) => field.is_active !== false && field.field_key)
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
 
   return {
-    tutor: activeFields
+    tutor: [
+      ...activeFields
       .filter((field) => field.entity_type === "tutor")
+      .filter((field) => hasActiveSourceQuestion(field, onboardingQuestions))
       .map((field) => ({ label: `${field.label ?? field.field_key} (${field.field_key})`, value: String(field.field_key) })),
+      ...buildOnboardingQuestionOptions(onboardingQuestions).map((question) => ({ ...question, label: `Resposta: ${question.label}` })),
+    ],
     animal: activeFields
       .filter((field) => field.entity_type === "animal")
       .map((field) => ({ label: `${field.label ?? field.field_key} (${field.field_key})`, value: String(field.field_key) })),
   };
 }
 
-function buildCustomFieldDefinitions(customFields: CustomFieldRecord[]) {
+function buildCustomFieldDefinitions(customFields: CustomFieldRecord[], onboardingQuestions: OnboardingQuestionRecord[] = []) {
   const activeFields = customFields
     .filter((field) => field.is_active !== false && field.field_key)
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
 
   return {
-    tutor: activeFields
+    tutor: [
+      ...activeFields
       .filter((field) => field.entity_type === "tutor")
+      .filter((field) => hasActiveSourceQuestion(field, onboardingQuestions))
       .map(toCustomFieldDefinition),
+      ...onboardingQuestions
+        .filter((question) => question.is_active !== false && question.id)
+        .map(toQuestionCustomFieldDefinition),
+    ],
     animal: activeFields
       .filter((field) => field.entity_type === "animal")
       .map(toCustomFieldDefinition),
@@ -1554,7 +1611,24 @@ function toCustomFieldDefinition(field: CustomFieldRecord): CustomFieldDefinitio
     field_type: String(field.field_type ?? "text"),
     label: String(field.label ?? field.field_key),
     options: normalizeOptions(field.options),
+    source_question_id: field.source_question_id ?? null,
   };
+}
+
+function toQuestionCustomFieldDefinition(question: OnboardingQuestionRecord): CustomFieldDefinition {
+  return {
+    field_key: String(question.id),
+    field_type: question.type === "radio" ? "select" : String(question.type ?? "text"),
+    label: `Resposta: ${question.label ?? question.id}`,
+    options: normalizeOptions(question.options),
+    source_question_id: String(question.id),
+  };
+}
+
+function hasActiveSourceQuestion(field: CustomFieldRecord, onboardingQuestions: OnboardingQuestionRecord[]) {
+  if (field.entity_type !== "tutor") return true;
+  const sourceQuestionId = String(field.source_question_id ?? "");
+  return Boolean(sourceQuestionId) && onboardingQuestions.some((question) => question.is_active !== false && question.id === sourceQuestionId);
 }
 
 function findOptionLabel(options: Array<{ label: string; value: string }>, value: unknown) {
