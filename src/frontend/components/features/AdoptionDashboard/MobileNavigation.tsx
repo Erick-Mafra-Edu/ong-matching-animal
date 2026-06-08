@@ -9,7 +9,7 @@ interface MobileNavigationProps {
 
 export function MobileNavigation({ items }: MobileNavigationProps) {
   return (
-    <nav className="animate-mobile-enter grid h-16 grid-cols-4 border-t border-white/10 bg-black" aria-label="Navegação principal">
+    <nav className="animate-mobile-enter grid h-16 border-t border-white/10 bg-black" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }} aria-label="Navegação principal">
       {items.map((item) => (
         <NavigationControl
           aria-label={item.label}
@@ -19,6 +19,7 @@ export function MobileNavigation({ items }: MobileNavigationProps) {
           className={`relative grid place-items-center transition duration-300 hover:bg-white/5 hover:text-cyan-200 active:scale-95 ${item.active ? "text-cyan-400" : "text-slate-400"}`}
         >
           {item.icon === "discover" && <PawIcon className="h-6 w-6" />}
+          {item.icon === "interests" && <span className="text-xl" aria-hidden="true">♡</span>}
           {item.icon === "messages" && <span className="text-2xl" aria-hidden="true">♣</span>}
           {item.icon === "profile" && <span className="text-xl" aria-hidden="true">♟</span>}
           {item.icon === "admin" && <span className="text-xl" aria-hidden="true">⚙</span>}

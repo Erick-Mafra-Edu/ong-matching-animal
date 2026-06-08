@@ -147,6 +147,7 @@ CREATE TABLE custom_fields (
   label TEXT NOT NULL,
   field_type TEXT NOT NULL DEFAULT 'text' CHECK (field_type IN ('text', 'number', 'boolean', 'select', 'multiselect')),
   options JSONB,
+  source_question_id TEXT,
   is_active BOOLEAN DEFAULT true,
   sort_order INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -157,19 +158,19 @@ CREATE TABLE custom_fields (
 CREATE INDEX custom_fields_entity_active_sort_idx
   ON custom_fields (entity_type, is_active, sort_order, label);
 
-INSERT INTO custom_fields (entity_type, field_key, label, field_type, options, is_active, sort_order) VALUES
-  ('tutor', 'pref_energia', 'Energia desejada', 'select', '["baixo","medio","alto"]'::jsonb, true, 10),
-  ('tutor', 'tem_criancas', 'Tem crianças', 'boolean', NULL, true, 20),
-  ('tutor', 'tamanho_casa', 'Tamanho da casa', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande","pequeno","medio","grande"]'::jsonb, true, 30),
-  ('tutor', 'tem_quintal', 'Tem quintal', 'boolean', NULL, true, 40),
-  ('tutor', 'renda_mensal', 'Renda mensal', 'select', '["ate_1000","1000_3000","3000_6000","6000_acima"]'::jsonb, true, 50),
-  ('tutor', 'disponibilidade_tempo', 'Disponibilidade de tempo', 'select', '["meio_periodo","integral"]'::jsonb, true, 60),
-  ('animal', 'nivel_energia', 'Nível de energia', 'select', '["baixo","medio","alto"]'::jsonb, true, 10),
-  ('animal', 'aceita_criancas', 'Aceita crianças', 'boolean', NULL, true, 20),
-  ('animal', 'espaco_necessario', 'Espaço necessário', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande"]'::jsonb, true, 30),
-  ('animal', 'tamanho', 'Tamanho', 'select', '["pequeno","medio","grande"]'::jsonb, true, 40),
-  ('animal', 'requer_espaco', 'Espaço necessário', 'select', '["apartamento","casa_pequena","casa_grande"]'::jsonb, true, 50),
-  ('animal', 'vacinado', 'Vacinado', 'boolean', NULL, true, 60);
+INSERT INTO custom_fields (entity_type, field_key, label, field_type, options, source_question_id, is_active, sort_order) VALUES
+  ('tutor', 'pref_energia', 'Energia desejada', 'select', '["baixo","medio","alto"]'::jsonb, 'preferred_energy', true, 10),
+  ('tutor', 'tem_criancas', 'Tem crianças', 'boolean', NULL, 'has_children', true, 20),
+  ('tutor', 'tamanho_casa', 'Tamanho da casa', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande","pequeno","medio","grande"]'::jsonb, 'home_type', true, 30),
+  ('tutor', 'tem_quintal', 'Tem quintal', 'boolean', NULL, NULL, true, 40),
+  ('tutor', 'renda_mensal', 'Renda mensal', 'select', '["ate_1000","1000_3000","3000_6000","6000_acima"]'::jsonb, NULL, true, 50),
+  ('tutor', 'disponibilidade_tempo', 'Disponibilidade de tempo', 'select', '["meio_periodo","integral"]'::jsonb, 'routine', true, 60),
+  ('animal', 'nivel_energia', 'Nível de energia', 'select', '["baixo","medio","alto"]'::jsonb, NULL, true, 10),
+  ('animal', 'aceita_criancas', 'Aceita crianças', 'boolean', NULL, NULL, true, 20),
+  ('animal', 'espaco_necessario', 'Espaço necessário', 'select', '["apartamento","casa_quintal_pequeno","casa_quintal_grande"]'::jsonb, NULL, true, 30),
+  ('animal', 'tamanho', 'Tamanho', 'select', '["pequeno","medio","grande"]'::jsonb, NULL, true, 40),
+  ('animal', 'requer_espaco', 'Espaço necessário', 'select', '["apartamento","casa_pequena","casa_grande"]'::jsonb, NULL, true, 50),
+  ('animal', 'vacinado', 'Vacinado', 'boolean', NULL, NULL, true, 60);
 
 -- Matching rules
 CREATE TABLE matching_rules (
@@ -204,6 +205,10 @@ INSERT INTO onboarding_questions (id, label, description, placeholder, type, opt
   ('preferred_energy', 'Qual nível de energia combina com sua rotina?', NULL, NULL, 'radio', '[{"label":"Tranquilo","value":"baixo"},{"label":"Equilibrado","value":"medio"},{"label":"Ativo","value":"alto"}]'::jsonb, true, 40),
   ('preferences', 'O que você procura em um novo companheiro?', 'Escolha uma ou mais opções.', NULL, 'multiselect', '[{"label":"Companhia","value":"companhia"},{"label":"Passeios","value":"passeios"},{"label":"Convívio com outros animais","value":"outros_animais"},{"label":"Perfil independente","value":"independente"}]'::jsonb, true, 50),
   ('notes', 'Quer contar algo importante para a ONG?', NULL, 'Ex.: já tenho um gato adulto em casa', 'text', NULL, false, 60);
+
+ALTER TABLE custom_fields
+  ADD CONSTRAINT custom_fields_source_question_id_fkey
+  FOREIGN KEY (source_question_id) REFERENCES onboarding_questions(id) ON DELETE SET NULL;
 
 ALTER TABLE tutors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;

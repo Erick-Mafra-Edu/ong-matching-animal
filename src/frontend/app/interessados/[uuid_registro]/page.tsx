@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { carregarInteresse } from "@/lib/interessados";
 
 type DetailRecord = Record<string, unknown>;
@@ -15,6 +16,7 @@ export default function InteresseDetalhePage() {
   const [record, setRecord] = useState<DetailRecord | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [isScheduling, setIsScheduling] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -45,9 +47,24 @@ export default function InteresseDetalhePage() {
   const animal = useMemo(() => asObject(record?.animal), [record]);
   const animalMatchingFields = getMatchingFields(asObject(animal.custom_fields));
   const tutorMatchingFields = getMatchingFields(asObject(tutor.custom_fields));
+  const schedule = useMemo(() => Array.isArray(record?.schedule) ? record.schedule.map(asObject) : [], [record]);
   const photoUrl = Array.isArray(animal.photoUrls) ? String(animal.photoUrls[0] ?? "") : String(animal.photoUrl ?? "");
   const tutorName = String(tutor.name ?? "Tutor");
   const animalName = String(animal.name ?? "Animal");
+
+  function openInterviewDraft() {
+    if (!record) return;
+
+    setIsScheduling(true);
+    sessionStorage.setItem("calendarInterviewDraft", JSON.stringify({
+      uuid_registro: record.uuid_registro,
+      tutor_id: record.tutor_id,
+      animal_id: record.animal_id,
+      tutor_name: tutorName,
+      animal_name: animalName,
+    }));
+    router.push("/calendario?draft=interview");
+  }
 
   if (status === "loading") {
     return (
@@ -78,7 +95,12 @@ export default function InteresseDetalhePage() {
             <h1 className="text-2xl font-semibold text-white">{tutorName} quer adotar {animalName}</h1>
             <p className="mt-2 text-sm text-slate-400">{formatDate(record?.data_registro)}</p>
           </div>
-          <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/admin">Voltar ao painel</Link>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={isScheduling} onClick={openInterviewDraft} type="button">
+              {isScheduling ? "Abrindo agenda..." : "Marcar entrevista"}
+            </Button>
+            <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-slate-300 hover:text-white" href="/admin">Voltar ao painel</Link>
+          </div>
         </header>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
@@ -112,6 +134,40 @@ export default function InteresseDetalhePage() {
             <MatchingInfoGrid fields={animalMatchingFields} />
           </ComparisonPanel>
         </div>
+
+        <section className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase text-cyan-200">Agenda</p>
+              <h2 className="mt-1 text-xl font-semibold text-white">Entrevista do interesse</h2>
+            </div>
+            <Badge>{schedule.length ? "Agendada" : "Sem agenda"}</Badge>
+          </div>
+
+          {schedule.length ? (
+            <div className="mt-4 grid gap-3">
+              {schedule.map((event) => (
+                <article className="rounded-md border border-white/10 bg-black/20 p-4" key={String(event.id)}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="font-semibold text-white">{formatValue(event.title)}</h3>
+                      <p className="mt-1 text-sm text-slate-400">{formatTimeRange(event.starts_at, event.ends_at)}</p>
+                      {event.location ? <p className="mt-1 text-sm text-slate-400">{formatValue(event.location)}</p> : null}
+                    </div>
+                    <Badge>{statusLabel(event.status)}</Badge>
+                  </div>
+                  {event.external_event_url ? (
+                    <a className="mt-3 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href={String(event.external_event_url)} rel="noreferrer" target="_blank">
+                      Abrir link externo
+                    </a>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm leading-6 text-slate-400">Ainda nao existe entrevista agendada para este registro.</p>
+          )}
+        </section>
       </div>
     </main>
   );
@@ -196,4 +252,19 @@ function formatValue(value: unknown) {
 
 function humanize(value: string) {
   return value.split("_").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function formatTimeRange(startValue: unknown, endValue: unknown) {
+  if (typeof startValue !== "string" || typeof endValue !== "string") return "sem horario";
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "sem horario";
+
+  return `${start.toLocaleDateString("pt-BR")} das ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} as ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function statusLabel(value: unknown) {
+  if (value === "completed") return "Concluida";
+  if (value === "cancelled") return "Cancelada";
+  return "Agendada";
 }

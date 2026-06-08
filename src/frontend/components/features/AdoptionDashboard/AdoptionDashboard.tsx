@@ -161,7 +161,10 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
       <header className="fixed left-0 right-0 top-0 z-20 hidden border-b border-white/10 bg-[#0e0e12]/90 px-10 py-4 backdrop-blur md:block">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <Link className="text-sm font-semibold text-white" href="/discover">Match Pet</Link>
-          <nav aria-label="Navegação desktop">
+          <nav className="flex items-center gap-2" aria-label="Navegação desktop">
+            <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/interesses">
+              Meus interesses
+            </Link>
             <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/admin">
               Painel administrativo
             </Link>

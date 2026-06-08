@@ -174,10 +174,15 @@ export class AdminController {
       const payload = req.params.resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id)
         : pickFields(req.body ?? {}, config.createFields);
+      const validationMessage = await validateAdminPayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
+      if (validationMessage) {
+        res.status(400).json({ message: validationMessage });
+        return;
+      }
       if (req.params.resource === "calendar-events") {
-        const validationMessage = validateCalendarEventPayload(payload);
-        if (validationMessage) {
-          res.status(400).json({ message: validationMessage });
+        const calendarValidationMessage = validateCalendarEventPayload(payload);
+        if (calendarValidationMessage) {
+          res.status(400).json({ message: calendarValidationMessage });
           return;
         }
       }
@@ -222,10 +227,15 @@ export class AdminController {
       const payload = req.params.resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id, true)
         : pickFields(req.body ?? {}, config.updateFields);
+      const validationMessage = await validateAdminPayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
+      if (validationMessage) {
+        res.status(400).json({ message: validationMessage });
+        return;
+      }
       if (req.params.resource === "calendar-events") {
-        const validationMessage = validateCalendarEventPayload(payload, true);
-        if (validationMessage) {
-          res.status(400).json({ message: validationMessage });
+        const calendarValidationMessage = validateCalendarEventPayload(payload, true);
+        if (calendarValidationMessage) {
+          res.status(400).json({ message: calendarValidationMessage });
           return;
         }
       }
@@ -293,4 +303,85 @@ export class AdminController {
       });
     }
   };
+}
+
+async function validateAdminPayload(resource: string, payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
+  if (resource === "custom-fields") {
+    return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
+  }
+
+  if (resource === "tutors" && Object.prototype.hasOwnProperty.call(payload, "custom_fields")) {
+    return validateTutorCustomFields(payload.custom_fields, supabaseUrl, serviceRoleKey);
+  }
+
+  return null;
+}
+
+async function validateCustomFieldPayload(payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
+  const entityType = String(payload.entity_type ?? "");
+  if (payload.source_question_id === "") payload.source_question_id = null;
+  if (entityType !== "tutor") {
+    payload.source_question_id = null;
+    return null;
+  }
+
+  const sourceQuestionId = typeof payload.source_question_id === "string" ? payload.source_question_id.trim() : "";
+  if (!sourceQuestionId) {
+    return "Campos customizados de tutor precisam estar vinculados a uma pergunta de onboarding.";
+  }
+
+  const questionIds = await fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey);
+  if (!questionIds.has(sourceQuestionId)) {
+    return "A pergunta vinculada ao campo customizado de tutor nao existe ou esta inativa.";
+  }
+
+  payload.source_question_id = sourceQuestionId;
+  return null;
+}
+
+async function validateTutorCustomFields(customFields: unknown, supabaseUrl: string, serviceRoleKey: string) {
+  if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return null;
+
+  const allowedKeys = await fetchTutorCustomFieldKeys(supabaseUrl, serviceRoleKey);
+  const invalidKeys = Object.keys(customFields as Record<string, unknown>)
+    .filter((key) => !allowedKeys.has(key));
+
+  if (invalidKeys.length > 0) {
+    return `Campos customizados de tutor sem pergunta vinculada: ${invalidKeys.join(", ")}.`;
+  }
+
+  return null;
+}
+
+async function fetchActiveOnboardingQuestionIds(supabaseUrl: string, serviceRoleKey: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=id&is_active=eq.true`, {
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+    },
+  });
+  const body = await response.json() as Array<{ id?: string }>;
+  return new Set(body.map((question) => question.id).filter((id): id is string => Boolean(id)));
+}
+
+async function fetchTutorCustomFieldKeys(supabaseUrl: string, serviceRoleKey: string) {
+  const [questions, customFieldsResponse] = await Promise.all([
+    fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey),
+    fetch(`${supabaseUrl}/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true&source_question_id=not.is.null`, {
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+      },
+    }),
+  ]);
+  const customFields = await customFieldsResponse.json() as Array<{ field_key?: string; source_question_id?: string | null }>;
+  const allowedKeys = new Set<string>(["onboarding_complete", ...questions]);
+
+  for (const field of customFields) {
+    if (field.field_key && field.source_question_id && questions.has(field.source_question_id)) {
+      allowedKeys.add(field.field_key);
+    }
+  }
+
+  return allowedKeys;
 }

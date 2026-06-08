@@ -30,6 +30,7 @@ export function createApiRouter() {
   router.put("/calendar-events/:id", calendarEvents.update);
   router.delete("/calendar-events/:id", calendarEvents.delete);
 
+  router.get("/interessados", interests.listMine);
   router.post("/interessados", interests.create);
   router.get("/interessados/:uuid_registro", interests.getDetail);
 

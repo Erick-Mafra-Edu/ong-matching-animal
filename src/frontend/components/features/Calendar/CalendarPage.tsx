@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { format, startOfWeek, addDays, isSameDay, isSameMonth, setHours, setMinutes, setSeconds } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,6 +38,14 @@ type FormState = {
   external_event_url: string;
 };
 
+type InterviewDraft = {
+  uuid_registro?: string;
+  tutor_id?: string;
+  animal_id?: string;
+  tutor_name?: string;
+  animal_name?: string;
+};
+
 const emptyFormState: FormState = {
   title: "",
   description: "",
@@ -58,6 +66,7 @@ const fieldClass =
 
 export function CalendarPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [events, setEvents] = useState<CalendarEventRecord[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventRecord | null>(null);
   const [formState, setFormState] = useState<FormState>(emptyFormState);
@@ -75,6 +84,7 @@ export function CalendarPage() {
   const [interests, setInterests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [draftApplied, setDraftApplied] = useState(false);
 
   const filteredEvents = useMemo(() => {
     const sorted = [...events].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
@@ -147,6 +157,48 @@ export function CalendarPage() {
       mounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (status !== "ready" || draftApplied || searchParams.get("draft") !== "interview") return;
+
+    const rawDraft = sessionStorage.getItem("calendarInterviewDraft");
+    if (!rawDraft) {
+      setDraftApplied(true);
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(rawDraft) as InterviewDraft;
+      if (!draft.tutor_id || !draft.animal_id) {
+        setDraftApplied(true);
+        return;
+      }
+
+      const slot = findNextFreeTutorDay(events, draft.tutor_id);
+      const title = `Entrevista com interessado ${draft.tutor_name || "tutor"} no animal ${draft.animal_name || "animal"}`;
+      const interestUrl = draft.uuid_registro ? `${window.location.origin}/interessados/${draft.uuid_registro}` : "";
+      setSelectedEvent(null);
+      setSelectedDate(slot.start);
+      setFormState({
+        ...emptyFormState,
+        title,
+        description: title,
+        starts_at: toDatetimeLocalValue(slot.start.toISOString()),
+        ends_at: toDatetimeLocalValue(slot.end.toISOString()),
+        tutor_id: draft.tutor_id,
+        animal_id: draft.animal_id,
+        interest_id: draft.uuid_registro ?? "",
+        external_event_url: interestUrl,
+      });
+      setMessage("Formulario de entrevista preenchido. Revise os dados e clique em Criar para salvar o evento.");
+      sessionStorage.removeItem("calendarInterviewDraft");
+      router.replace("/calendario");
+    } catch {
+      setMessage("Nao foi possivel abrir o rascunho da entrevista.");
+    } finally {
+      setDraftApplied(true);
+    }
+  }, [draftApplied, events, router, searchParams, status]);
 
   // Backend search debounced
   useEffect(() => {
@@ -762,4 +814,33 @@ function toDatetimeLocalValue(value: string) {
   const offset = date.getTimezoneOffset();
   const localDate = new Date(date.getTime() - offset * 60 * 1000);
   return localDate.toISOString().slice(0, 16);
+}
+
+function findNextFreeTutorDay(events: CalendarEventRecord[], tutorId: string) {
+  const occupiedDays = new Set(events
+    .filter((event) => event.tutor_id === tutorId && event.status === "scheduled")
+    .map((event) => formatLocalDayKey(new Date(event.starts_at))));
+
+  for (let offset = 1; offset <= 45; offset += 1) {
+    const start = new Date();
+    start.setDate(start.getDate() + offset);
+    start.setHours(9, 0, 0, 0);
+
+    if (occupiedDays.has(formatLocalDayKey(start))) continue;
+
+    const end = new Date(start);
+    end.setHours(10, 0, 0, 0);
+    return { start, end };
+  }
+
+  const fallbackStart = new Date();
+  fallbackStart.setDate(fallbackStart.getDate() + 1);
+  fallbackStart.setHours(9, 0, 0, 0);
+  const fallbackEnd = new Date(fallbackStart);
+  fallbackEnd.setHours(10, 0, 0, 0);
+  return { start: fallbackStart, end: fallbackEnd };
+}
+
+function formatLocalDayKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
