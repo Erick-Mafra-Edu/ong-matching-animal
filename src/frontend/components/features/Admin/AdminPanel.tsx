@@ -2,24 +2,60 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { AdminContext, useDataProvider, type DataProvider, type RaRecord } from "react-admin";
+import {
+  ImageIcon,
+  Dog,
+  HeartHandshake,
+  Calendar,
+  Settings,
+  ShieldCheck,
+  ClipboardCheck,
+  Settings2,
+  HelpCircle,
+  Zap,
+  Globe,
+  Trash2,
+  AlertTriangle,
+  ChevronDown,
+  Star,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Link as LinkIcon,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/Dialog";
 import {
   adminResources,
   createAdminResource,
   createAdminUser,
   deleteAdminResource,
+  disconnectCalendarOAuthConnection,
   getAdminMe,
+  getCalendarOAuthAuthorizationUrl,
   listAdminResource,
+  refreshCalendarOAuthConnection,
   updateAdminResource,
   uploadAnimalPhoto,
   type AdminResource,
 } from "@/lib/admin";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { FileUpload } from "@/components/ui/FileUpload";
+import { CalendarPage } from "@/components/features/Calendar/CalendarPage";
 
 type AdminRecord = RaRecord & Record<string, unknown>;
-type FieldType = "text" | "email" | "password" | "number" | "boolean" | "select" | "textarea" | "keyValue" | "options";
+type FieldType = "text" | "email" | "password" | "number" | "boolean" | "select" | "textarea" | "keyValue" | "options" | "slider";
 type CustomFieldEntity = "tutor" | "animal";
 
 interface FieldConfig {
@@ -77,7 +113,7 @@ type OnboardingQuestionRecord = AdminRecord & {
 };
 
 const fieldClass =
-  "min-h-11 w-full rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-cyan-200 disabled:opacity-40";
+  "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
 const animalPhotoMaxSizeBytes = 800 * 1024;
 const animalPhotoMaxWidth = 1080;
 const animalPhotoMaxHeight = 1920;
@@ -105,12 +141,11 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     id: "service-configs",
     description: "Configure credenciais de servicos externos como Google e Microsoft.",
     emptyTitle: "Nenhum servico configurado.",
-    primaryField: "id",
-    secondaryFields: ["service_type", "provider", "is_active"],
+    primaryField: "provider",
+    secondaryFields: ["service_type", "is_active"],
     searchFields: ["id", "service_type", "provider"],
-    createDefaults: { id: "", service_type: "calendar", provider: "google", config: [], is_active: true },
+    createDefaults: { service_type: "calendar", provider: "google", config: [], is_active: true },
     fields: [
-      { name: "id", label: "Identificador unico", type: "text", createOnly: true, required: true, helper: "Ex.: google_calendar_main" },
       {
         name: "service_type",
         label: "Tipo de servico",
@@ -132,6 +167,46 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "is_active", label: "Ativo", type: "boolean" },
     ],
   },
+  "ong-settings": {
+    id: "ong-settings",
+    description: "Configure os dados de contato e a mensagem usada quando um tutor quer adotar.",
+    emptyTitle: "Nenhuma configuracao da ONG encontrada.",
+    primaryField: "ong_name",
+    secondaryFields: ["contact_email", "whatsapp_phone", "is_active"],
+    searchFields: ["ong_name", "contact_email", "contact_phone", "whatsapp_phone"],
+    createDefaults: {
+      ong_name: "ONG Matching Animal",
+      contact_email: "",
+      contact_phone: "",
+      whatsapp_phone: "",
+      website_url: "",
+      address_line: "",
+      city: "",
+      state: "",
+      postal_code: "",
+      social_links: [],
+      business_hours: [],
+      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:",
+      settings: [],
+      is_active: true,
+    },
+    fields: [
+      { name: "ong_name", label: "Nome da ONG", type: "text", required: true },
+      { name: "contact_email", label: "Email de contato", type: "email" },
+      { name: "contact_phone", label: "Telefone", type: "text" },
+      { name: "whatsapp_phone", label: "WhatsApp", type: "text", helper: "Use DDI e DDD. Ex.: 5511999999999." },
+      { name: "website_url", label: "Site", type: "text" },
+      { name: "address_line", label: "Endereco", type: "text" },
+      { name: "city", label: "Cidade", type: "text" },
+      { name: "state", label: "Estado", type: "text" },
+      { name: "postal_code", label: "CEP", type: "text" },
+      { name: "adoption_message_template", label: "Mensagem de adocao", type: "textarea", helper: "Use {nomeDoAnimal} e {linkInteresse} para preencher automaticamente." },
+      { name: "social_links", label: "Redes sociais", type: "keyValue" },
+      { name: "business_hours", label: "Horario de atendimento", type: "keyValue" },
+      { name: "settings", label: "Configuracoes extras", type: "keyValue" },
+      { name: "is_active", label: "Configuracao ativa", type: "boolean" },
+    ],
+  },
   tutors: {
     id: "tutors",
     description: "Perfis de tutores cadastrados e dados usados no matching.",
@@ -139,9 +214,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     primaryField: "name",
     secondaryFields: ["location", "created_at"],
     searchFields: ["name", "location", "auth_user_id"],
-    createDefaults: { auth_user_id: "", name: "", location: "", custom_fields: [] },
+    createDefaults: { name: "", location: "", custom_fields: [] },
     fields: [
-      { name: "auth_user_id", label: "ID do usuario Auth", type: "text", createOnly: true, required: true },
       { name: "name", label: "Nome", type: "text", required: true },
       { name: "location", label: "Localizacao", type: "text" },
       { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "tutor", helper: "Use os campos cadastrados para preferencias, rotina e outros dados." },
@@ -154,9 +228,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     primaryField: "name",
     secondaryFields: ["species", "location"],
     searchFields: ["name", "species", "location", "owner_id"],
-    createDefaults: { owner_id: "", name: "", species: "", location: "", custom_fields: [] },
+    createDefaults: { name: "", species: "", location: "", custom_fields: [] },
     fields: [
-      { name: "owner_id", label: "ID da ONG responsavel", type: "text", required: true },
       { name: "name", label: "Nome", type: "text", required: true },
       { name: "species", label: "Especie", type: "text", required: true },
       { name: "location", label: "Localizacao", type: "text" },
@@ -242,9 +315,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     secondaryFields: ["starts_at", "status", "animal_name"],
     searchFields: ["title", "description", "location", "tutor_name", "animal_name", "status"],
     createDefaults: {
-      tutor_id: "",
-      animal_id: "",
-      interest_id: "",
       title: "",
       description: "",
       location: "",
@@ -252,7 +322,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       ends_at: "",
       status: "scheduled",
       provider: "",
-      external_event_id: "",
       external_event_url: "",
       metadata: [],
     },
@@ -270,9 +339,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
           { label: "Cancelado", value: "cancelled" },
         ],
       },
-      { name: "tutor_id", label: "ID do tutor", type: "text" },
-      { name: "animal_id", label: "ID do animal", type: "text" },
-      { name: "interest_id", label: "ID do interesse", type: "text" },
       { name: "location", label: "Local", type: "text" },
       { name: "description", label: "Descricao", type: "textarea" },
       {
@@ -285,9 +351,39 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
           { label: "Microsoft", value: "microsoft" },
         ],
       },
-      { name: "external_event_id", label: "ID externo", type: "text" },
       { name: "external_event_url", label: "URL externa", type: "text" },
       { name: "metadata", label: "Metadados", type: "keyValue" },
+    ],
+  },
+  "calendar-oauth-connections": {
+    id: "calendar-oauth-connections",
+    description: "Conexoes OAuth de calendario para Google e Microsoft.",
+    emptyTitle: "Nenhuma conexao OAuth configurada.",
+    primaryField: "provider",
+    secondaryFields: ["calendar_id", "account_email", "is_active"],
+    searchFields: ["provider", "calendar_id", "account_email", "tenant_id"],
+    readonly: true,
+    createDefaults: {
+      provider: "google",
+      calendar_id: "primary",
+      account_email: "",
+      tenant_id: "",
+      access_token: "",
+      refresh_token: "",
+      token_type: "Bearer",
+      scope: "",
+      expires_at: "",
+      metadata: [],
+      is_active: true,
+    },
+    fields: [
+      { name: "provider", label: "Provider", type: "select", options: [{ label: "Google", value: "google" }, { label: "Microsoft", value: "microsoft" }], required: true },
+      { name: "calendar_id", label: "Calendar ID", type: "text" },
+      { name: "account_email", label: "Conta", type: "text" },
+      { name: "tenant_id", label: "Tenant", type: "text" },
+      { name: "scope", label: "Scopes", type: "textarea" },
+      { name: "expires_at", label: "Expira em", type: "text" },
+      { name: "is_active", label: "Ativa", type: "boolean" },
     ],
   },
   "animal-photos": {
@@ -298,7 +394,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     secondaryFields: ["content_type", "is_primary"],
     searchFields: ["animal_id", "storage_path", "public_url", "content_type"],
     createDefaults: {
-      animal_id: "",
       bucket_id: "animal-photos",
       storage_path: "",
       public_url: "",
@@ -307,7 +402,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       is_primary: false,
     },
     fields: [
-      { name: "animal_id", label: "ID do animal", type: "text", required: true },
       { name: "bucket_id", label: "Bucket", type: "text", required: true },
       { name: "storage_path", label: "Caminho no storage", type: "text", required: true },
       { name: "public_url", label: "URL publica", type: "text", required: true },
@@ -334,7 +428,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     secondaryFields: ["type", "sort_order"],
     searchFields: ["id", "label", "description", "placeholder"],
     createDefaults: {
-      id: "",
       label: "",
       description: "",
       placeholder: "",
@@ -345,7 +438,6 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       sort_order: 0,
     },
     fields: [
-      { name: "id", label: "Identificador", type: "text", createOnly: true, required: true, helper: "Use um nome curto, sem espacos. Ex.: tipo_moradia." },
       { name: "label", label: "Pergunta", type: "text", required: true },
       { name: "description", label: "Descricao", type: "textarea" },
       { name: "placeholder", label: "Texto de apoio", type: "text" },
@@ -373,14 +465,15 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     description: "Regras que comparam campos do tutor com campos do animal.",
     emptyTitle: "Nenhuma regra cadastrada.",
     primaryField: "rule_name",
-    secondaryFields: ["comparison_operator", "weight"],
+    secondaryFields: ["comparison_operator", "weight", "is_dealbreaker"],
     searchFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator"],
     createDefaults: {
       rule_name: "",
       tutor_field: "",
       animal_field: "",
       comparison_operator: "=",
-      weight: 10,
+      weight: 50,
+      is_dealbreaker: false,
       is_active: true,
     },
     fields: [
@@ -391,18 +484,34 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         label: "Condicao",
         type: "select",
         options: [
-          { label: "Igual", value: "=" },
-          { label: "Diferente", value: "!=" },
-          { label: "Contem", value: "contains" },
-          { label: "Maior ou igual", value: ">=" },
-          { label: "Menor ou igual", value: "<=" },
+          { label: "Deve ser igual a", value: "=" },
+          { label: "Deve ser diferente de", value: "!=" },
+          { label: "Deve conter", value: "contains" },
+          { label: "Deve ser maior ou igual a", value: ">=" },
+          { label: "Deve ser menor ou igual a", value: "<=" },
         ],
       },
       { name: "animal_field", label: "Campo do animal", type: "select", required: true, dynamicOptionsFor: "animal" },
-      { name: "weight", label: "Peso", type: "number" },
+      { name: "weight", label: "Impacto na pontuacao", type: "slider", helper: "0 baixo impacto, 50 medio, 100 alto." },
+      { name: "is_dealbreaker", label: "Regra eliminatoria", type: "boolean", helper: "Se falhar, o animal nao aparece para esse tutor." },
       { name: "is_active", label: "Regra ativa", type: "boolean" },
     ],
   },
+};
+
+const resourceIconMap: Record<AdminResource, any> = {
+  "admin-users": ShieldCheck,
+  "service-configs": Globe,
+  "calendar-oauth-connections": Globe,
+  "ong-settings": Settings,
+  tutors: HeartHandshake,
+  animals: Dog,
+  "custom-fields": Settings2,
+  "tutor-interessados": ClipboardCheck,
+  "calendar-events": Calendar,
+  "animal-photos": ImageIcon,
+  "onboarding-questions": HelpCircle,
+  "matching-rules": Zap,
 };
 
 const adminDataProvider = {
@@ -467,17 +576,32 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const router = useRouter();
   const dataProvider = useDataProvider();
   const [activeResource, setActiveResource] = useState<AdminResource>("admin-users");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const visibleResources = useMemo(() => {
     return visibleAdminResources.filter(r => {
-      if (r.id === "calendar-events" || r.id === "service-configs") {
+      if (r.id === "calendar-events" || r.id === "calendar-oauth-connections") {
         return showCalendarConfig;
       }
       return true;
     });
   }, [showCalendarConfig]);
-// ...
   const [rows, setRows] = useState<AdminRecord[]>([]);
+  const [photoMap, setPhotoMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (activeResource === "animals" && rows.length > 0) {
+      listAdminResource("animal-photos").then(photos => {
+        const map: Record<string, string> = {};
+        photos.forEach(p => {
+          if (p.is_primary && p.animal_id && p.public_url) {
+            map[String(p.animal_id)] = String(p.public_url);
+          }
+        });
+        setPhotoMap(map);
+      });
+    }
+  }, [activeResource, rows]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("edit");
   const [formState, setFormState] = useState<FormState>(() => createInitialState(resourceUiConfigs["admin-users"]));
@@ -658,23 +782,49 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-          <aside className="space-y-3">
-            {visibleResources.map((resource) => (
-              <button
-                aria-current={resource.id === activeResource ? "page" : undefined}
-                className={`block w-full rounded-md border px-4 py-3 text-left transition disabled:cursor-wait disabled:opacity-65 ${resource.id === activeResource ? "border-cyan-200 bg-cyan-200 text-slate-950" : "border-white/10 bg-white/[0.035] text-slate-200 hover:bg-white/[0.07]"}`}
-                disabled={isResourceLoading}
-                key={resource.id}
-                onClick={() => changeResource(resource.id)}
-                type="button"
-              >
-                <span className="block text-sm font-semibold">{resource.label}</span>
-                <span className={`mt-1 block text-xs ${resource.id === activeResource ? "text-slate-800" : "text-slate-500"}`}>
-                  {resourceUiConfigs[resource.id].description}
-                </span>
-              </button>
-            ))}
+        <div className={`grid gap-6 transition-all duration-300 ${isSidebarCollapsed ? "xl:grid-cols-[80px_1fr]" : "xl:grid-cols-[280px_1fr]"}`}>
+          <aside className="space-y-2 relative">
+            <button
+              className="absolute -right-3 top-0 z-10 hidden xl:flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#16161a] text-slate-400 hover:text-white"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              type="button"
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+            </button>
+
+            {visibleResources.map((resource) => {
+              const Icon = resourceIconMap[resource.id as AdminResource] || Settings;
+              const isActive = resource.id === activeResource;
+
+              return (
+                <button
+                  aria-current={isActive ? "page" : undefined}
+                  className={`group flex w-full items-center gap-4 rounded-xl border px-3 py-3 text-left transition-all duration-200 disabled:cursor-wait disabled:opacity-65 ${
+                    isActive
+                      ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-50 shadow-[0_0_20px_rgba(34,211,238,0.1)]"
+                      : "border-transparent bg-transparent text-slate-400 hover:bg-white/[0.04]"
+                  } ${isSidebarCollapsed ? "justify-center px-3" : "px-4"}`}
+                  disabled={isResourceLoading}
+                  key={resource.id}
+                  onClick={() => changeResource(resource.id)}
+                  title={isSidebarCollapsed ? resource.label : undefined}
+                  type="button"
+                >
+                  <div className={`shrink-0 rounded-lg p-2 transition-colors ${isActive ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-slate-500 group-hover:text-slate-300"}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  {!isSidebarCollapsed && (
+                    <div className="min-w-0">
+                      <span className={`block text-sm font-bold tracking-tight ${isActive ? "text-white" : "text-slate-300 group-hover:text-white"}`}>{resource.label}</span>
+                      <span className={`mt-0.5 block truncate text-[11px] font-medium ${isActive ? "text-cyan-200/70" : "text-slate-500"}`}>
+                        {resourceUiConfigs[resource.id as AdminResource].description}
+                      </span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </aside>
 
           <section className="min-w-0 space-y-5">
@@ -684,10 +834,19 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
 
             {isResourceLoading ? (
               <MenuLoadingPanel label={adminResources.find((resource) => resource.id === activeResource)?.label ?? "menu"} />
+            ) : activeResource === "calendar-events" ? (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <CalendarPage skipAuthCheck standalone={false} />
+              </div>
+            ) : activeResource === "service-configs" ? (
+              <ServiceConfigsPanel onRefresh={() => loadResource(activeResource)} rows={rows} />
+            ) : activeResource === "calendar-oauth-connections" ? (
+              <CalendarOAuthPanel onRefresh={() => loadResource(activeResource)} rows={rows} />
             ) : (
               <div className="grid gap-5 lg:grid-cols-[minmax(300px,420px)_1fr]">
                 <RecordList
                   config={activeConfig}
+                  photoMap={photoMap}
                   query={query}
                   rows={filteredRows}
                   selectedId={selectedId}
@@ -721,49 +880,68 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
 
 function AdminShell({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#0e0e12] px-4 py-6 text-white md:px-8 lg:px-12">
-      <div className="mx-auto w-full max-w-[1500px]">{children}</div>
+    <main className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/20 via-[#0a0a0c] to-[#0a0a0c] px-4 py-8 text-white md:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-[1600px] animate-state-enter">{children}</div>
     </main>
   );
 }
 
 function ResourceHeader({ config, count, isLoading, onCreate }: { config: ResourceUiConfig; count: number; isLoading: boolean; onCreate: () => void }) {
+  const Icon = resourceIconMap[config.id as AdminResource] || Settings;
+
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.035] p-4 md:flex-row md:items-center md:justify-between">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-white">{adminResources.find((resource) => resource.id === config.id)?.label}</h2>
-          <Badge>{isLoading ? "carregando" : `${count} registros`}</Badge>
+    <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/5 text-slate-400">
+          <Icon className="h-6 w-6" />
         </div>
-        <p className="mt-1 text-sm text-slate-400">{config.description}</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white tracking-tight">{adminResources.find((resource) => resource.id === config.id)?.label}</h2>
+            <Badge className="bg-white/5 text-slate-400 border-none font-bold uppercase tracking-wider text-[10px]">
+              {isLoading ? "Buscando..." : `${count} itens`}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs font-medium text-slate-500 truncate">{config.description}</p>
+        </div>
       </div>
-      {!config.readonly && <Button className="shrink-0" disabled={isLoading} onClick={onCreate} type="button">Novo registro</Button>}
+      {!config.readonly && (
+        <Button className="shrink-0 h-11 px-6 shadow-lg shadow-cyan-400/5" disabled={isLoading} onClick={onCreate} type="button">
+          Adicionar Novo
+        </Button>
+      )}
     </div>
   );
 }
 
 function MenuLoadingPanel({ label }: { label: string }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(300px,420px)_1fr]" role="status" aria-live="polite">
-      <section className="min-h-[520px] rounded-md border border-white/10 bg-white/[0.035] p-4">
-        <div className="h-11 animate-pulse rounded-md bg-white/10" />
-        <div className="mt-5 space-y-3">
+    <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]" role="status" aria-live="polite">
+      <section className="min-h-[520px] rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <div className="h-12 animate-pulse rounded-xl bg-white/5" />
+        <div className="mt-6 space-y-4">
           {[0, 1, 2, 3, 4].map((item) => (
-            <div className="rounded-md border border-white/5 bg-white/[0.025] p-3" key={item}>
-              <div className="h-4 w-2/3 animate-pulse rounded bg-white/10" />
-              <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-white/5" />
+            <div className="rounded-xl border border-white/5 bg-white/[0.01] p-4" key={item}>
+              <div className="h-4 w-2/3 animate-pulse rounded bg-white/5" />
+              <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-white/[0.03]" />
             </div>
           ))}
         </div>
       </section>
-      <section className="rounded-md border border-white/10 bg-white/[0.035] p-4">
-        <p className="text-sm font-semibold text-cyan-100">Carregando {label}...</p>
-        <p className="mt-1 text-sm text-slate-500">Buscando registros e preparando os formularios.</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-8 flex flex-col items-center justify-center text-center">
+        <div className="relative">
+          <div className="absolute inset-0 animate-ping rounded-full bg-cyan-400/20" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-400">
+            <Settings className="h-8 w-8 animate-spin-slow" />
+          </div>
+        </div>
+        <h3 className="mt-6 text-lg font-bold text-white tracking-tight">Preparando {label}</h3>
+        <p className="mt-2 text-sm text-slate-500 max-w-xs">Buscando registros e configurando formulários dinâmicos...</p>
+        <div className="mt-10 grid w-full gap-6 md:grid-cols-2">
           {[0, 1, 2, 3, 4, 5].map((item) => (
-            <div className="space-y-2" key={item}>
-              <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
-              <div className="h-11 animate-pulse rounded-md bg-white/5" />
+            <div className="space-y-3" key={item}>
+              <div className="h-3 w-24 animate-pulse rounded bg-white/5" />
+              <div className="h-12 animate-pulse rounded-xl bg-white/[0.02]" />
             </div>
           ))}
         </div>
@@ -776,6 +954,7 @@ function RecordList({
   config,
   onQueryChange,
   onSelect,
+  photoMap = {},
   query,
   rows,
   selectedId,
@@ -784,43 +963,99 @@ function RecordList({
   config: ResourceUiConfig;
   onQueryChange: (value: string) => void;
   onSelect: (row: AdminRecord) => void;
+  photoMap?: Record<string, string>;
   query: string;
   rows: AdminRecord[];
   selectedId: string | null;
   total: number;
 }) {
   return (
-    <section className="min-h-[520px] rounded-md border border-white/10 bg-white/[0.035]">
-      <div className="border-b border-white/10 p-4">
-        <label className="text-xs font-semibold uppercase text-slate-400" htmlFor="admin-search">Buscar</label>
-        <input
-          className={`${fieldClass} mt-2`}
-          id="admin-search"
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Filtrar registros"
-          value={query}
-        />
+    <section className="flex flex-col min-h-[520px] rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+      <div className="border-b border-white/10 p-5 bg-white/[0.01]">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="admin-search">Buscar em {total} registros</label>
+        <div className="relative mt-2">
+          <input
+            className={`${fieldClass} pl-10 h-12 border-white/5 focus:border-cyan-400/50 bg-black/40`}
+            id="admin-search"
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={`Pesquisar por ${config.searchFields.join(", ")}...`}
+            value={query}
+          />
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+          </div>
+        </div>
       </div>
-      <div className="max-h-[620px] overflow-auto">
-        {rows.map((row) => (
-          <button
-            className={`block w-full border-b border-white/5 px-4 py-3 text-left text-sm transition hover:bg-white/5 ${String(row.id) === selectedId ? "bg-cyan-200/10 text-cyan-100" : "text-slate-300"}`}
-            key={String(row.id)}
-            onClick={() => onSelect(row)}
-            type="button"
-          >
-            <span className="block truncate font-semibold">{getRecordTitle(row, config)}</span>
-            <span className="mt-1 flex flex-wrap gap-1.5">
-              {config.secondaryFields.map((field) => (
-                <span className="rounded bg-white/5 px-2 py-1 text-[11px] text-slate-400" key={field}>{formatValue(row[field])}</span>
-              ))}
-            </span>
-          </button>
-        ))}
+      <div className="flex-1 overflow-auto custom-scrollbar">
+        {rows.map((row) => {
+          const isSelected = String(row.id) === selectedId;
+          const photoUrl = config.id === "animals" ? photoMap[String(row.id)] : null;
+
+          return (
+            <button
+              className={`group relative block w-full border-b border-white/5 px-5 py-4 text-left transition-all hover:bg-white/[0.04] ${
+                isSelected ? "bg-cyan-400/10" : ""
+              }`}
+              key={String(row.id)}
+              onClick={() => onSelect(row)}
+              type="button"
+            >
+              {isSelected && <div className="absolute left-0 top-0 h-full w-1 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]" />}
+              <div className="flex items-center gap-3">
+                {config.id === "animals" && (
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                    {photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" className="h-full w-full object-cover" src={photoUrl} />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-600">
+                        <Dog className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={`block truncate text-sm font-bold tracking-tight transition-colors ${isSelected ? "text-cyan-200" : "text-white group-hover:text-cyan-100"}`}>
+                      {getRecordTitle(row, config)}
+                    </span>
+                    {("is_active" in row || "status" in row) && (
+                      <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full shadow-sm ${
+                        row.is_active === false || row.status === "cancelled" ? "bg-slate-600" :
+                        row.status === "scheduled" ? "bg-amber-400" : "bg-cyan-400"
+                      }`} />
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {config.secondaryFields.map((field) => {
+                      const val = row[field];
+                      if (val === null || val === undefined || val === "") return null;
+                      return (
+                        <span
+                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                            isSelected ? "bg-cyan-400/10 text-cyan-300/70" : "bg-white/5 text-slate-500 group-hover:bg-white/10 group-hover:text-slate-400"
+                          }`}
+                          key={field}
+                        >
+                          {formatValue(val)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
         {!rows.length && (
-          <p className="px-4 py-6 text-sm text-slate-400">
-            {query && total > 0 ? "Nenhum registro encontrado para a busca." : config.emptyTitle}
-          </p>
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="rounded-full bg-white/5 p-4 text-slate-600">
+              <ImageIcon className="h-8 w-8" />
+            </div>
+            <p className="mt-4 text-sm font-medium text-slate-400">
+              {query && total > 0 ? `Nenhum ${config.id === "animals" ? "animal" : "registro"} encontrado para sua busca.` : config.emptyTitle}
+            </p>
+          </div>
         )}
       </div>
     </section>
@@ -858,55 +1093,89 @@ function RecordForm({
   const formDisabled = disabled || config.readonly === true;
 
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.035] p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
       <form onSubmit={onSubmit}>
-        <div className="mb-5 flex flex-col gap-3 border-b border-white/10 pb-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-white">{mode === "create" ? "Criar registro" : "Editar registro"}</h3>
-            <p className="mt-1 text-sm text-slate-400">
-              {mode === "create" ? "Preencha os campos abaixo para adicionar um item." : selectedRow ? `Selecionado: ${getRecordTitle(selectedRow, config)}` : "Selecione um item na lista."}
+        <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.01] p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-white tracking-tight">{mode === "create" ? "Novo Registro" : "Editar Registro"}</h3>
+            <p className="mt-1 text-xs font-medium text-slate-500 truncate">
+              {mode === "create" ? `Adicionando em ${config.id}` : selectedRow ? `ID: ${selectedRow.id}` : "Selecione um item"}
             </p>
+          </div>
+          <div className="flex items-center gap-3">
             {config.id === "tutor-interessados" && selectedRow?.uuid_registro && (
-              <Link className="mt-2 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href={`/interessados/${String(selectedRow.uuid_registro)}`}>
-                Abrir comparacao
+              <Link className="rounded-full bg-cyan-400/10 px-4 py-2 text-xs font-bold text-cyan-400 transition hover:bg-cyan-400/20" href={`/interessados/${String(selectedRow.uuid_registro)}`}>
+                Ver Detalhes
               </Link>
             )}
+            {mode === "edit" && !config.readonly && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="h-9 px-4 text-[10px]" disabled={formDisabled} type="button" variant="danger">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
+                    <DialogDescription className="text-center">
+                      Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="mt-4 gap-2 sm:justify-center">
+                    <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
+                    <DialogClose asChild>
+                      <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
-          {mode === "edit" && (
-            !config.readonly && <Button className="shrink-0" disabled={formDisabled} onClick={onDelete} type="button" variant="danger">Excluir</Button>
+        </div>
+
+          <div className="flex-1 p-6 pb-24">
+            <div className="grid gap-6 md:grid-cols-2">
+              {visibleFields.map((field) => (
+                <FieldInput
+                  disabled={formDisabled}
+                  field={field}
+                  key={field.name}
+                  customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
+                  dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
+                  value={formState[field.name]}
+                  onChange={(value) => onChange({ ...formState, [field.name]: value })}
+                />
+              ))}
+            </div>
+
+            {config.id === "matching-rules" && (
+              <RuleComparisonPreview
+                animalOptions={customFieldOptions.animal}
+                formState={formState}
+                tutorOptions={customFieldOptions.tutor}
+              />
+            )}
+
+            {config.id === "animals" && mode === "edit" && selectedRow && (
+              <div className="mt-8 border-t border-white/10 bg-white/[0.01] p-6 rounded-xl">
+                <AnimalImagesPanel animal={selectedRow} disabled={disabled} onRefresh={() => onRefresh(String(selectedRow.id))} />
+              </div>
+            )}
+          </div>
+
+          {!config.readonly && (
+            <div className="sticky bottom-0 z-20 flex justify-end border-t border-white/10 bg-[#16161a]/80 p-4 backdrop-blur-md">
+              <Button className="min-w-[160px] shadow-xl shadow-cyan-400/10" disabled={formDisabled} type="submit">
+                {mode === "create" ? "Criar Registro" : "Salvar Alterações"}
+              </Button>
+            </div>
           )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {visibleFields.map((field) => (
-            <FieldInput
-              disabled={formDisabled}
-              field={field}
-              key={field.name}
-              customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
-              dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
-              value={formState[field.name]}
-              onChange={(value) => onChange({ ...formState, [field.name]: value })}
-            />
-          ))}
-        </div>
-
-        {config.id === "matching-rules" && (
-          <RuleComparisonPreview
-            animalOptions={customFieldOptions.animal}
-            formState={formState}
-            tutorOptions={customFieldOptions.tutor}
-          />
-        )}
-
-        <div className="mt-5 flex justify-end">
-          {!config.readonly && <Button disabled={formDisabled} type="submit">{mode === "create" ? "Criar" : "Salvar"}</Button>}
-        </div>
       </form>
-
-      {config.id === "animals" && mode === "edit" && selectedRow && (
-        <AnimalImagesPanel animal={selectedRow} disabled={disabled} onRefresh={() => onRefresh(String(selectedRow.id))} />
-      )}
     </div>
   );
 }
@@ -923,31 +1192,41 @@ function RuleComparisonPreview({
   const tutorLabel = findOptionLabel(tutorOptions, formState.tutor_field) || "campo_tutor";
   const animalLabel = findOptionLabel(animalOptions, formState.animal_field) || "campo_animal";
   const conditionLabel = comparisonOperatorLabel(String(formState.comparison_operator ?? ""));
+  const weight = Number(formState.weight ?? 0);
+  const isDealbreaker = Boolean(formState.is_dealbreaker);
 
   return (
     <div className="mt-5 rounded-md border border-cyan-200/20 bg-cyan-200/[0.06] p-4">
-      <p className="text-xs font-semibold uppercase text-cyan-100">Visualizacao da regra</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase text-cyan-100">Construtor visual da regra</p>
+        <div className="flex flex-wrap gap-2 text-xs font-bold uppercase">
+          <span className="rounded-full bg-cyan-200/15 px-3 py-1 text-cyan-100">{impactLabel(weight)}</span>
+          {isDealbreaker && <span className="rounded-full bg-pink-400/15 px-3 py-1 text-pink-200">Eliminatoria</span>}
+        </div>
+      </div>
       <div className="mt-3 grid items-center gap-3 text-sm md:grid-cols-[1fr_auto_1fr]">
         <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
-          <span className="block text-[11px] uppercase text-slate-500">campo_tutor</span>
+          <span className="block text-[11px] uppercase text-slate-500">Perfil do tutor</span>
           <span className="font-semibold">{tutorLabel}</span>
         </div>
         <div className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center font-semibold text-cyan-100">
           {conditionLabel}
         </div>
         <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
-          <span className="block text-[11px] uppercase text-slate-500">campo_animal</span>
+          <span className="block text-[11px] uppercase text-slate-500">Atributo do animal</span>
           <span className="font-semibold">{animalLabel}</span>
         </div>
       </div>
+      <p className="mt-3 text-sm leading-6 text-slate-300">
+        Quando essa frase for verdadeira, o animal recebe <span className="font-bold text-cyan-100">{weight || 0} pontos</span>.
+        {isDealbreaker && " Se for falsa, o animal sera removido dos resultados desse tutor."}
+      </p>
     </div>
   );
 }
 
 function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecord; disabled: boolean; onRefresh: () => Promise<void> }) {
   const [photos, setPhotos] = useState<AdminRecord[]>([]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileInputKey, setFileInputKey] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "saving">("loading");
   const [message, setMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -958,7 +1237,8 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
     setMessage("");
     try {
       const data = await listAdminResource("animal-photos");
-      setPhotos(data.filter((photo) => String(photo.animal_id) === animalId).map(toRaRecord));
+      const filtered = data.filter((photo) => String(photo.animal_id) === animalId).map(toRaRecord);
+      setPhotos(filtered);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel carregar as fotos.");
     } finally {
@@ -970,25 +1250,14 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
     void loadPhotos();
   }, [loadPhotos]);
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    setSelectedFile(file);
-    setUploadProgress(null);
-    setMessage(file ? "A imagem sera recortada em 9:16 e convertida para WebP antes do envio." : "");
-  }
-
-  async function handleUpload(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedFile) {
-      setMessage("Selecione uma imagem para enviar.");
-      return;
-    }
+  async function handleUpload(file: File) {
+    if (!file) return;
 
     setStatus("saving");
     setUploadProgress(0);
     setMessage("Recortando e compactando imagem...");
     try {
-      const optimizedFile = await cropAndCompressAnimalPhoto(selectedFile);
+      const optimizedFile = await cropAndCompressAnimalPhoto(file);
       setMessage(`Imagem otimizada: ${formatFileSize(optimizedFile.size)}. Enviando...`);
 
       const newPhoto = await uploadAnimalPhoto(animalId, optimizedFile, (percent) => {
@@ -996,8 +1265,6 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
         setMessage(`Enviando imagem: ${percent}%`);
       });
       await makePrimary(String(newPhoto.id), false);
-      setSelectedFile(null);
-      setFileInputKey((current) => current + 1);
       await loadPhotos();
       await onRefresh();
       setMessage(`Imagem enviada em WebP 9:16 (${formatFileSize(optimizedFile.size)}) e definida como principal.`);
@@ -1048,68 +1315,97 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
     <section className="mt-6 border-t border-white/10 pt-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Imagens do animal</h3>
-          <p className="mt-1 text-sm text-slate-400">Adicione uma imagem ou escolha qual aparece como principal no card de adocao.</p>
+          <h3 className="text-lg font-bold text-white tracking-tight">Fotos do Animal</h3>
+          <p className="mt-1 text-xs font-medium text-slate-500">Adicione imagens e gerencie a visualização principal do card.</p>
         </div>
       </div>
 
-      <form className="mt-4 grid gap-3 rounded-md border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto]" onSubmit={handleUpload}>
-        <input
+      <div className="mt-5">
+        <FileUpload
           accept="image/avif,image/jpeg,image/png,image/webp"
-          className={fieldClass}
           disabled={isBusy}
-          key={fileInputKey}
-          onChange={handleFileChange}
-          type="file"
+          onFileSelect={handleUpload}
         />
-        <Button disabled={isBusy || !selectedFile} type="submit">Enviar imagem</Button>
-      </form>
-      {selectedFile && (
-        <p className="mt-2 text-xs text-slate-500">
-          Selecionado: {selectedFile.name} ({formatFileSize(selectedFile.size)}). Saida: WebP vertical 9:16, ate {formatFileSize(animalPhotoMaxSizeBytes)}.
-        </p>
-      )}
+      </div>
 
       {uploadProgress !== null && (
         <div className="mt-4 overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-2 bg-cyan-400 transition-all duration-300"
+            className="h-1.5 bg-cyan-400 transition-all duration-300"
             style={{ width: `${uploadProgress}%` }}
           />
         </div>
       )}
 
-      {message && <p className="mt-3 rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-200">{message}</p>}
+      {message && <p className="mt-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-xs font-medium text-slate-400 leading-relaxed">{message}</p>}
 
       {status === "loading" ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[0, 1, 2].map((item) => (
-            <div className="aspect-[4/3] animate-pulse rounded-md bg-white/10" key={item} />
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[0, 1, 2, 3].map((item) => (
+            <div className="aspect-[3/4] animate-pulse rounded-xl bg-white/5" key={item} />
           ))}
         </div>
-      ) : (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+      ) : photos.length > 0 ? (
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {photos.map((photo) => (
-            <article className="overflow-hidden rounded-md border border-white/10 bg-black/20" key={String(photo.id)}>
-              {typeof photo.public_url === "string" && photo.public_url ? (
+            <article className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-white/10 bg-black/40" key={String(photo.id)}>
+              {photo.public_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img alt={`Foto de ${String(animal.name ?? "animal")}`} className="aspect-[4/3] w-full object-cover" src={photo.public_url} />
+                <img alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-110" src={String(photo.public_url)} />
               ) : (
-                <div className="flex aspect-[4/3] items-center justify-center bg-white/5 text-xs text-slate-500">Sem preview</div>
-              )}
-              <div className="space-y-3 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs text-slate-400">{formatValue(photo.content_type)}</span>
-                  {Boolean(photo.is_primary) && <Badge>principal</Badge>}
+                <div className="flex h-full w-full items-center justify-center text-slate-600">
+                  <ImageIcon className="h-8 w-8" />
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button className="min-h-10 px-3" disabled={isBusy || Boolean(photo.is_primary)} onClick={() => makePrimary(String(photo.id))} type="button" variant="outline">Principal</Button>
-                  <Button className="min-h-10 px-3" disabled={isBusy} onClick={() => deletePhoto(String(photo.id))} type="button" variant="danger">Excluir</Button>
+              )}
+
+              {/* Overlays */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
+
+              {photo.is_primary && (
+                <div className="absolute left-2 top-2 rounded-full bg-cyan-400 p-1.5 text-slate-950 shadow-lg">
+                  <Star className="h-3 w-3 fill-current" />
+                </div>
+              )}
+
+              <div className="absolute right-2 top-2 flex flex-col gap-2 translate-y-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                <button
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border shadow-lg transition-all ${
+                    photo.is_primary
+                      ? "border-cyan-400/50 bg-cyan-400 text-slate-950"
+                      : "border-white/20 bg-black/60 text-white hover:border-cyan-400 hover:text-cyan-400"
+                  }`}
+                  disabled={isBusy || Boolean(photo.is_primary)}
+                  onClick={() => makePrimary(String(photo.id))}
+                  title="Tornar principal"
+                  type="button"
+                >
+                  <Star className={`h-3.5 w-3.5 ${photo.is_primary ? "fill-current" : ""}`} />
+                </button>
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white shadow-lg transition-all hover:border-red-500 hover:text-red-500"
+                  disabled={isBusy}
+                  onClick={() => deletePhoto(String(photo.id))}
+                  title="Excluir foto"
+                  type="button"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="absolute bottom-2 left-2 right-2 translate-y-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                <div className="rounded-lg bg-black/60 px-2 py-1 text-center backdrop-blur-sm">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/70">
+                    {formatValue(photo.content_type).replace("image/", "")}
+                  </p>
                 </div>
               </div>
             </article>
           ))}
-          {!photos.length && <p className="text-sm text-slate-500">Nenhuma imagem cadastrada para este animal.</p>}
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-white/5 bg-white/[0.01] py-12 text-slate-500">
+          <ImageIcon className="h-10 w-10 opacity-20" />
+          <p className="mt-4 text-sm font-medium">Nenhuma foto enviada para este animal.</p>
         </div>
       )}
     </section>
@@ -1281,23 +1577,58 @@ function FieldInput({
     );
   }
 
+  if (field.type === "slider") {
+    const numericValue = Number(value ?? 0);
+    const safeValue = Number.isFinite(numericValue) ? Math.min(Math.max(numericValue, 0), 100) : 0;
+    return (
+      <div>
+        <FieldLabel field={field} htmlFor={id} />
+        <div className="rounded-md border border-white/10 bg-black/20 px-3 py-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-cyan-100">{impactLabel(safeValue)}</span>
+            <span className="rounded-full bg-white/10 px-2 py-1 text-xs font-bold text-white">{safeValue}</span>
+          </div>
+          <input
+            className="w-full accent-cyan-200"
+            disabled={disabled}
+            id={id}
+            max={100}
+            min={0}
+            onChange={(event) => onChange(Number(event.target.value))}
+            step={5}
+            type="range"
+            value={safeValue}
+          />
+          <div className="mt-2 flex justify-between text-[11px] uppercase text-slate-500">
+            <span>Baixo</span>
+            <span>Medio</span>
+            <span>Alto</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={field.type === "textarea" ? "md:col-span-2" : undefined}>
+    <div className={field.type === "textarea" ? "md:col-span-2" : "relative"}>
       <FieldLabel field={field} htmlFor={id} />
       {field.type === "select" ? (
-        <select
-          className={fieldClass}
-          disabled={disabled}
-          id={id}
-          onChange={(event) => onChange(event.target.value)}
-          required={field.required}
-          value={String(value ?? "")}
-        >
-          {(field.dynamicOptionsFor || field.dynamicOptionsSource) && <option value="">{field.dynamicOptionsFor ? "Selecione um campo" : "Selecione uma pergunta"}</option>}
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            className={`${fieldClass} appearance-none`}
+            disabled={disabled}
+            id={id}
+            onChange={(event) => onChange(event.target.value)}
+            required={field.required}
+            value={String(value ?? "")}
+          >
+            {(field.dynamicOptionsFor || field.dynamicOptionsSource) && <option value="">{field.dynamicOptionsFor ? "Selecione um campo" : "Selecione uma pergunta"}</option>}
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        </div>
       ) : field.type === "textarea" ? (
         <textarea
           className={`${fieldClass} min-h-[112px] resize-y py-3`}
@@ -1327,10 +1658,10 @@ function FieldInput({
 
 function FieldLabel({ field, htmlFor }: { field: FieldConfig; htmlFor: string }) {
   return (
-    <label className="mb-2 block text-sm font-semibold text-slate-100" htmlFor={htmlFor}>
+    <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400" htmlFor={htmlFor}>
       {field.label}
-      {field.required && <span className="text-cyan-200"> *</span>}
-      {field.helper && <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">{field.helper}</span>}
+      {field.required && <span className="ml-1 text-cyan-400">*</span>}
+      {field.helper && <span className="mt-1 block text-[10px] font-medium leading-relaxed text-slate-500 normal-case tracking-normal">{field.helper}</span>}
     </label>
   );
 }
@@ -1355,34 +1686,63 @@ function KeyValueEditor({
   }
 
   return (
-    <div className="space-y-2">
-      {rows.map((row, index) => (
-        <div className="grid gap-2 md:grid-cols-[minmax(140px,220px)_1fr_auto]" key={index}>
-          {customFieldDefinitions.length ? (
-            <select
-              className={fieldClass}
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {rows.map((row, index) => (
+          <div className="group relative rounded-xl border border-white/5 bg-white/[0.01] p-4 transition-all hover:border-white/10 hover:bg-white/[0.03]" key={index}>
+            <div className="grid gap-3">
+              {customFieldDefinitions.length ? (
+                <div className="relative">
+                  <select
+                    className={`${fieldClass} appearance-none h-10 min-h-[40px] px-3 text-xs`}
+                    disabled={disabled}
+                    onChange={(event) => updateRow(index, { key: event.target.value, value: "" })}
+                    value={row.key}
+                  >
+                    <option value="">Selecione o campo</option>
+                    {customFieldDefinitions.map((field) => (
+                      <option key={field.field_key} value={field.field_key}>{field.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                </div>
+              ) : (
+                <input
+                  className={`${fieldClass} h-10 min-h-[40px] px-3 text-xs`}
+                  disabled={disabled}
+                  onChange={(event) => updateRow(index, { key: event.target.value })}
+                  placeholder="Nome do campo"
+                  value={row.key}
+                />
+              )}
+              <CustomFieldValueInput
+                definition={customFieldDefinitions.find((field) => field.field_key === row.key)}
+                disabled={disabled}
+                value={row.value}
+                onChange={(value) => updateRow(index, { value })}
+              />
+            </div>
+            <button
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-red-500/20 bg-[#16161a] text-slate-500 opacity-0 shadow-lg transition-all hover:border-red-500/50 hover:text-red-500 group-hover:opacity-100 disabled:pointer-events-none"
               disabled={disabled}
-              onChange={(event) => updateRow(index, { key: event.target.value, value: "" })}
-              value={row.key}
+              onClick={() => removeRow(index)}
+              title="Remover campo"
+              type="button"
             >
-              <option value="">Campo</option>
-              {customFieldDefinitions.map((field) => (
-                <option key={field.field_key} value={field.field_key}>{field.label}</option>
-              ))}
-            </select>
-          ) : (
-            <input className={fieldClass} disabled={disabled} onChange={(event) => updateRow(index, { key: event.target.value })} placeholder="Campo" value={row.key} />
-          )}
-          <CustomFieldValueInput
-            definition={customFieldDefinitions.find((field) => field.field_key === row.key)}
-            disabled={disabled}
-            value={row.value}
-            onChange={(value) => updateRow(index, { value })}
-          />
-          <Button className="min-h-11 px-4" disabled={disabled} onClick={() => removeRow(index)} type="button" variant="outline">Remover</Button>
-        </div>
-      ))}
-      <Button className="mt-1" disabled={disabled} onClick={() => onChange([...rows, { key: "", value: "" }])} type="button" variant="outline">Adicionar campo</Button>
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <Button
+        className="h-10 px-5 text-[10px] tracking-widest"
+        disabled={disabled}
+        onClick={() => onChange([...rows, { key: "", value: "" }])}
+        type="button"
+        variant="outline"
+      >
+        + Adicionar novo campo
+      </Button>
     </div>
   );
 }
@@ -1398,30 +1758,38 @@ function CustomFieldValueInput({
   onChange: (value: string) => void;
   value: string;
 }) {
+  const inputBaseClass = `${fieldClass} h-10 min-h-[40px] px-3 text-xs`;
+
   if (definition?.field_type === "boolean") {
     return (
-      <select className={fieldClass} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-        <option value="">Valor</option>
-        <option value="true">Sim</option>
-        <option value="false">Nao</option>
-      </select>
+      <div className="relative">
+        <select className={`${inputBaseClass} appearance-none`} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+          <option value="">Valor</option>
+          <option value="true">Sim</option>
+          <option value="false">Nao</option>
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+      </div>
     );
   }
 
   if ((definition?.field_type === "select" || definition?.field_type === "multiselect") && definition.options.length) {
     return (
-      <select className={fieldClass} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-        <option value="">Valor</option>
-        {definition.options.map((option) => (
-          <option key={option} value={option}>{humanizeFieldKey(option)}</option>
-        ))}
-      </select>
+      <div className="relative">
+        <select className={`${inputBaseClass} appearance-none`} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+          <option value="">Valor</option>
+          {definition.options.map((option) => (
+            <option key={option} value={option}>{humanizeFieldKey(option)}</option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+      </div>
     );
   }
 
   return (
     <input
-      className={fieldClass}
+      className={inputBaseClass}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       placeholder="Valor"
@@ -1484,7 +1852,7 @@ function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "c
           ? options.map((option) => ({ label: humanizeFieldKey(option), value: option }))
           : options
         : null;
-    } else if (field.type === "number") {
+    } else if (field.type === "number" || field.type === "slider") {
       payload[field.name] = Number(value) || 0;
     } else if (field.name === "source_question_id") {
       payload[field.name] = value ? String(value) : null;
@@ -1637,14 +2005,380 @@ function findOptionLabel(options: Array<{ label: string; value: string }>, value
 
 function comparisonOperatorLabel(operator: string) {
   const labels: Record<string, string> = {
-    "=": "Igual",
-    "!=": "Diferente",
-    contains: "Contem",
-    ">=": "Maior ou igual",
-    "<=": "Menor ou igual",
+    "=": "Deve ser igual a",
+    "!=": "Deve ser diferente de",
+    contains: "Deve conter",
+    ">=": "Deve ser maior ou igual a",
+    "<=": "Deve ser menor ou igual a",
   };
 
   return labels[operator] ?? "condicao";
+}
+
+function impactLabel(weight: number) {
+  if (weight >= 70) return "Alto impacto";
+  if (weight >= 35) return "Medio impacto";
+  return "Baixo impacto";
+}
+
+function ServiceConfigsPanel({ onRefresh, rows }: { onRefresh: () => Promise<void>; rows: AdminRecord[] }) {
+  const [isConfiguring, setIsConfiguring] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const services = [
+    {
+      id: "google_calendar",
+      provider: "google",
+      service_type: "calendar",
+      label: "Google Calendar",
+      description: "Sincronize visitas e entrevistas diretamente na agenda do Google.",
+      icon: Globe,
+    },
+    {
+      id: "microsoft_calendar",
+      provider: "microsoft",
+      service_type: "calendar",
+      label: "Microsoft Outlook",
+      description: "Integre agendamentos com sua conta Microsoft Office 365.",
+      icon: Globe,
+    },
+  ];
+
+  async function handleToggleStatus(config: AdminRecord) {
+    setIsSaving(true);
+    try {
+      await updateAdminResource("service-configs", String(config.id), { is_active: !config.is_active });
+      await onRefresh();
+      setMessage(`Integração ${config.is_active ? "desativada" : "ativada"}.`);
+    } catch (error) {
+      setMessage("Erro ao alterar status.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleRemove(config: AdminRecord) {
+    if (!confirm("Tem certeza que deseja remover esta conexão?")) return;
+    setIsSaving(true);
+    try {
+      await deleteAdminResource("service-configs", String(config.id));
+      await onRefresh();
+      setMessage("Conexão removida.");
+    } catch (error) {
+      setMessage("Erro ao remover conexão.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {services.map((service) => {
+          const config = rows.find((r) => r.provider === service.provider && r.service_type === service.service_type);
+          const isConnected = !!config;
+          const isActive = config?.is_active !== false;
+
+          return (
+            <article
+              className={cn(
+                "group flex flex-col justify-between rounded-2xl border p-6 transition-all duration-300",
+                isConnected
+                  ? "border-cyan-400/20 bg-cyan-400/[0.02] shadow-[0_0_25px_rgba(34,211,238,0.05)]"
+                  : "border-white/10 bg-white/[0.01] hover:border-white/20 hover:bg-white/[0.03]"
+              )}
+              key={service.id}
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <div
+                    className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-xl transition-colors",
+                      isConnected ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-slate-500"
+                    )}
+                  >
+                    <service.icon className="h-6 w-6" />
+                  </div>
+                  <Badge
+                    className={cn(
+                      "border-none px-3 py-1 font-black uppercase tracking-widest text-[9px]",
+                      isConnected
+                        ? isActive
+                          ? "bg-cyan-400/10 text-cyan-400"
+                          : "bg-amber-400/10 text-amber-400"
+                        : "bg-white/5 text-slate-600"
+                    )}
+                  >
+                    {isConnected ? (isActive ? "Conectado" : "Pausado") : "Disponível"}
+                  </Badge>
+                </div>
+
+                <div className="mt-5">
+                  <h3 className="text-lg font-bold text-white tracking-tight">{service.label}</h3>
+                  <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">{service.description}</p>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3">
+                {isConnected ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 h-10 text-[10px]"
+                        onClick={() => setIsConfiguring(service.id)}
+                        variant="outline"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Configurar
+                      </Button>
+                      <Button
+                        className="h-10 px-4"
+                        disabled={isSaving}
+                        onClick={() => handleToggleStatus(config)}
+                        variant="outline"
+                        title={isActive ? "Pausar integração" : "Ativar integração"}
+                      >
+                        {isActive ? <Zap className="h-3.5 w-3.5 text-cyan-400" /> : <Zap className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                    <button
+                      className="text-[10px] font-bold uppercase tracking-widest text-red-500/60 hover:text-red-500 transition-colors py-2"
+                      disabled={isSaving}
+                      onClick={() => handleRemove(config)}
+                    >
+                      Remover Conexão
+                    </button>
+                  </>
+                ) : (
+                  <Button
+                    className="w-full h-11 text-[10px] shadow-lg shadow-cyan-400/10"
+                    onClick={() => setIsConfiguring(service.id)}
+                  >
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    Conectar Agora
+                  </Button>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {message && (
+        <p className="inline-block rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2 text-xs font-medium text-slate-400">
+          {message}
+        </p>
+      )}
+
+      {/* Modal de Configuração Específica */}
+      <Dialog open={!!isConfiguring} onOpenChange={(open) => !open && setIsConfiguring(null)}>
+        <ServiceConfigModal
+          onClose={() => setIsConfiguring(null)}
+          onRefresh={onRefresh}
+          service={services.find((s) => s.id === isConfiguring) || null}
+          existingConfig={rows.find((r) => r.provider === services.find((s) => s.id === isConfiguring)?.provider)}
+        />
+      </Dialog>
+    </div>
+  );
+}
+
+function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void>; rows: AdminRecord[] }) {
+  const [isWorking, setIsWorking] = useState<"google" | "microsoft" | null>(null);
+  const [message, setMessage] = useState("");
+  const providers: Array<"google" | "microsoft"> = ["google", "microsoft"];
+
+  async function connect(provider: "google" | "microsoft") {
+    setIsWorking(provider);
+    setMessage("");
+    try {
+      const authorizationUrl = await getCalendarOAuthAuthorizationUrl(provider);
+      window.location.assign(authorizationUrl);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel iniciar a conexao.");
+    } finally {
+      setIsWorking(null);
+    }
+  }
+
+  async function refresh(provider: "google" | "microsoft") {
+    setIsWorking(provider);
+    setMessage("");
+    try {
+      await refreshCalendarOAuthConnection(provider);
+      await onRefresh();
+      setMessage("Token renovado com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel renovar a conexao.");
+    } finally {
+      setIsWorking(null);
+    }
+  }
+
+  async function disconnect(provider: "google" | "microsoft") {
+    if (!confirm("Desconectar esta conta do calendario?")) return;
+    setIsWorking(provider);
+    setMessage("");
+    try {
+      await disconnectCalendarOAuthConnection(provider);
+      await onRefresh();
+      setMessage("Conexao removida.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel desconectar.");
+    } finally {
+      setIsWorking(null);
+    }
+  }
+
+  const connectedRows = rows.filter((row) => row.provider === "google" || row.provider === "microsoft");
+
+  return (
+    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="grid gap-5 sm:grid-cols-2">
+        {providers.map((provider) => {
+          const current = connectedRows.find((row) => row.provider === provider && row.is_active !== false) ?? null;
+          const isConnected = Boolean(current);
+          return (
+            <article key={provider} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">{provider === "google" ? "Google Calendar" : "Microsoft Outlook"}</h3>
+                  <p className="mt-1 text-xs uppercase tracking-widest text-slate-500">{isConnected ? "Conectado" : "Desconectado"}</p>
+                </div>
+                <Badge className={cn("border-none px-3 py-1 font-black uppercase tracking-widest text-[9px]", isConnected ? "bg-cyan-400/10 text-cyan-400" : "bg-white/5 text-slate-600")}>
+                  {isConnected ? "Ativo" : "Sem conexao"}
+                </Badge>
+              </div>
+              <div className="mt-4 space-y-1 text-sm text-slate-300">
+                <p>Conta: {current?.account_email ? String(current.account_email) : "nao informada"}</p>
+                <p>Calendar ID: {current?.calendar_id ? String(current.calendar_id) : "primary"}</p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button className="flex-1" disabled={isWorking === provider} onClick={() => connect(provider)} variant="outline">
+                  {isConnected ? "Reconectar" : "Conectar"}
+                </Button>
+                <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => refresh(provider)} variant="outline">
+                  Renovar
+                </Button>
+                <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => disconnect(provider)} variant="danger">
+                  Desconectar
+                </Button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      {message && <p className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-200">{message}</p>}
+    </div>
+  );
+}
+
+function ServiceConfigModal({
+  onClose,
+  onRefresh,
+  service,
+  existingConfig,
+}: {
+  onClose: () => void;
+  onRefresh: () => Promise<void>;
+  service: any;
+  existingConfig?: AdminRecord;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<Record<string, string>>(() => {
+    const configObj = existingConfig?.config as Record<string, any> || {};
+    return {
+      calendar_id: configObj.calendar_id || "",
+      api_key: configObj.api_key || "",
+      client_email: configObj.client_email || "",
+    };
+  });
+
+  if (!service) return null;
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const payload = {
+        id: existingConfig?.id || `${service.provider}_${Date.now()}`,
+        service_type: service.service_type,
+        provider: service.provider,
+        config: formData,
+        is_active: true,
+      };
+
+      if (existingConfig) {
+        await updateAdminResource("service-configs", String(existingConfig.id), payload);
+      } else {
+        await createAdminResource("service-configs", payload);
+      }
+      await onRefresh();
+      onClose();
+    } catch (error) {
+      alert("Erro ao salvar configuração.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-md bg-[#16161a] border-white/10">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-3 text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-400">
+            <Settings2 className="h-5 w-5" />
+          </div>
+          Configurar {service.label}
+        </DialogTitle>
+        <DialogDescription>Preencha os campos abaixo para estabelecer a conexão.</DialogDescription>
+      </DialogHeader>
+
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">ID do Calendário</label>
+            <input
+              className={fieldClass}
+              placeholder="primary ou email"
+              required
+              value={formData.calendar_id}
+              onChange={(e) => setFormData({ ...formData, calendar_id: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Email do Cliente (Service Account)</label>
+            <input
+              className={fieldClass}
+              placeholder="ex: app@project.iam.gserviceaccount.com"
+              type="email"
+              value={formData.client_email}
+              onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Chave Privada / API Key</label>
+            <textarea
+              className={cn(fieldClass, "min-h-[100px] py-3")}
+              placeholder="Cole aqui sua chave ou token..."
+              value={formData.api_key}
+              onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="mt-8 gap-3 sm:justify-between border-t border-white/5 pt-6">
+          <DialogClose asChild>
+            <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+          </DialogClose>
+          <Button className="flex-1 shadow-lg shadow-cyan-400/10" disabled={isSaving} type="submit">
+            {isSaving ? "Salvando..." : "Salvar Configuração"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
 }
 
 function humanizeFieldKey(value: string) {

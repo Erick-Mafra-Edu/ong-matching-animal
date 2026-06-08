@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { format, startOfWeek, addDays, isSameDay, isSameMonth, setHours, setMinutes, setSeconds } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, List, CalendarDays, Search, User, Dog } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronDown, List, CalendarDays, Search, Trash2, User, Dog } from "lucide-react";
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -64,7 +64,13 @@ const emptyFormState: FormState = {
 const fieldClass =
   "min-h-11 w-full rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-cyan-200 disabled:opacity-40";
 
-export function CalendarPage() {
+export function CalendarPage({ 
+  standalone = true,
+  skipAuthCheck = false
+}: { 
+  standalone?: boolean;
+  skipAuthCheck?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [events, setEvents] = useState<CalendarEventRecord[]>([]);
@@ -100,7 +106,7 @@ export function CalendarPage() {
 
   const isBusy = status === "loading" || status === "saving";
 
-  async function loadEvents() {
+  const loadEvents = useCallback(async () => {
     try {
       setEvents(await listCalendarEvents());
     } catch (error) {
@@ -111,9 +117,9 @@ export function CalendarPage() {
       }
       setMessage(msg);
     }
-  }
+  }, [router]);
 
-  async function loadSelectionData() {
+  const loadSelectionData = useCallback(async () => {
     try {
       const [tutorsData, animalsData, interestsData] = await Promise.all([
         listAdminResource("tutors"),
@@ -126,13 +132,19 @@ export function CalendarPage() {
     } catch (error) {
       console.error("Erro ao carregar dados de selecao:", error);
     }
-  }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    getAdminMe()
-      .then(() => Promise.all([loadEvents(), loadSelectionData()]))
+    const run = async () => {
+      if (!skipAuthCheck) {
+        await getAdminMe();
+      }
+      await Promise.all([loadEvents(), loadSelectionData()]);
+    };
+
+    run()
       .then(() => {
         if (mounted) setStatus("ready");
       })
@@ -156,7 +168,7 @@ export function CalendarPage() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, skipAuthCheck, loadEvents, loadSelectionData]);
 
   useEffect(() => {
     if (status !== "ready" || draftApplied || searchParams.get("draft") !== "interview") return;
@@ -334,9 +346,9 @@ export function CalendarPage() {
   const filteredAnimals = animals;
   const filteredInterests = interests;
 
-  return (
-    <main className="min-h-screen bg-[#0e0e12] px-5 py-6 text-white sm:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+  const content = (
+    <div className={cn("flex flex-col gap-6", standalone && "mx-auto max-w-7xl")}>
+      {standalone && (
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/admin">Voltar ao admin</Link>
@@ -356,329 +368,239 @@ export function CalendarPage() {
             ))}
           </div>
         </header>
+      )}
 
-        {message && <p className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-200">{message}</p>}
+      {!standalone && (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "scheduled", "completed", "cancelled"] as const).map((item) => (
+              <button
+                className={`min-h-9 rounded-full border px-4 text-[10px] font-bold uppercase tracking-wider transition ${statusFilter === item ? "border-cyan-400 bg-cyan-400/10 text-cyan-400" : "border-white/5 bg-white/[0.02] text-slate-400 hover:border-white/20"}`}
+                key={item}
+                onClick={() => setStatusFilter(item)}
+                type="button"
+              >
+                {statusLabel(item)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-          <section className="flex flex-col gap-4 rounded-md border border-white/10 bg-black/20 p-4 min-h-[600px]">
-            <Tabs defaultValue="list" className="w-full">
-              <div className="flex items-center justify-between mb-4">
-                <TabsList>
-                  <TabsTrigger value="list" className="gap-2">
-                    <List className="h-4 w-4" />
-                    Lista
-                  </TabsTrigger>
-                  <TabsTrigger value="month" className="gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    Mês
-                  </TabsTrigger>
-                  <TabsTrigger value="week" className="gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    Semana
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+      {message && <p className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-200">{message}</p>}
 
-              <TabsContent value="list" className="mt-0">
-                {status === "loading" ? (
-                  <div className="space-y-3">
-                    {[0, 1, 2].map((item) => <div className="h-24 animate-pulse rounded-md bg-white/10" key={item} />)}
-                  </div>
-                ) : groupedEvents.length ? (
-                  <div className="space-y-5">
-                    {groupedEvents.map((group) => (
-                      <div key={group.dateKey}>
-                        <h2 className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-slate-500">{group.label}</h2>
-                        <div className="space-y-2">
-                          {group.events.map((event) => (
-                            <EventCard 
-                              key={event.id} 
-                              event={event} 
-                              isSelected={selectedEvent?.id === event.id} 
-                              onClick={() => selectEvent(event)} 
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex min-h-[420px] items-center justify-center text-sm text-slate-500">Nenhum evento encontrado.</div>
-                )}
-              </TabsContent>
+      <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
+        <section className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[600px]">
+          <Tabs defaultValue="list" className="w-full">
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="bg-black/20 p-1">
+                <TabsTrigger value="list" className="gap-2 px-4">
+                  <List className="h-4 w-4" />
+                  Lista
+                </TabsTrigger>
+                <TabsTrigger value="month" className="gap-2 px-4">
+                  <CalendarIcon className="h-4 w-4" />
+                  Mês
+                </TabsTrigger>
+                <TabsTrigger value="week" className="gap-2 px-4">
+                  <CalendarDays className="h-4 w-4" />
+                  Semana
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-              <TabsContent value="month" className="mt-0">
-                <div className="grid gap-6 md:grid-cols-[auto_1fr]">
-                  <div className="rounded-md border border-white/10 bg-white/[0.02] p-2">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      locale={ptBR}
-                      className="rounded-md"
-                      modifiers={{
-                        hasEvent: (date) => events.some(e => isSameDay(new Date(e.starts_at), date))
-                      }}
-                      modifiersClassNames={{
-                        hasEvent: "after:content-[''] after:block after:w-1 after:h-1 after:bg-cyan-200 after:rounded-full after:mx-auto after:mt-1"
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-slate-400">
-                      {selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : "Selecione uma data"}
-                    </h3>
-                    <div className="space-y-2">
-                      {dayEvents.length ? (
-                        dayEvents.map(event => (
+            <TabsContent value="list" className="mt-0">
+              {status === "loading" ? (
+                <div className="space-y-3">
+                  {[0, 1, 2].map((item) => <div className="h-24 animate-pulse rounded-xl bg-white/5" key={item} />)}
+                </div>
+              ) : groupedEvents.length ? (
+                <div className="space-y-8">
+                  {groupedEvents.map((group) => (
+                    <div key={group.dateKey}>
+                      <h2 className="mb-4 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 border-l-2 border-cyan-400/30 pl-3">{group.label}</h2>
+                      <div className="space-y-3">
+                        {group.events.map((event) => (
                           <EventCard 
                             key={event.id} 
                             event={event} 
                             isSelected={selectedEvent?.id === event.id} 
                             onClick={() => selectEvent(event)} 
                           />
-                        ))
-                      ) : (
-                        <p className="text-sm text-slate-500">Sem compromissos para este dia.</p>
-                      )}
+                        ))}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+                   <CalendarIcon className="h-10 w-10 text-slate-700 mb-4" />
+                   <p className="text-sm font-medium text-slate-500">Nenhum evento agendado.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="month" className="mt-0">
+              <div className="grid gap-8 md:grid-cols-[auto_1fr]">
+                <div className="rounded-xl border border-white/5 bg-black/20 p-3 self-start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    locale={ptBR}
+                    className="rounded-md"
+                    modifiers={{
+                      hasEvent: (date) => events.some(e => isSameDay(new Date(e.starts_at), date))
+                    }}
+                    modifiersClassNames={{
+                      hasEvent: "after:content-[''] after:block after:w-1 after:h-1 after:bg-cyan-400 after:rounded-full after:mx-auto after:mt-1"
+                    }}
+                  />
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-200/70 border-b border-white/5 pb-2">
+                    {selectedDate ? format(selectedDate, "eeee, dd 'de' MMMM", { locale: ptBR }) : "Selecione uma data"}
+                  </h3>
+                  <div className="space-y-3">
+                    {dayEvents.length ? (
+                      dayEvents.map(event => (
+                        <EventCard 
+                          key={event.id} 
+                          event={event} 
+                          isSelected={selectedEvent?.id === event.id} 
+                          onClick={() => selectEvent(event)} 
+                        />
+                      ))
+                    ) : (
+                      <div className="py-12 flex flex-col items-center justify-center text-center opacity-30">
+                        <List className="h-8 w-8 mb-2" />
+                        <p className="text-xs font-medium">Sem compromissos</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="week" className="mt-0">
-                <div className="space-y-6">
-                  {Array.from({ length: 7 }).map((_, i) => {
-                    const date = addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), i);
-                    const eventsOnDay = filteredEvents.filter(e => isSameDay(new Date(e.starts_at), date));
-                    
-                    return (
-                      <div key={i} className={cn("space-y-2", !isSameMonth(date, new Date()) && "opacity-50")}>
-                        <h3 className={cn(
-                          "text-xs font-black uppercase tracking-[0.18em]",
-                          isSameDay(date, new Date()) ? "text-cyan-200" : "text-slate-500"
-                        )}>
-                          {format(date, "eeee, dd/MM", { locale: ptBR })}
-                          {isSameDay(date, new Date()) && " (Hoje)"}
-                        </h3>
-                        <div className="space-y-2">
-                          {eventsOnDay.length ? (
-                            eventsOnDay.map(event => (
-                              <EventCard 
-                                key={event.id} 
-                                event={event} 
-                                isSelected={selectedEvent?.id === event.id} 
-                                onClick={() => selectEvent(event)} 
-                              />
-                            ))
-                          ) : (
-                            <div className="h-10 flex items-center px-4 rounded-md border border-white/5 bg-white/[0.01] text-xs text-slate-600 italic">
-                              Sem eventos
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </section>
-
-          <aside className="rounded-md border border-white/10 bg-black/20 p-4 self-start sticky top-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">{selectedEvent ? "Editar evento" : "Novo evento"}</h2>
-              <Button className="min-h-10 px-3" disabled={isBusy} onClick={startCreate} type="button" variant="outline">Novo</Button>
-            </div>
-
-            <form className="space-y-3" onSubmit={handleSubmit}>
-              <Field label="Titulo" required>
-                <input className={fieldClass} disabled={isBusy} required value={formState.title} onChange={(event) => setFormState({ ...formState, title: event.target.value })} />
-              </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Inicio" required>
-                  <input className={fieldClass} disabled={isBusy} required type="datetime-local" value={formState.starts_at} onChange={(event) => setFormState({ ...formState, starts_at: event.target.value })} />
-                </Field>
-                <Field label="Fim" required>
-                  <input className={fieldClass} disabled={isBusy} required type="datetime-local" value={formState.ends_at} onChange={(event) => setFormState({ ...formState, ends_at: event.target.value })} />
-                </Field>
               </div>
-              <Field label="Status">
-                <select className={fieldClass} disabled={isBusy} value={formState.status} onChange={(event) => setFormState({ ...formState, status: event.target.value as CalendarEventStatus })}>
+            </TabsContent>
+
+            <TabsContent value="week" className="mt-0">
+              <div className="space-y-8">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const date = addDays(startOfWeek(new Date(), { weekStartsOn: 0 }), i);
+                  const eventsOnDay = filteredEvents.filter(e => isSameDay(new Date(e.starts_at), date));
+                  
+                  return (
+                    <div key={i} className={cn("space-y-3", !isSameMonth(date, new Date()) && "opacity-40")}>
+                      <h3 className={cn(
+                        "text-[10px] font-black uppercase tracking-[0.2em] border-l-2 pl-3",
+                        isSameDay(date, new Date()) ? "text-cyan-400 border-cyan-400" : "text-slate-500 border-white/10"
+                      )}>
+                        {format(date, "eeee, dd/MM", { locale: ptBR })}
+                        {isSameDay(date, new Date()) && " (Hoje)"}
+                      </h3>
+                      <div className="space-y-2">
+                        {eventsOnDay.length ? (
+                          eventsOnDay.map(event => (
+                            <EventCard 
+                              key={event.id} 
+                              event={event} 
+                              isSelected={selectedEvent?.id === event.id} 
+                              onClick={() => selectEvent(event)} 
+                            />
+                          ))
+                        ) : (
+                          <div className="h-12 flex items-center px-5 rounded-xl border border-white/5 bg-white/[0.01] text-[10px] font-bold uppercase tracking-widest text-slate-700 italic">
+                            Vazio
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </section>
+
+        <aside className="rounded-xl border border-white/10 bg-white/[0.02] p-5 self-start sticky top-6">
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h2 className="text-md font-bold text-white tracking-tight">{selectedEvent ? "Editar evento" : "Novo evento"}</h2>
+            <Button className="h-9 px-4 text-[10px]" disabled={isBusy} onClick={startCreate} type="button" variant="outline">Limpar</Button>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <Field label="Titulo" required>
+              <input className={fieldClass} disabled={isBusy} required value={formState.title} onChange={(event) => setFormState({ ...formState, title: event.target.value })} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Inicio" required>
+                <input className={fieldClass} disabled={isBusy} required type="datetime-local" value={formState.starts_at} onChange={(event) => setFormState({ ...formState, starts_at: event.target.value })} />
+              </Field>
+              <Field label="Fim" required>
+                <input className={fieldClass} disabled={isBusy} required type="datetime-local" value={formState.ends_at} onChange={(event) => setFormState({ ...formState, ends_at: event.target.value })} />
+              </Field>
+            </div>
+            <Field label="Status">
+              <div className="relative">
+                <select className={cn(fieldClass, "appearance-none")} disabled={isBusy} value={formState.status} onChange={(event) => setFormState({ ...formState, status: event.target.value as CalendarEventStatus })}>
                   <option value="scheduled">Agendado</option>
                   <option value="completed">Concluido</option>
                   <option value="cancelled">Cancelado</option>
                 </select>
-              </Field>
-              <Field label="Local">
-                <input className={fieldClass} disabled={isBusy} value={formState.location} onChange={(event) => setFormState({ ...formState, location: event.target.value })} />
-              </Field>
-              <Field label="Descricao">
-                <textarea className={`${fieldClass} min-h-24 resize-y py-3`} disabled={isBusy} value={formState.description} onChange={(event) => setFormState({ ...formState, description: event.target.value })} />
-              </Field>
-              
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Tutor">
-                  <div className="flex gap-2">
-                    <input 
-                      className={cn(fieldClass, "bg-white/5 cursor-default")} 
-                      disabled 
-                      value={tutors.find(t => t.id === formState.tutor_id)?.name || "Nenhum tutor selecionado"} 
-                    />
-                    <Dialog open={isTutorModalOpen} onOpenChange={(open) => { setIsTutorModalOpen(open); setSearchQuery(""); }}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="px-3" type="button"><Search className="h-4 w-4" /></Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Selecionar Tutor</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                            <input 
-                              className={cn(fieldClass, "pl-10")} 
-                              placeholder="Pesquisar tutor..." 
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                            {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-200 border-t-transparent rounded-full animate-spin" />}
-                          </div>
-                          <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2">
-                            {filteredTutors.map(t => (
-                              <button
-                                key={t.id}
-                                className="w-full flex items-center gap-3 p-3 rounded-md hover:bg-white/5 text-left transition"
-                                onClick={() => {
-                                  updateTutor(t.id);
-                                  setIsTutorModalOpen(false);
-                                  setSearchQuery("");
-                                }}
-                              >
-                                <User className="h-4 w-4 text-cyan-200" />
-                                <span className="text-sm text-white">{t.name}</span>
-                              </button>
-                            ))}
-                            {!filteredTutors.length && !isSearching && <p className="text-center py-4 text-sm text-slate-500">Nenhum tutor encontrado.</p>}
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </Field>
-
-                <Field label="Animal">
-                  <div className="flex gap-2">
-                    <input 
-                      className={cn(fieldClass, "bg-white/5 cursor-default")} 
-                      disabled 
-                      value={animals.find(a => a.id === formState.animal_id)?.name || "Nenhum animal selecionado"} 
-                    />
-                    <Dialog open={isAnimalModalOpen} onOpenChange={(open) => { setIsAnimalModalOpen(open); setSearchQuery(""); }}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="px-3" type="button"><Search className="h-4 w-4" /></Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Selecionar Animal</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                            <input 
-                              className={cn(fieldClass, "pl-10")} 
-                              placeholder="Pesquisar animal..." 
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                            {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-200 border-t-transparent rounded-full animate-spin" />}
-                          </div>
-                          <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2">
-                            {filteredAnimals.map(a => (
-                              <button
-                                key={a.id}
-                                className="w-full flex items-center gap-3 p-3 rounded-md hover:bg-white/5 text-left transition"
-                                onClick={() => {
-                                  updateAnimal(a.id);
-                                  setIsAnimalModalOpen(false);
-                                  setSearchQuery("");
-                                }}
-                              >
-                                <Dog className="h-4 w-4 text-pink-400" />
-                                <span className="text-sm text-white">{a.name} ({a.species})</span>
-                              </button>
-                            ))}
-                            {!filteredAnimals.length && !isSearching && <p className="text-center py-4 text-sm text-slate-500">Nenhum animal encontrado.</p>}
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </Field>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               </div>
-
-              <Field label="Interesse">
+            </Field>
+            <Field label="Local">
+              <input className={fieldClass} disabled={isBusy} value={formState.location} onChange={(event) => setFormState({ ...formState, location: event.target.value })} />
+            </Field>
+            <Field label="Descricao">
+              <textarea className={`${fieldClass} min-h-24 resize-y py-3`} disabled={isBusy} value={formState.description} onChange={(event) => setFormState({ ...formState, description: event.target.value })} />
+            </Field>
+            
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Tutor">
                 <div className="flex gap-2">
                   <input 
-                    className={cn(fieldClass, "bg-white/5 cursor-default")} 
+                    className={cn(fieldClass, "bg-white/5 cursor-default truncate text-[11px]")} 
                     disabled 
-                    value={(() => {
-                      const i = interests.find(i => i.id === formState.interest_id);
-                      if (!i) return "Nenhum interesse selecionado";
-                      const t = tutors.find(t => t.id === i.tutor_id);
-                      const a = animals.find(a => a.id === i.animal_id);
-                      return `${t?.name || "?"} + ${a?.name || "?"}`;
-                    })()} 
+                    value={tutors.find(t => t.id === formState.tutor_id)?.name || "Selecione..."} 
                   />
-                  <Dialog open={isInterestModalOpen} onOpenChange={(open) => { setIsInterestModalOpen(open); setSearchQuery(""); }}>
+                  <Dialog open={isTutorModalOpen} onOpenChange={(open) => { setIsTutorModalOpen(open); setSearchQuery(""); }}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="px-3" type="button"><Search className="h-4 w-4" /></Button>
+                      <Button variant="outline" className="h-11 w-11 p-0 shrink-0" type="button"><Search className="h-4 w-4" /></Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl bg-[#16161a] border-white/10">
                       <DialogHeader>
-                        <DialogTitle>Selecionar Interesse</DialogTitle>
+                        <DialogTitle className="text-white">Selecionar Tutor</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                           <input 
-                            className={cn(fieldClass, "pl-10")} 
-                            placeholder="Pesquisar por tutor ou animal..." 
+                            className={cn(fieldClass, "pl-10 h-12 bg-black/40 border-white/5 focus:border-cyan-400/50")} 
+                            placeholder="Pesquisar tutor..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                           />
-                          {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-200 border-t-transparent rounded-full animate-spin" />}
+                          {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />}
                         </div>
-                        <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2">
-                          {filteredInterests.map(i => {
-                             const tutorName = i.tutor_name || i.tutorName;
-                             const animalName = i.animal_name || i.animalName;
-                             return (
+                        <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                          {filteredTutors.map(t => (
                             <button
-                              key={i.id}
-                              className="w-full grid grid-cols-2 gap-4 p-3 rounded-md hover:bg-white/5 text-left transition"
+                              key={t.id}
+                              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 text-left transition"
                               onClick={() => {
-                                setFormState({ 
-                                  ...formState, 
-                                  interest_id: i.id,
-                                  tutor_id: i.tutor_id,
-                                  animal_id: i.animal_id
-                                });
-                                setIsInterestModalOpen(false);
+                                updateTutor(t.id);
+                                setIsTutorModalOpen(false);
                                 setSearchQuery("");
                               }}
                             >
-                              <div className="flex items-center gap-2">
-                                <User className="h-3 w-3 text-cyan-200" />
-                                <span className="text-sm text-white truncate">{tutorName || "Tutor desconhecido"}</span>
+                              <div className="h-8 w-8 rounded-full bg-cyan-400/10 flex items-center justify-center text-cyan-400">
+                                <User className="h-4 w-4" />
                               </div>
-                              <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-                                <Dog className="h-3 w-3 text-pink-400" />
-                                <span className="text-sm text-white truncate">{animalName || "Animal desconhecido"}</span>
-                              </div>
+                              <span className="text-sm font-bold text-slate-200">{t.name}</span>
                             </button>
-                          );})}
-                          {!filteredInterests.length && !isSearching && <p className="text-center py-4 text-sm text-slate-500">Nenhum interesse encontrado.</p>}
+                          ))}
+                          {!filteredTutors.length && !isSearching && <p className="text-center py-8 text-sm text-slate-600">Nenhum tutor encontrado.</p>}
                         </div>
                       </div>
                     </DialogContent>
@@ -686,17 +608,149 @@ export function CalendarPage() {
                 </div>
               </Field>
 
-              <Field label="URL externa">
-                <input className={fieldClass} disabled={isBusy} value={formState.external_event_url} onChange={(event) => setFormState({ ...formState, external_event_url: event.target.value })} />
+              <Field label="Animal">
+                <div className="flex gap-2">
+                  <input 
+                    className={cn(fieldClass, "bg-white/5 cursor-default truncate text-[11px]")} 
+                    disabled 
+                    value={animals.find(a => a.id === formState.animal_id)?.name || "Selecione..."} 
+                  />
+                  <Dialog open={isAnimalModalOpen} onOpenChange={(open) => { setIsAnimalModalOpen(open); setSearchQuery(""); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-11 w-11 p-0 shrink-0" type="button"><Search className="h-4 w-4" /></Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl bg-[#16161a] border-white/10">
+                      <DialogHeader>
+                        <DialogTitle className="text-white">Selecionar Animal</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                          <input 
+                            className={cn(fieldClass, "pl-10 h-12 bg-black/40 border-white/5 focus:border-cyan-400/50")} 
+                            placeholder="Pesquisar animal..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                          />
+                          {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />}
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                          {filteredAnimals.map(a => (
+                            <button
+                              key={a.id}
+                              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 text-left transition"
+                              onClick={() => {
+                                updateAnimal(a.id);
+                                setIsAnimalModalOpen(false);
+                                setSearchQuery("");
+                              }}
+                            >
+                              <div className="h-8 w-8 rounded-full bg-pink-400/10 flex items-center justify-center text-pink-400">
+                                <Dog className="h-4 w-4" />
+                              </div>
+                              <span className="text-sm font-bold text-slate-200">{a.name} <span className="text-[10px] font-medium opacity-50 uppercase ml-1">({a.species})</span></span>
+                            </button>
+                          ))}
+                          {!filteredAnimals.length && !isSearching && <p className="text-center py-8 text-sm text-slate-600">Nenhum animal encontrado.</p>}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </Field>
-              <div className="flex gap-2 pt-2">
-                <Button disabled={isBusy} type="submit">{selectedEvent ? "Salvar" : "Criar"}</Button>
-                {selectedEvent && <Button disabled={isBusy} onClick={handleDelete} type="button" variant="danger">Excluir</Button>}
+            </div>
+
+            <Field label="Interesse">
+              <div className="flex gap-2">
+                <input 
+                  className={cn(fieldClass, "bg-white/5 cursor-default truncate text-[11px]")} 
+                  disabled 
+                  value={(() => {
+                    const i = interests.find(i => i.id === formState.interest_id);
+                    if (!i) return "Vincular a um interesse...";
+                    const t = tutors.find(t => t.id === i.tutor_id);
+                    const a = animals.find(a => a.id === i.animal_id);
+                    return `${t?.name || "?"} + ${a?.name || "?"}`;
+                  })()} 
+                />
+                <Dialog open={isInterestModalOpen} onOpenChange={(open) => { setIsInterestModalOpen(open); setSearchQuery(""); }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="h-11 w-11 p-0 shrink-0" type="button"><Search className="h-4 w-4" /></Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl bg-[#16161a] border-white/10">
+                    <DialogHeader>
+                      <DialogTitle className="text-white">Selecionar Interesse</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                        <input 
+                          className={cn(fieldClass, "pl-10 h-12 bg-black/40 border-white/5 focus:border-cyan-400/50")} 
+                          placeholder="Pesquisar por tutor ou animal..." 
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        {isSearching && <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />}
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                        {filteredInterests.map(i => {
+                           const tutorName = i.tutor_name || i.tutorName;
+                           const animalName = i.animal_name || i.animalName;
+                           return (
+                          <button
+                            key={i.id}
+                            className="w-full grid grid-cols-2 gap-4 p-4 rounded-xl hover:bg-white/5 text-left transition border border-transparent hover:border-white/5"
+                            onClick={() => {
+                              setFormState({ 
+                                ...formState, 
+                                interest_id: i.id,
+                                tutor_id: i.tutor_id,
+                                animal_id: i.animal_id
+                              });
+                              setIsInterestModalOpen(false);
+                              setSearchQuery("");
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3 text-cyan-200" />
+                              <span className="text-xs font-bold text-slate-200 truncate">{tutorName || "Tutor desconhecido"}</span>
+                            </div>
+                            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+                              <Dog className="h-3 w-3 text-pink-400" />
+                              <span className="text-xs font-bold text-slate-200 truncate">{animalName || "Animal desconhecido"}</span>
+                            </div>
+                          </button>
+                        );})}
+                        {!filteredInterests.length && !isSearching && <p className="text-center py-8 text-sm text-slate-600">Nenhum interesse encontrado.</p>}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
-            </form>
-          </aside>
-        </div>
+            </Field>
+
+            <Field label="Link de Reunião / URL">
+              <input className={fieldClass} placeholder="https://..." disabled={isBusy} value={formState.external_event_url} onChange={(event) => setFormState({ ...formState, external_event_url: event.target.value })} />
+            </Field>
+            <div className="flex gap-2 pt-4 border-t border-white/5">
+              <Button className="flex-1 shadow-lg shadow-cyan-400/10" disabled={isBusy} type="submit">{selectedEvent ? "Salvar Alterações" : "Criar Evento"}</Button>
+              {selectedEvent && (
+                 <Button className="w-12 h-11 p-0 shrink-0" disabled={isBusy} onClick={handleDelete} type="button" variant="danger">
+                    <Trash2 className="h-4 w-4" />
+                 </Button>
+              )}
+            </div>
+          </form>
+        </aside>
       </div>
+    </div>
+  );
+
+  if (!standalone) return content;
+
+  return (
+    <main className="min-h-screen bg-[#0e0e12] px-5 py-6 text-white sm:px-8">
+      {content}
     </main>
   );
 }
@@ -705,20 +759,31 @@ function EventCard({ event, isSelected, onClick }: { event: CalendarEventRecord,
   return (
     <button
       className={cn(
-        "grid w-full gap-3 rounded-md border p-4 text-left transition md:grid-cols-[120px_1fr_auto]",
-        isSelected ? "border-cyan-200 bg-cyan-200/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-white/25"
+        "group relative grid w-full gap-4 rounded-xl border p-4 text-left transition-all duration-200 md:grid-cols-[140px_1fr_auto]",
+        isSelected ? "border-cyan-400/30 bg-cyan-400/10 shadow-[0_0_15px_rgba(34,211,238,0.05)]" : "border-white/5 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
       )}
       onClick={onClick}
       type="button"
     >
-      <span className="text-sm font-semibold text-cyan-100">{formatTimeRange(event)}</span>
-      <span>
-        <span className="block font-semibold text-white">{event.title}</span>
-        <span className="mt-1 block text-sm text-slate-400">{eventSubtitle(event)}</span>
-      </span>
-      <span className="flex items-start justify-end">
-        <Badge>{statusLabel(event.status)}</Badge>
-      </span>
+      {isSelected && <div className="absolute left-0 top-0 h-full w-1 bg-cyan-400" />}
+      <div className="flex flex-col justify-center border-r border-white/5 pr-2">
+         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Horário</span>
+         <span className={cn("text-xs font-bold tracking-tighter", isSelected ? "text-cyan-200" : "text-slate-300")}>{formatTimeRange(event)}</span>
+      </div>
+      <div className="min-w-0">
+        <span className={cn("block font-bold text-sm tracking-tight truncate", isSelected ? "text-white" : "text-slate-200 group-hover:text-white")}>{event.title}</span>
+        <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{eventSubtitle(event)}</span>
+      </div>
+      <div className="flex items-center justify-end">
+        <Badge className={cn(
+          "bg-transparent border border-white/10 font-black uppercase tracking-widest text-[9px]",
+          event.status === "scheduled" && "text-amber-400 border-amber-400/20",
+          event.status === "completed" && "text-cyan-400 border-cyan-400/20",
+          event.status === "cancelled" && "text-slate-500 border-slate-500/20"
+        )}>
+          {statusLabel(event.status)}
+        </Badge>
+      </div>
     </button>
   );
 }
@@ -726,7 +791,10 @@ function EventCard({ event, isSelected, onClick }: { event: CalendarEventRecord,
 function Field({ children, label, required = false }: { children: ReactNode; label: string; required?: boolean }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-semibold text-slate-100">{label}{required && <span className="text-cyan-200"> *</span>}</span>
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+        {label}
+        {required && <span className="text-cyan-400 ml-1">*</span>}
+      </span>
       {children}
     </label>
   );

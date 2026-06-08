@@ -8,10 +8,12 @@ export type AdminResource =
   | "animal-photos"
   | "tutor-interessados"
   | "calendar-events"
+  | "calendar-oauth-connections"
   | "custom-fields"
   | "onboarding-questions"
   | "matching-rules"
-  | "service-configs";
+  | "service-configs"
+  | "ong-settings";
 
 export interface AdminResourceConfig {
   id: AdminResource;
@@ -83,6 +85,23 @@ export const adminResources: AdminResourceConfig[] = [
     },
   },
   {
+    id: "calendar-oauth-connections",
+    label: "Conexoes OAuth",
+    createTemplate: {
+      provider: "google",
+      calendar_id: "primary",
+      account_email: "",
+      tenant_id: "",
+      access_token: "",
+      refresh_token: "",
+      token_type: "Bearer",
+      scope: "",
+      expires_at: "",
+      metadata: {},
+      is_active: true,
+    },
+  },
+  {
     id: "service-configs",
     label: "Servicos Externos",
     createTemplate: {
@@ -90,6 +109,27 @@ export const adminResources: AdminResourceConfig[] = [
       service_type: "calendar",
       provider: "google",
       config: {},
+      is_active: true,
+    },
+  },
+  {
+    id: "ong-settings",
+    label: "Configuracoes da ONG",
+    createTemplate: {
+      id: "default",
+      ong_name: "ONG Matching Animal",
+      contact_email: "",
+      contact_phone: "",
+      whatsapp_phone: "",
+      website_url: "",
+      address_line: "",
+      city: "",
+      state: "",
+      postal_code: "",
+      social_links: {},
+      business_hours: {},
+      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:",
+      settings: {},
       is_active: true,
     },
   },
@@ -129,7 +169,8 @@ export const adminResources: AdminResourceConfig[] = [
       tutor_field: "",
       animal_field: "",
       comparison_operator: "=",
-      weight: 10,
+      weight: 50,
+      is_dealbreaker: false,
       is_active: true,
     },
   },
@@ -195,6 +236,29 @@ export function createAdminUser(payload: NewAdminUserInput) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export type CalendarOAuthProvider = "google" | "microsoft";
+
+export async function getCalendarOAuthAuthorizationUrl(provider: CalendarOAuthProvider) {
+  const response = await adminFetch<{ authorizationUrl: string }>(`/api/oauth/${encodeURIComponent(provider)}/start`);
+  return response.authorizationUrl;
+}
+
+export function refreshCalendarOAuthConnection(provider: CalendarOAuthProvider) {
+  return adminFetch<{ refreshed: boolean }>(`/api/oauth/${encodeURIComponent(provider)}/refresh`, {
+    method: "POST",
+  });
+}
+
+export function disconnectCalendarOAuthConnection(provider: CalendarOAuthProvider) {
+  return adminFetch<{ disconnected: boolean }>(`/api/oauth/${encodeURIComponent(provider)}/disconnect`, {
+    method: "POST",
+  });
+}
+
+export function getCalendarOAuthConnectionStatus(provider: CalendarOAuthProvider) {
+  return adminFetch<{ connected: boolean; connection: Record<string, unknown> | null }>(`/api/oauth/${encodeURIComponent(provider)}/status`);
 }
 
 export async function uploadAnimalPhoto(

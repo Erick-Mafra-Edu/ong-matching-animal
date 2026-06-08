@@ -53,8 +53,9 @@ export interface MatchingRule {
     rule_name: string;
     tutor_field: string;
     animal_field: string;
-    comparison_operator: "=" | ">=" | "<=" | "contains";
+    comparison_operator: "=" | "!=" | ">=" | "<=" | "contains";
     weight: number;
+    is_dealbreaker?: boolean;
     is_active: boolean;
     created_at?: string;
 }
@@ -71,6 +72,7 @@ export interface MatchResult {
         rule_name: string;
         matched: boolean;
         weight: number;
+        is_dealbreaker?: boolean;
     }[];
 }
 /**

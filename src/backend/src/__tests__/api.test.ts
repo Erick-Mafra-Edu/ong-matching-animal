@@ -43,6 +43,7 @@ describe("API Endpoints", () => {
       expect(response.body).toHaveProperty("swagger", "2.0");
       expect(response.body).toHaveProperty("basePath", "/api");
       expect(response.body.paths).toHaveProperty("/health");
+      expect(response.body.paths).toHaveProperty("/ong-settings");
       expect(response.body.paths).toHaveProperty("/tutors");
       expect(response.body.paths).toHaveProperty("/animals/{id}/photos");
       expect(response.body.paths).toHaveProperty("/animals/{id}/photos/signed-url");
@@ -98,6 +99,54 @@ describe("API Endpoints", () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty("message");
+    });
+  });
+
+  describe("GET /api/ong-settings", () => {
+    it("should return active ONG contact settings", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{
+          id: "default",
+          ong_name: "ONG Teste",
+          contact_email: "contato@example.org",
+          contact_phone: "+5511999999999",
+          whatsapp_phone: "+5511988888888",
+          social_links: {},
+          business_hours: {},
+          settings: {},
+        }],
+      }) as jest.Mock;
+
+      const response = await request(app).get("/api/ong-settings");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("id", "default");
+      expect(response.body).toHaveProperty("contact_email", "contato@example.org");
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/rest/v1/ong_settings"),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+    });
+
+    it("should return null when no active ONG settings exist", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      }) as jest.Mock;
+
+      const response = await request(app).get("/api/ong-settings");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toBeNull();
     });
   });
 
@@ -259,6 +308,78 @@ describe("API Endpoints", () => {
           body: expect.stringContaining("\"created_by\":\"admin-auth-123\""),
         }),
       );
+    });
+
+    it("should update ONG settings for active admins", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "default",
+            ong_name: "ONG Atualizada",
+            contact_email: "contato@example.org",
+            social_links: {},
+            business_hours: {},
+            settings: {},
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .put("/api/admin/ong-settings/default")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          ong_name: "ONG Atualizada",
+          contact_email: "contato@example.org",
+          social_links: {},
+          business_hours: {},
+          settings: {},
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("ong_name", "ONG Atualizada");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/ong_settings?id=eq.default",
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.stringContaining("\"updated_at\""),
+        }),
+      );
+    });
+
+    it("should reject invalid ONG settings JSON fields", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .put("/api/admin/ong-settings/default")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          social_links: [],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toContain("social_links");
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
     it("should list tutor interest records with tutor and animal labels for admins", async () => {
@@ -949,6 +1070,43 @@ describe("API Endpoints", () => {
   });
 
   describe("POST /api/match", () => {
+    beforeEach(() => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "tutor123",
+            name: "Tutor Teste",
+            custom_fields: { pref_energia: "alto" },
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "animal123",
+            owner_id: "owner123",
+            name: "Rex",
+            species: "Cachorro",
+            custom_fields: { nivel_energia: "alto" },
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "rule123",
+            rule_name: "Energia",
+            tutor_field: "pref_energia",
+            animal_field: "nivel_energia",
+            comparison_operator: "=",
+            weight: 50,
+            is_dealbreaker: false,
+            is_active: true,
+          }],
+        }) as jest.Mock;
+    });
+
     it("should return match response with required fields", async () => {
       const response = await request(app)
         .post("/api/match")
@@ -961,10 +1119,12 @@ describe("API Endpoints", () => {
       expect(response.body).toHaveProperty("matches");
       expect(response.body).toHaveProperty("timestamp");
       expect(Array.isArray(response.body.matches)).toBe(true);
+      expect(response.body.matches[0]).toHaveProperty("animal_id", "animal123");
+      expect(response.body.matches[0]).toHaveProperty("compatibility_score", 50);
     });
 
     it("should accept tutor_id in request body", async () => {
-      const tutor_id = "test_tutor_456";
+      const tutor_id = "tutor123";
       const response = await request(app)
         .post("/api/match")
         .send({ tutor_id });
@@ -995,14 +1155,48 @@ describe("API Endpoints", () => {
 
   describe("JSON Body Parsing", () => {
     it("should parse JSON request bodies", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "tutor123",
+            name: "Tutor Teste",
+            custom_fields: { pref_energia: "alto" },
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "animal123",
+            owner_id: "owner123",
+            name: "Rex",
+            species: "Cachorro",
+            custom_fields: { nivel_energia: "alto" },
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "rule123",
+            rule_name: "Energia",
+            tutor_field: "pref_energia",
+            animal_field: "nivel_energia",
+            comparison_operator: "=",
+            weight: 50,
+            is_dealbreaker: false,
+            is_active: true,
+          }],
+        }) as jest.Mock;
       const testData = { tutor_id: "test123", data: "test" };
       const response = await request(app)
         .post("/api/match")
         .set("Content-Type", "application/json")
-        .send(testData);
+        .send({ ...testData, tutor_id: "tutor123" });
 
       expect(response.status).toBe(200);
-      expect(response.body.tutor_id).toBe(testData.tutor_id);
+      expect(response.body.tutor_id).toBe("tutor123");
     });
   });
 });

@@ -113,6 +113,47 @@ describe("MatchingAlgorithm", () => {
       expect(result.matched_rules.length).toBe(2);
     });
 
+    it("should disqualify animal when a dealbreaker rule fails", () => {
+      const tutor: TutorProfile = {
+        id: "tutor1",
+        name: "Ana",
+        location: { lat: -23.5505, lng: -46.6333 },
+        custom_fields: {
+          aceita_gato: true,
+        },
+      };
+
+      const animal: AnimalProfile = {
+        id: "animal1",
+        owner_id: "owner1",
+        name: "Thor",
+        species: "Cachorro",
+        location: { lat: -23.5505, lng: -46.6333 },
+        custom_fields: {
+          convive_com_gatos: false,
+        },
+      };
+
+      const rules: MatchingRule[] = [
+        {
+          id: "rule1",
+          rule_name: "Convivencia com gatos",
+          tutor_field: "aceita_gato",
+          animal_field: "convive_com_gatos",
+          comparison_operator: "=",
+          weight: 100,
+          is_dealbreaker: true,
+          is_active: true,
+        },
+      ];
+
+      const result = algorithm.calculateScore(tutor, animal, rules);
+
+      expect(result.compatibility_score).toBe(0);
+      expect(result.details[0]).toHaveProperty("is_dealbreaker", true);
+      expect(result.details[0]).toHaveProperty("matched", false);
+    });
+
     it("should handle empty rules array", () => {
       const tutor: TutorProfile = {
         id: "tutor1",

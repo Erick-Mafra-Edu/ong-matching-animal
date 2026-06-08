@@ -70,10 +70,10 @@ export const adminTables = {
   },
   "matching-rules": {
     table: "matching_rules",
-    select: "id,rule_name,tutor_field,animal_field,comparison_operator,weight,is_active,created_at",
+    select: "id,rule_name,tutor_field,animal_field,comparison_operator,weight,is_dealbreaker,is_active,created_at",
     order: "created_at.desc",
-    createFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_active"],
-    updateFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_active"],
+    createFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_dealbreaker", "is_active"],
+    updateFields: ["rule_name", "tutor_field", "animal_field", "comparison_operator", "weight", "is_dealbreaker", "is_active"],
   },
   "service-configs": {
     table: "service_configs",
@@ -81,6 +81,20 @@ export const adminTables = {
     order: "service_type.asc,provider.asc",
     createFields: ["id", "service_type", "provider", "config", "is_active"],
     updateFields: ["config", "is_active"],
+  },
+  "calendar-oauth-connections": {
+    table: "calendar_oauth_connections",
+    select: "id,provider,calendar_id,account_email,tenant_id,access_token,refresh_token,token_type,scope,expires_at,metadata,is_active,created_by,updated_by,created_at,updated_at",
+    order: "updated_at.desc",
+    createFields: ["provider", "calendar_id", "account_email", "tenant_id", "access_token", "refresh_token", "token_type", "scope", "expires_at", "metadata", "is_active", "created_by", "updated_by"],
+    updateFields: ["provider", "calendar_id", "account_email", "tenant_id", "access_token", "refresh_token", "token_type", "scope", "expires_at", "metadata", "is_active", "updated_by", "updated_at"],
+  },
+  "ong-settings": {
+    table: "ong_settings",
+    select: "id,ong_name,contact_email,contact_phone,whatsapp_phone,website_url,address_line,city,state,postal_code,social_links,business_hours,adoption_message_template,settings,is_active,created_at,updated_at",
+    order: "id.asc",
+    createFields: ["id", "ong_name", "contact_email", "contact_phone", "whatsapp_phone", "website_url", "address_line", "city", "state", "postal_code", "social_links", "business_hours", "adoption_message_template", "settings", "is_active"],
+    updateFields: ["ong_name", "contact_email", "contact_phone", "whatsapp_phone", "website_url", "address_line", "city", "state", "postal_code", "social_links", "business_hours", "adoption_message_template", "settings", "is_active", "updated_at"],
   },
 } as const;
 
