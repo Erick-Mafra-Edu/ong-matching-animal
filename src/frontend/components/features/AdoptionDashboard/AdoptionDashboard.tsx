@@ -6,6 +6,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
 import { registrarInteresse } from "@/lib/interessados";
+import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
@@ -22,6 +23,15 @@ export type SwipeDirection = "left" | "right";
 export interface CardAction {
   direction: SwipeDirection;
   id: number;
+}
+
+interface ContactDialogState {
+  animalName: string;
+  emailUrl: string;
+  interestLink: string;
+  message: string;
+  ongName: string;
+  whatsappUrl: string;
 }
 
 const fallbackPhotosBySpecies: Record<string, string> = {
@@ -47,8 +57,26 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
   const [actionMessage, setActionMessage] = useState("");
   const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
+  const [ongSettings, setOngSettings] = useState<OngSettings | null>(null);
+  const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
 
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    carregarOngSettings()
+      .then((settings) => {
+        if (isMounted) setOngSettings(settings);
+      })
+      .catch(() => {
+        if (isMounted) setOngSettings(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (status !== "ready") {
@@ -101,7 +129,23 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     setActionMessage("Registrando interesse...");
 
     try {
-      await registrarInteresse(featuredPet.id);
+      const interest = await registrarInteresse(featuredPet.id);
+      const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
+      if (settings && !ongSettings) setOngSettings(settings);
+
+      const interestLink = toAbsoluteInterestLink(interest.detail_url);
+      const message = buildAdoptionMessage(settings?.adoption_message_template, featuredPet.name, interestLink);
+      const email = settings?.contact_email?.trim() ?? "";
+      const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
+
+      setContactDialog({
+        animalName: featuredPet.name,
+        emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Interesse em adotar ${featuredPet.name}`)}&body=${encodeURIComponent(message)}` : "",
+        interestLink,
+        message,
+        ongName: settings?.ong_name?.trim() || "ONG",
+        whatsappUrl: buildWhatsAppUrl(whatsappPhone, message),
+      });
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
@@ -194,6 +238,92 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           </div>
         </section>
       </div>
+      {contactDialog && (
+        <AdoptionContactDialog
+          dialog={contactDialog}
+          onChange={setContactDialog}
+          onClose={() => setContactDialog(null)}
+        />
+      )}
     </PageContainer>
   );
+}
+
+function toAbsoluteInterestLink(detailUrl: string) {
+  if (/^https?:\/\//i.test(detailUrl)) return detailUrl;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}${detailUrl.startsWith("/") ? detailUrl : `/${detailUrl}`}`;
+}
+
+interface AdoptionContactDialogProps {
+  dialog: ContactDialogState;
+  onChange: (dialog: ContactDialogState) => void;
+  onClose: () => void;
+}
+
+function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDialogProps) {
+  const emailUrl = dialog.emailUrl
+    ? replaceMailtoBody(dialog.emailUrl, dialog.message)
+    : "";
+  const whatsappUrl = dialog.whatsappUrl
+    ? replaceWhatsAppText(dialog.whatsappUrl, dialog.message)
+    : "";
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="adoption-contact-title">
+      <div className="w-full max-w-lg rounded-lg border border-white/12 bg-[#141419] p-5 text-cyan-50 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-black" id="adoption-contact-title">Contato com a ONG</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-400">{dialog.animalName} foi salvo nos seus interesses.</p>
+          </div>
+          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xl text-slate-300 transition hover:border-cyan-200 hover:text-cyan-100" onClick={onClose} type="button" aria-label="Fechar">
+            ×
+          </button>
+        </div>
+
+        <label className="mt-5 block space-y-2">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Mensagem para {dialog.ongName}</span>
+          <textarea
+            className="form-control min-h-40 resize-y text-sm leading-6"
+            value={dialog.message}
+            onChange={(event) => onChange({ ...dialog, message: event.target.value })}
+          />
+        </label>
+
+        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">
+          <span className="font-semibold text-cyan-100">Link do interesse:</span> {dialog.interestLink}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          {whatsappUrl && (
+            <a className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-cyan-200 px-5 text-xs font-bold uppercase tracking-wide text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-100" href={whatsappUrl} target="_blank" rel="noreferrer">
+              Enviar WhatsApp
+            </a>
+          )}
+          {emailUrl && (
+            <a className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-amber-500 px-5 text-xs font-bold uppercase tracking-wide text-amber-500 transition hover:-translate-y-0.5 hover:bg-amber-500/10" href={emailUrl}>
+              Enviar e-mail
+            </a>
+          )}
+          {!whatsappUrl && !emailUrl && (
+            <p className="text-sm leading-6 text-slate-400">Nenhum WhatsApp ou e-mail de contato foi configurado para a ONG.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function replaceWhatsAppText(url: string, message: string) {
+  const parsed = new URL(url);
+  parsed.searchParams.set("text", message);
+  return parsed.toString();
+}
+
+function replaceMailtoBody(url: string, message: string) {
+  const [base, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  params.set("body", message);
+  return `${base}?${params.toString()}`;
 }

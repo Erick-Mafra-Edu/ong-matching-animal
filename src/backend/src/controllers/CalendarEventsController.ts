@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { createCalendarAdapterFromDB } from "../lib/calendar";
 import {
   buildCalendarEventPayload,
   normalizeCalendarEvent,
@@ -56,28 +55,6 @@ export class CalendarEventsController {
         return;
       }
 
-      let externalEventId: string | null = null;
-      let externalEventUrl: string | null = null;
-      let provider: string | null = null;
-
-      const adapter = payload.provider ? await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey) : null;
-      if (adapter) {
-        try {
-          const externalEvent = await adapter.createEvent({
-            title: String(payload.title),
-            description: payload.description ? String(payload.description) : undefined,
-            location: payload.location ? String(payload.location) : undefined,
-            start: { dateTime: String(payload.starts_at), timeZone: "America/Sao_Paulo" },
-            end: { dateTime: String(payload.ends_at), timeZone: "America/Sao_Paulo" },
-          });
-          externalEventId = externalEvent.id;
-          externalEventUrl = externalEvent.htmlLink ?? null;
-          provider = externalEvent.provider;
-        } catch (syncError) {
-          console.error("Erro ao sincronizar com calendario externo:", syncError);
-        }
-      }
-
       const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events`, {
         method: "POST",
         headers: {
@@ -86,12 +63,7 @@ export class CalendarEventsController {
           "content-type": "application/json",
           prefer: "return=representation",
         },
-        body: JSON.stringify({
-          ...payload,
-          external_event_id: externalEventId,
-          external_event_url: externalEventUrl,
-          provider,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await response.json();
 
@@ -120,30 +92,6 @@ export class CalendarEventsController {
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
         return;
-      }
-
-      const existingResponse = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}&select=*`, {
-        headers: { apikey: context.serviceRoleKey, authorization: `Bearer ${context.serviceRoleKey}` },
-      });
-      const existingBody = await existingResponse.json();
-      const existingEvent = Array.isArray(existingBody) ? existingBody[0] : null;
-
-      if (existingEvent?.external_event_id) {
-        const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
-        if (adapter) {
-          try {
-            await adapter.updateEvent({
-              id: String(existingEvent.external_event_id),
-              title: payload.title ? String(payload.title) : String(existingEvent.title),
-              description: payload.description ? String(payload.description) : (existingEvent.description ? String(existingEvent.description) : undefined),
-              location: payload.location ? String(payload.location) : (existingEvent.location ? String(existingEvent.location) : undefined),
-              start: { dateTime: payload.starts_at ? String(payload.starts_at) : String(existingEvent.starts_at), timeZone: "America/Sao_Paulo" },
-              end: { dateTime: payload.ends_at ? String(payload.ends_at) : String(existingEvent.ends_at), timeZone: "America/Sao_Paulo" },
-            });
-          } catch (syncError) {
-            console.error("Erro ao atualizar calendario externo:", syncError);
-          }
-        }
       }
 
       const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}`, {
@@ -178,23 +126,6 @@ export class CalendarEventsController {
       if (!context) return;
 
       const { id } = req.params;
-      const existingResponse = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}&select=external_event_id`, {
-        headers: { apikey: context.serviceRoleKey, authorization: `Bearer ${context.serviceRoleKey}` },
-      });
-      const existingBody = await existingResponse.json();
-      const existingEvent = Array.isArray(existingBody) ? existingBody[0] : null;
-
-      if (existingEvent?.external_event_id) {
-        const adapter = await createCalendarAdapterFromDB(context.supabaseUrl, context.serviceRoleKey);
-        if (adapter) {
-          try {
-            await adapter.deleteEvent(String(existingEvent.external_event_id));
-          } catch (syncError) {
-            console.error("Erro ao remover do calendario externo:", syncError);
-          }
-        }
-      }
-
       const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: {

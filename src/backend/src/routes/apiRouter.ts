@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/AdminController";
 import { AnimalsController } from "../controllers/AnimalsController";
+import { CalendarOAuthController } from "../controllers/CalendarOAuthController";
 import { CalendarEventsController } from "../controllers/CalendarEventsController";
 import { InterestsController } from "../controllers/InterestsController";
 import { SystemController } from "../controllers/SystemController";
@@ -10,12 +11,14 @@ export function createApiRouter() {
   const router = Router();
   const admin = new AdminController();
   const animals = new AnimalsController();
+  const calendarOAuth = new CalendarOAuthController();
   const calendarEvents = new CalendarEventsController();
   const interests = new InterestsController();
   const system = new SystemController();
   const tutors = new TutorsController();
 
   router.get("/health", system.getHealth);
+  router.get("/ong-settings", system.getOngSettings);
   router.get("/onboarding-questions", system.listOnboardingQuestions);
 
   router.get("/admin/me", admin.getMe);
@@ -29,6 +32,14 @@ export function createApiRouter() {
   router.post("/calendar-events", calendarEvents.create);
   router.put("/calendar-events/:id", calendarEvents.update);
   router.delete("/calendar-events/:id", calendarEvents.delete);
+
+  router.get("/oauth/:provider/start", calendarOAuth.start);
+  router.get("/oauth/:provider/callback", calendarOAuth.callback);
+  router.post("/oauth/:provider/refresh", calendarOAuth.refresh);
+  router.post("/oauth/:provider/disconnect", calendarOAuth.disconnect);
+  router.get("/oauth/:provider/status", calendarOAuth.status);
+  router.get("/auth/callback/:provider", calendarOAuth.callback);
+  router.get("/auth/start/:provider", calendarOAuth.start);
 
   router.get("/interessados", interests.listMine);
   router.post("/interessados", interests.create);

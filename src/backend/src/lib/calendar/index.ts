@@ -26,7 +26,7 @@ export function createCalendarAdapter(config: CalendarAdapterConfig): CalendarAd
 
 export async function createCalendarAdapterFromDB(supabaseUrl: string, serviceRoleKey: string): Promise<CalendarAdapter | null> {
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/service_configs?service_type=eq.calendar&is_active=eq.true&limit=1`, {
+    const response = await fetch(`${supabaseUrl}/rest/v1/calendar_oauth_connections?is_active=eq.true&order=updated_at.desc&limit=1`, {
       headers: {
         apikey: serviceRoleKey,
         authorization: `Bearer ${serviceRoleKey}`,
@@ -35,36 +35,91 @@ export async function createCalendarAdapterFromDB(supabaseUrl: string, serviceRo
 
     if (!response.ok) return null;
     const body = await response.json();
-    const configRecord = Array.isArray(body) ? body[0] : null;
+    const connection = Array.isArray(body) ? body[0] : null;
+    if (!connection?.provider || !connection.access_token) return null;
 
-    if (!configRecord || !configRecord.config) return null;
-
-    const { provider, config } = configRecord;
+    const provider = connection.provider as CalendarProvider;
+    const expiresAt = connection.expires_at ? new Date(connection.expires_at) : null;
+    const isExpired = expiresAt ? expiresAt.getTime() <= Date.now() : false;
+    const accessToken = isExpired
+      ? await refreshAccessToken(supabaseUrl, serviceRoleKey, connection)
+      : String(connection.access_token);
 
     if (provider === "google") {
       return new GoogleCalendarAdapter({
-        calendarId: config.calendarId,
-        accessToken: config.accessToken,
-        refreshToken: config.refreshToken,
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
-        redirectUri: config.redirectUri,
+        calendarId: connection.calendar_id,
+        accessToken,
+        refreshToken: connection.refresh_token ?? undefined,
+        clientId: process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_CALENDAR_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+        redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI ?? process.env.GOOGLE_CALENDAR_REDIRECT_URI,
       });
     }
 
     if (provider === "microsoft") {
       return new MicrosoftCalendarAdapter({
-        calendarId: config.calendarId,
-        userId: config.userId,
-        accessToken: config.accessToken,
+        calendarId: connection.calendar_id,
+        userId: connection.account_email ?? undefined,
+        accessToken,
       });
     }
 
     return null;
   } catch (error) {
-    console.error("Erro ao carregar configuracao do calendario do banco:", error);
+    console.error("Erro ao carregar configuracao OAuth do calendario:", error);
     return null;
   }
+}
+
+async function refreshAccessToken(supabaseUrl: string, serviceRoleKey: string, connection: Record<string, unknown>) {
+  const provider = String(connection.provider ?? "");
+  const refreshToken = String(connection.refresh_token ?? "");
+  if (!refreshToken) return String(connection.access_token ?? "");
+
+  const tokenUrl = provider === "google"
+    ? "https://oauth2.googleapis.com/token"
+    : `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? "common"}/oauth2/v2.0/token`;
+
+  const clientId = provider === "google"
+    ? process.env.GOOGLE_OAUTH_CLIENT_ID ?? process.env.GOOGLE_CALENDAR_CLIENT_ID
+    : process.env.MICROSOFT_OAUTH_CLIENT_ID;
+  const clientSecret = provider === "google"
+    ? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? process.env.GOOGLE_CALENDAR_CLIENT_SECRET
+    : process.env.MICROSOFT_OAUTH_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) return String(connection.access_token ?? "");
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) return String(connection.access_token ?? "");
+
+  const body = await response.json() as Record<string, unknown>;
+  const newAccessToken = String(body.access_token ?? connection.access_token ?? "");
+  const expiresIn = Number(body.expires_in ?? 3600);
+  await fetch(`${supabaseUrl}/rest/v1/calendar_oauth_connections?id=eq.${encodeURIComponent(String(connection.id ?? ""))}`, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      access_token: newAccessToken,
+      expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  return newAccessToken;
 }
 
 export function createCalendarAdapterFromEnv(provider: CalendarProvider = readCalendarProvider()): CalendarAdapter {

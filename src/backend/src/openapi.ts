@@ -24,6 +24,7 @@ export const apiDoc = {
   tags: [
     { name: "Health" },
     { name: "Onboarding" },
+    { name: "ONG Settings" },
     { name: "Tutors" },
     { name: "Animals" },
     { name: "Matching" },
@@ -60,6 +61,26 @@ export const apiDoc = {
         value: { type: "string" },
       },
       required: ["label", "value"],
+    },
+    OngSettings: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        ong_name: { type: "string" },
+        contact_email: { type: "string" },
+        contact_phone: { type: "string" },
+        whatsapp_phone: { type: "string" },
+        website_url: { type: "string" },
+        address_line: { type: "string" },
+        city: { type: "string" },
+        state: { type: "string" },
+        postal_code: { type: "string" },
+        social_links: { type: "object", additionalProperties: true },
+        business_hours: { type: "object", additionalProperties: true },
+        adoption_message_template: { type: "string" },
+        settings: { type: "object", additionalProperties: true },
+      },
+      required: ["id", "ong_name", "social_links", "business_hours", "settings"],
     },
     TutorInput: {
       type: "object",
@@ -169,6 +190,23 @@ export const apiDoc = {
               type: "array",
               items: { $ref: "#/definitions/OnboardingQuestion" },
             },
+          },
+          500: {
+            description: "Configuração ou conexão Supabase inválida.",
+            schema: { $ref: "#/definitions/ErrorResponse" },
+          },
+        },
+      },
+    },
+    "/ong-settings": {
+      get: {
+        tags: ["ONG Settings"],
+        operationId: "getOngSettings",
+        summary: "Retorna configuracoes publicas de contato da ONG.",
+        responses: {
+          200: {
+            description: "Configuracoes ativas da ONG.",
+            schema: { $ref: "#/definitions/OngSettings" },
           },
           500: {
             description: "Configuração ou conexão Supabase inválida.",
@@ -350,6 +388,7 @@ export const apiDoc = {
 
 export const openApiOperations = {
   getHealth: operationPassThrough,
+  getOngSettings: operationPassThrough,
   listOnboardingQuestions: operationPassThrough,
   upsertTutor: operationPassThrough,
   getTutorById: operationPassThrough,

@@ -59,6 +59,7 @@ export interface MatchingRule {
   animal_field: string; // Chave em AnimalProfile.custom_fields
   comparison_operator: "=" | "!=" | ">=" | "<=" | "contains";
   weight: number; // Pontos a somar se der match (30, 50, etc)
+  is_dealbreaker?: boolean; // Se true, falhar nesta regra elimina o animal
   is_active: boolean;
   created_at?: string;
 }
@@ -76,6 +77,7 @@ export interface MatchResult {
     rule_name: string;
     matched: boolean;
     weight: number;
+    is_dealbreaker?: boolean;
   }[];
 }
 

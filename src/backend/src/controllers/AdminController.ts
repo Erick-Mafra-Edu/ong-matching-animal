@@ -240,6 +240,7 @@ export class AdminController {
         }
       }
       if (req.params.resource === "admin-users") payload.updated_at = new Date().toISOString();
+      if (req.params.resource === "ong-settings") payload.updated_at = new Date().toISOString();
 
       const idField = "idField" in config ? config.idField : "id";
       const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?${idField}=eq.${encodeURIComponent(req.params.id)}`, {
@@ -310,8 +311,57 @@ async function validateAdminPayload(resource: string, payload: Record<string, un
     return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
   }
 
+  if (resource === "ong-settings") {
+    return validateOngSettingsPayload(payload);
+  }
+
+  if (resource === "matching-rules") {
+    return validateMatchingRulePayload(payload);
+  }
+
   if (resource === "tutors" && Object.prototype.hasOwnProperty.call(payload, "custom_fields")) {
     return validateTutorCustomFields(payload.custom_fields, supabaseUrl, serviceRoleKey);
+  }
+
+  return null;
+}
+
+function validateMatchingRulePayload(payload: Record<string, unknown>) {
+  for (const field of ["rule_name", "tutor_field", "animal_field", "comparison_operator"]) {
+    if (Object.prototype.hasOwnProperty.call(payload, field) && !String(payload[field] ?? "").trim()) {
+      return "Preencha nome, campos comparados e condicao da regra.";
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "comparison_operator")) {
+    const operator = String(payload.comparison_operator);
+    if (!["=", "!=", ">=", "<=", "contains"].includes(operator)) {
+      return "Condicao de matching invalida.";
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "weight")) {
+    const weight = Number(payload.weight);
+    if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
+      return "O impacto da regra deve ficar entre 0 e 100.";
+    }
+    payload.weight = Math.round(weight);
+  }
+
+  return null;
+}
+
+function validateOngSettingsPayload(payload: Record<string, unknown>) {
+  for (const field of ["social_links", "business_hours", "settings"]) {
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) continue;
+    const value = payload[field];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return `${field} deve ser um objeto JSON.`;
+    }
+  }
+
+  for (const field of ["contact_email", "contact_phone", "whatsapp_phone", "website_url", "address_line", "city", "state", "postal_code", "adoption_message_template"]) {
+    if (payload[field] === "") payload[field] = null;
   }
 
   return null;

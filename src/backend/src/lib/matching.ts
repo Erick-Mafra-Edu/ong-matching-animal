@@ -28,6 +28,14 @@ export class MatchingAlgorithm {
       return tutorNum <= animalNum;
     },
     contains: (tutor: unknown, animal: unknown) => {
+      if (Array.isArray(animal)) {
+        return Array.isArray(tutor)
+          ? tutor.some((item) => animal.includes(item))
+          : animal.includes(tutor);
+      }
+      if (Array.isArray(tutor)) {
+        return tutor.some((item) => typeof animal === "string" && animal.includes(String(item)));
+      }
       if (typeof tutor === "string" && typeof animal === "string") {
         return animal.includes(tutor);
       }
@@ -97,11 +105,13 @@ export class MatchingAlgorithm {
     let totalScore = 0;
     const matchedRules: string[] = [];
     const details: MatchResult["details"] = [];
+    let disqualified = false;
 
     for (const rule of rules) {
       if (!rule.is_active) continue;
 
       const isMatch = this.evaluateRule(rule, tutor, animal);
+      if (rule.is_dealbreaker && !isMatch) disqualified = true;
       const score = isMatch ? rule.weight : 0;
 
       totalScore += score;
@@ -111,6 +121,7 @@ export class MatchingAlgorithm {
         rule_name: rule.rule_name,
         matched: isMatch,
         weight: rule.weight,
+        is_dealbreaker: rule.is_dealbreaker,
       });
 
       if (isMatch) {
@@ -121,7 +132,7 @@ export class MatchingAlgorithm {
     return {
       animal_id: animal.id,
       animal_name: animal.name,
-      compatibility_score: totalScore,
+      compatibility_score: disqualified ? 0 : totalScore,
       matched_rules: matchedRules,
       details,
     };
