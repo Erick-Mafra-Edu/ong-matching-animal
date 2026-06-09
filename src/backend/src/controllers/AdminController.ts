@@ -369,6 +369,10 @@ function validateOngSettingsPayload(payload: Record<string, unknown>) {
 
 async function validateCustomFieldPayload(payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
   const entityType = String(payload.entity_type ?? "");
+  if (!["tutor", "animal"].includes(entityType)) {
+    return "Informe se o campo customizado serve para tutores ou animais.";
+  }
+
   if (payload.source_question_id === "") payload.source_question_id = null;
   if (entityType !== "tutor") {
     payload.source_question_id = null;

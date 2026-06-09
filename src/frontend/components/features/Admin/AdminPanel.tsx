@@ -256,16 +256,17 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     fields: [
       {
         name: "entity_type",
-        label: "Aplicar em",
+        label: "Serve para",
         type: "select",
         required: true,
+        helper: "Define se este campo aparecera nos dados de tutores ou de animais.",
         options: [
           { label: "Para tutor", value: "tutor" },
           { label: "Para animal", value: "animal" },
         ],
       },
       { name: "field_key", label: "Chave do campo", type: "text", required: true, helper: "Use letras minusculas, numeros e underscore. Ex.: nivel_energia." },
-      { name: "label", label: "Label amigavel", type: "text", required: true },
+      { name: "label", label: "Descrição do campo", type: "text", required: true },
       {
         name: "source_question_id",
         label: "Pergunta que preenche",
@@ -580,7 +581,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
 
   const visibleResources = useMemo(() => {
     return visibleAdminResources.filter(r => {
-      if (r.id === "calendar-events" || r.id === "calendar-oauth-connections") {
+      if (r.id === "calendar-events" || r.id === "calendar-oauth-connections" || r.id === "service-configs") {
         return showCalendarConfig;
       }
       return true;
@@ -777,7 +778,9 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
+            {showCalendarConfig && (
+              <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
+            )}
             <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
           </div>
         </div>
@@ -1092,6 +1095,29 @@ function RecordForm({
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
   const formDisabled = disabled || config.readonly === true;
 
+  function handleFieldChange(field: FieldConfig, value: unknown) {
+    if (config.id !== "custom-fields") {
+      onChange({ ...formState, [field.name]: value });
+      return;
+    }
+
+    if (field.name === "field_key") {
+      onChange({ ...formState, field_key: sanitizeCustomFieldKey(String(value ?? "")) });
+      return;
+    }
+
+    if (field.name === "label") {
+      const nextState: FormState = { ...formState, label: value };
+      if (!String(formState.field_key ?? "").trim()) {
+        nextState.field_key = sanitizeCustomFieldKey(String(value ?? ""));
+      }
+      onChange(nextState);
+      return;
+    }
+
+    onChange({ ...formState, [field.name]: value });
+  }
+
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
       <form onSubmit={onSubmit}>
@@ -1148,7 +1174,7 @@ function RecordForm({
                   customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
                   dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
                   value={formState[field.name]}
-                  onChange={(value) => onChange({ ...formState, [field.name]: value })}
+                  onChange={(value) => handleFieldChange(field, value)}
                 />
               ))}
             </div>
@@ -2387,6 +2413,19 @@ function humanizeFieldKey(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function sanitizeCustomFieldKey(value: string) {
+  const sanitized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+
+  if (!sanitized) return "";
+  return /^[a-z]/.test(sanitized) ? sanitized : `campo_${sanitized}`;
 }
 
 function formatValue(value: unknown) {
