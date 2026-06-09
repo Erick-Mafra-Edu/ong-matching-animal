@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
 import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
-import { registrarInteresse } from "@/lib/interessados";
+import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { DashboardState } from "./DashboardState";
@@ -102,17 +102,58 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     };
   }, [status]);
 
+  function renderContactDialog() {
+    if (!contactDialog) return null;
+
+    return (
+      <AdoptionContactDialog
+        dialog={contactDialog}
+        onChange={setContactDialog}
+        onClose={() => setContactDialog(null)}
+      />
+    );
+  }
+
   if (loadStatus !== "ready") {
-    return <DashboardState status={loadStatus} />;
+    return (
+      <>
+        <DashboardState status={loadStatus} />
+        {renderContactDialog()}
+      </>
+    );
   }
 
   const featuredPet = pets[0];
   if (!featuredPet) {
-    return <DashboardState status="empty" />;
+    return (
+      <>
+        <DashboardState status="empty" />
+        {renderContactDialog()}
+      </>
+    );
   }
 
   function requestCardAction(direction: SwipeDirection) {
     setCardAction({ direction, id: Date.now() });
+  }
+
+  async function openContactDialogForInterest(animal: AnimalListItem, interest: InteresseRegistro) {
+    const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
+    if (settings && !ongSettings) setOngSettings(settings);
+
+    const interestLink = toAbsoluteInterestLink(interest.detail_url);
+    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
+    const email = settings?.contact_email?.trim() ?? "";
+    const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
+
+    setContactDialog({
+      animalName: animal.name,
+      emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Interesse em adotar ${animal.name}`)}&body=${encodeURIComponent(message)}` : "",
+      interestLink,
+      message,
+      ongName: settings?.ong_name?.trim() || "ONG",
+      whatsappUrl: buildWhatsAppUrl(whatsappPhone, message),
+    });
   }
 
   async function handleAdopt() {
@@ -124,22 +165,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
     try {
       const interest = await registrarInteresse(featuredPet.id);
-      const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
-      if (settings && !ongSettings) setOngSettings(settings);
-
-      const interestLink = toAbsoluteInterestLink(interest.detail_url);
-      const message = buildAdoptionMessage(settings?.adoption_message_template, featuredPet.name, interestLink);
-      const email = settings?.contact_email?.trim() ?? "";
-      const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
-
-      setContactDialog({
-        animalName: featuredPet.name,
-        emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Interesse em adotar ${featuredPet.name}`)}&body=${encodeURIComponent(message)}` : "",
-        interestLink,
-        message,
-        ongName: settings?.ong_name?.trim() || "ONG",
-        whatsappUrl: buildWhatsAppUrl(whatsappPhone, message),
-      });
+      await openContactDialogForInterest(featuredPet, interest);
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
@@ -159,7 +185,8 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {
-        await registrarInteresse(current.id);
+        const interest = await registrarInteresse(current.id);
+        await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
         setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
@@ -232,13 +259,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           </div>
         </section>
       </div>
-      {contactDialog && (
-        <AdoptionContactDialog
-          dialog={contactDialog}
-          onChange={setContactDialog}
-          onClose={() => setContactDialog(null)}
-        />
-      )}
+      {renderContactDialog()}
     </PageContainer>
   );
 }
