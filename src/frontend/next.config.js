@@ -6,6 +6,7 @@ require('dotenv').config({ path: '../../.env.local' });
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, '');
 
 const connectSources = ["'self'"];
+connectSources.push("https://dog.ceo");
 
 if (backendUrl) {
   connectSources.push(backendUrl);

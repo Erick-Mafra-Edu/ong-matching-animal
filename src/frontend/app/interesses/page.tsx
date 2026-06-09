@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { MobileNavigation } from "@/components/features/AdoptionDashboard/MobileNavigation";
 import { Badge } from "@/components/ui/Badge";
 import { navigationItems } from "@/data/adoption.mock";
+import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { listarMeusInteresses, type InteresseComAnimal } from "@/lib/interessados";
 
 export default function MeusInteressesPage() {
@@ -93,8 +94,27 @@ export default function MeusInteressesPage() {
 
 function InterestCard({ interesse }: { interesse: InteresseComAnimal }) {
   const animal = interesse.animal ?? {};
-  const photoUrl = animal.photoUrl || animal.photoUrls?.[0] || "";
+  const initialPhotoUrl = animal.photoUrl || animal.photoUrls?.[0] || "";
+  const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const nextSchedule = interesse.schedule?.[0];
+
+  useEffect(() => {
+    let mounted = true;
+    if (initialPhotoUrl) {
+      setPhotoUrl(initialPhotoUrl);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    fetchAnimalFallbackPhoto().then((fallbackUrl) => {
+      if (mounted) setPhotoUrl(fallbackUrl);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [initialPhotoUrl]);
 
   return (
     <article className="grid gap-4 rounded-md border border-white/10 bg-white/[0.035] p-4 md:grid-cols-[180px_1fr]">
@@ -103,7 +123,7 @@ function InterestCard({ interesse }: { interesse: InteresseComAnimal }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img alt={`Foto de ${animal.name ?? "animal"}`} className="aspect-[4/3] h-full w-full object-cover md:aspect-square" src={photoUrl} />
         ) : (
-          <div className="grid aspect-[4/3] place-items-center text-sm text-slate-500 md:aspect-square">Sem foto</div>
+          <div className="grid aspect-[4/3] animate-pulse place-items-center text-sm text-slate-500 md:aspect-square">Carregando foto...</div>
         )}
       </div>
 

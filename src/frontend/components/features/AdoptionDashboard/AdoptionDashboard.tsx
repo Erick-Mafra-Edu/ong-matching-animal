@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
+import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { registrarInteresse } from "@/lib/interessados";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
@@ -34,19 +35,10 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-const fallbackPhotosBySpecies: Record<string, string> = {
-  cachorro: "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=90",
-  gato: "https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=1200&q=90",
-  coelho: "https://images.unsplash.com/photo-1585565623926-2469211a7b75?auto=format&fit=crop&w=1200&q=90",
-};
-
-const defaultFallbackPhoto = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1200&q=90";
-
-function withFallbackPhoto(animal: AnimalListItem): AnimalListItem {
+async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
   if (animal.photoUrl || animal.photoUrls?.length) return animal;
 
-  const speciesKey = animal.species?.toLocaleLowerCase("pt-BR") ?? "";
-  const photoUrl = fallbackPhotosBySpecies[speciesKey] ?? defaultFallbackPhoto;
+  const photoUrl = await fetchAnimalFallbackPhoto();
   return { ...animal, photoUrl, photoUrls: [photoUrl] };
 }
 
@@ -93,8 +85,10 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
         return response.json() as Promise<AnimalListItem[]>;
       })
       .then((animals) => {
+        return Promise.all(animals.map(withFallbackPhoto));
+      })
+      .then((availableAnimals) => {
         if (!isMounted) return;
-        const availableAnimals = animals.map(withFallbackPhoto);
         setPets(availableAnimals);
         setLoadStatus(availableAnimals.length ? "ready" : "empty");
       })
