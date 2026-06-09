@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Star,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Link as LinkIcon,
@@ -53,6 +54,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { CalendarPage } from "@/components/features/Calendar/CalendarPage";
+import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 
 type AdminRecord = RaRecord & Record<string, unknown>;
 type FieldType = "text" | "email" | "password" | "number" | "boolean" | "select" | "textarea" | "keyValue" | "options" | "slider";
@@ -578,6 +580,8 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const dataProvider = useDataProvider();
   const [activeResource, setActiveResource] = useState<AdminResource>("admin-users");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileFormOpen, setIsMobileFormOpen] = useState(false);
 
   const visibleResources = useMemo(() => {
     return visibleAdminResources.filter(r => {
@@ -695,6 +699,8 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(null);
     setMode("edit");
     setFormState(createInitialState(resourceUiConfigs[resource]));
+    setIsMobileMenuOpen(false);
+    setIsMobileFormOpen(false);
   }
 
   function startCreate() {
@@ -702,6 +708,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(null);
     setMessage("");
     setFormState(createInitialState(activeConfig));
+    setIsMobileFormOpen(true);
   }
 
   function selectRow(row: AdminRecord) {
@@ -709,6 +716,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(String(row.id));
     setMessage("");
     setFormState(recordToFormState(row, activeConfig));
+    setIsMobileFormOpen(true);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -728,6 +736,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       if (activeResource === "custom-fields") await loadCustomFields();
       if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
       setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
+      setIsMobileFormOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
     } finally {
@@ -746,6 +755,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       if (activeResource === "custom-fields") await loadCustomFields();
       if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
       setMessage("Registro removido.");
+      setIsMobileFormOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel remover.");
     } finally {
@@ -778,6 +788,53 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <DialogTrigger asChild>
+                <Button className="lg:hidden" type="button" variant="outline">
+                  <Menu className="h-4 w-4" />
+                  Menu
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[90vh] overflow-hidden border-white/10 bg-[#101014] p-0 text-white sm:max-w-lg lg:hidden">
+                <DialogHeader className="border-b border-white/10 px-5 py-4">
+                  <DialogTitle>Menu administrativo</DialogTitle>
+                  <DialogDescription>Escolha qual area do painel deseja gerenciar.</DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[calc(90vh-88px)] overflow-y-auto p-4 custom-scrollbar">
+                  <div className="grid gap-2">
+                    {visibleResources.map((resource) => {
+                      const Icon = resourceIconMap[resource.id as AdminResource] || Settings;
+                      const isActive = resource.id === activeResource;
+
+                      return (
+                        <button
+                          aria-current={isActive ? "page" : undefined}
+                          className={`group flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all duration-200 disabled:cursor-wait disabled:opacity-65 ${
+                            isActive
+                              ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-50"
+                              : "border-white/5 bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]"
+                          }`}
+                          disabled={isResourceLoading}
+                          key={resource.id}
+                          onClick={() => changeResource(resource.id)}
+                          type="button"
+                        >
+                          <div className={`shrink-0 rounded-lg p-2 transition-colors ${isActive ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-slate-500 group-hover:text-slate-300"}`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className={`block text-sm font-bold tracking-tight ${isActive ? "text-white" : "text-slate-300 group-hover:text-white"}`}>{resource.label}</span>
+                            <span className={`mt-0.5 block text-[11px] font-medium ${isActive ? "text-cyan-200/70" : "text-slate-500"}`}>
+                              {resourceUiConfigs[resource.id as AdminResource].description}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             {showCalendarConfig && (
               <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
             )}
@@ -786,7 +843,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         </div>
 
         <div className={`grid gap-6 transition-all duration-300 ${isSidebarCollapsed ? "xl:grid-cols-[80px_1fr]" : "xl:grid-cols-[280px_1fr]"}`}>
-          <aside className="space-y-2 relative">
+          <aside className="relative hidden space-y-2 lg:block">
             <button
               className="absolute -right-3 top-0 z-10 hidden xl:flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#16161a] text-slate-400 hover:text-white"
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -858,20 +915,51 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                   onSelect={selectRow}
                 />
 
-                <RecordForm
-                  config={activeConfig}
-                  disabled={isSaving || (mode === "edit" && !selectedRow)}
-                  formState={formState}
-                  mode={mode}
-                  selectedRow={selectedRow}
-                  customFieldDefinitions={customFieldDefinitions}
-                  customFieldOptions={customFieldOptions}
-                  onboardingQuestionOptions={onboardingQuestionOptions}
-                  onChange={setFormState}
-                  onDelete={handleDelete}
-                  onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
-                  onSubmit={handleSubmit}
-                />
+                <div className="hidden lg:block">
+                  <RecordForm
+                    config={activeConfig}
+                    disabled={isSaving || (mode === "edit" && !selectedRow)}
+                    formState={formState}
+                    mode={mode}
+                    selectedRow={selectedRow}
+                    customFieldDefinitions={customFieldDefinitions}
+                    customFieldOptions={customFieldOptions}
+                    onboardingQuestionOptions={onboardingQuestionOptions}
+                    onChange={setFormState}
+                    onDelete={handleDelete}
+                    onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
+                    onSubmit={handleSubmit}
+                  />
+                </div>
+
+                <Dialog open={isMobileFormOpen} onOpenChange={setIsMobileFormOpen}>
+                  <DialogContent className="max-h-[92vh] overflow-hidden border-white/10 bg-[#101014] p-0 text-white sm:max-w-2xl lg:hidden">
+                    <DialogHeader className="border-b border-white/10 px-5 py-4">
+                      <DialogTitle>{mode === "create" ? "Novo registro" : "Editar registro"}</DialogTitle>
+                      <DialogDescription>
+                        {mode === "create" ? "Preencha os dados e salve o novo registro." : "Altere os dados do registro selecionado ou feche para voltar a lista."}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[calc(92vh-88px)] overflow-y-auto custom-scrollbar">
+                      <RecordForm
+                        config={activeConfig}
+                        disabled={isSaving || (mode === "edit" && !selectedRow)}
+                        formState={formState}
+                        mode={mode}
+                        selectedRow={selectedRow}
+                        customFieldDefinitions={customFieldDefinitions}
+                        customFieldOptions={customFieldOptions}
+                        onboardingQuestionOptions={onboardingQuestionOptions}
+                        onChange={setFormState}
+                        onDelete={handleDelete}
+                        onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
+                        onSubmit={handleSubmit}
+                        onClose={() => setIsMobileFormOpen(false)}
+                        variant="modal"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
           </section>
@@ -972,6 +1060,29 @@ function RecordList({
   selectedId: string | null;
   total: number;
 }) {
+  const [fallbackPhotoMap, setFallbackPhotoMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (config.id !== "animals") return;
+
+    let mounted = true;
+    const missingPhotoIds = rows
+      .map((row) => String(row.id))
+      .filter((id) => !photoMap[id] && !fallbackPhotoMap[id]);
+
+    if (!missingPhotoIds.length) return;
+
+    Promise.all(missingPhotoIds.map(async (id) => [id, await fetchAnimalFallbackPhoto()] as const))
+      .then((entries) => {
+        if (!mounted) return;
+        setFallbackPhotoMap((current) => ({ ...current, ...Object.fromEntries(entries) }));
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [config.id, fallbackPhotoMap, photoMap, rows]);
+
   return (
     <section className="flex flex-col min-h-[520px] rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
       <div className="border-b border-white/10 p-5 bg-white/[0.01]">
@@ -992,7 +1103,7 @@ function RecordList({
       <div className="flex-1 overflow-auto custom-scrollbar">
         {rows.map((row) => {
           const isSelected = String(row.id) === selectedId;
-          const photoUrl = config.id === "animals" ? photoMap[String(row.id)] : null;
+          const photoUrl = config.id === "animals" ? photoMap[String(row.id)] ?? fallbackPhotoMap[String(row.id)] : null;
 
           return (
             <button
@@ -1078,6 +1189,8 @@ function RecordForm({
   onRefresh,
   onSubmit,
   selectedRow,
+  onClose,
+  variant = "panel",
 }: {
   config: ResourceUiConfig;
   customFieldDefinitions: Record<CustomFieldEntity, CustomFieldDefinition[]>;
@@ -1091,9 +1204,12 @@ function RecordForm({
   onRefresh: (nextSelectedId?: string) => Promise<void>;
   onSubmit: (event: FormEvent) => void;
   selectedRow: AdminRecord | null;
+  onClose?: () => void;
+  variant?: "panel" | "modal";
 }) {
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
   const formDisabled = disabled || config.readonly === true;
+  const isModal = variant === "modal";
 
   function handleFieldChange(field: FieldConfig, value: unknown) {
     if (config.id !== "custom-fields") {
@@ -1119,9 +1235,9 @@ function RecordForm({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+    <div className={isModal ? "bg-white/[0.02]" : "rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden"}>
       <form onSubmit={onSubmit}>
-        <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.01] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className={`flex flex-col gap-4 border-b border-white/10 bg-white/[0.01] p-5 sm:flex-row sm:items-center sm:justify-between ${isModal ? "hidden" : ""}`}>
           <div className="min-w-0">
             <h3 className="text-lg font-bold text-white tracking-tight">{mode === "create" ? "Novo Registro" : "Editar Registro"}</h3>
             <p className="mt-1 text-xs font-medium text-slate-500 truncate">
@@ -1164,7 +1280,7 @@ function RecordForm({
           </div>
         </div>
 
-          <div className="flex-1 p-6 pb-24">
+          <div className={`flex-1 p-6 ${isModal ? "pb-28" : "pb-24"}`}>
             <div className="grid gap-6 md:grid-cols-2">
               {visibleFields.map((field) => (
                 <FieldInput
@@ -1195,7 +1311,12 @@ function RecordForm({
           </div>
 
           {!config.readonly && (
-            <div className="sticky bottom-0 z-20 flex justify-end border-t border-white/10 bg-[#16161a]/80 p-4 backdrop-blur-md">
+            <div className={`sticky bottom-0 z-20 flex gap-3 border-t border-white/10 bg-[#16161a]/90 p-4 backdrop-blur-md ${isModal ? "justify-between" : "justify-end"}`}>
+              {isModal && (
+                <Button className="flex-1" onClick={onClose} type="button" variant="outline">
+                  Fechar registro
+                </Button>
+              )}
               <Button className="min-w-[160px] shadow-xl shadow-cyan-400/10" disabled={formDisabled} type="submit">
                 {mode === "create" ? "Criar Registro" : "Salvar Alterações"}
               </Button>

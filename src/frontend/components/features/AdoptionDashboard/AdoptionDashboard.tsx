@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
-import { registrarInteresse } from "@/lib/interessados";
+import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
+import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { DashboardState } from "./DashboardState";
@@ -34,19 +35,10 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-const fallbackPhotosBySpecies: Record<string, string> = {
-  cachorro: "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=90",
-  gato: "https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=1200&q=90",
-  coelho: "https://images.unsplash.com/photo-1585565623926-2469211a7b75?auto=format&fit=crop&w=1200&q=90",
-};
-
-const defaultFallbackPhoto = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1200&q=90";
-
-function withFallbackPhoto(animal: AnimalListItem): AnimalListItem {
+async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
   if (animal.photoUrl || animal.photoUrls?.length) return animal;
 
-  const speciesKey = animal.species?.toLocaleLowerCase("pt-BR") ?? "";
-  const photoUrl = fallbackPhotosBySpecies[speciesKey] ?? defaultFallbackPhoto;
+  const photoUrl = await fetchAnimalFallbackPhoto();
   return { ...animal, photoUrl, photoUrls: [photoUrl] };
 }
 
@@ -93,8 +85,10 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
         return response.json() as Promise<AnimalListItem[]>;
       })
       .then((animals) => {
+        return Promise.all(animals.map(withFallbackPhoto));
+      })
+      .then((availableAnimals) => {
         if (!isMounted) return;
-        const availableAnimals = animals.map(withFallbackPhoto);
         setPets(availableAnimals);
         setLoadStatus(availableAnimals.length ? "ready" : "empty");
       })
@@ -108,17 +102,58 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     };
   }, [status]);
 
+  function renderContactDialog() {
+    if (!contactDialog) return null;
+
+    return (
+      <AdoptionContactDialog
+        dialog={contactDialog}
+        onChange={setContactDialog}
+        onClose={() => setContactDialog(null)}
+      />
+    );
+  }
+
   if (loadStatus !== "ready") {
-    return <DashboardState status={loadStatus} />;
+    return (
+      <>
+        <DashboardState status={loadStatus} />
+        {renderContactDialog()}
+      </>
+    );
   }
 
   const featuredPet = pets[0];
   if (!featuredPet) {
-    return <DashboardState status="empty" />;
+    return (
+      <>
+        <DashboardState status="empty" />
+        {renderContactDialog()}
+      </>
+    );
   }
 
   function requestCardAction(direction: SwipeDirection) {
     setCardAction({ direction, id: Date.now() });
+  }
+
+  async function openContactDialogForInterest(animal: AnimalListItem, interest: InteresseRegistro) {
+    const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
+    if (settings && !ongSettings) setOngSettings(settings);
+
+    const interestLink = toAbsoluteInterestLink(interest.detail_url);
+    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
+    const email = settings?.contact_email?.trim() ?? "";
+    const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
+
+    setContactDialog({
+      animalName: animal.name,
+      emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Interesse em adotar ${animal.name}`)}&body=${encodeURIComponent(message)}` : "",
+      interestLink,
+      message,
+      ongName: settings?.ong_name?.trim() || "ONG",
+      whatsappUrl: buildWhatsAppUrl(whatsappPhone, message),
+    });
   }
 
   async function handleAdopt() {
@@ -130,22 +165,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
     try {
       const interest = await registrarInteresse(featuredPet.id);
-      const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
-      if (settings && !ongSettings) setOngSettings(settings);
-
-      const interestLink = toAbsoluteInterestLink(interest.detail_url);
-      const message = buildAdoptionMessage(settings?.adoption_message_template, featuredPet.name, interestLink);
-      const email = settings?.contact_email?.trim() ?? "";
-      const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
-
-      setContactDialog({
-        animalName: featuredPet.name,
-        emailUrl: email ? `mailto:${email}?subject=${encodeURIComponent(`Interesse em adotar ${featuredPet.name}`)}&body=${encodeURIComponent(message)}` : "",
-        interestLink,
-        message,
-        ongName: settings?.ong_name?.trim() || "ONG",
-        whatsappUrl: buildWhatsAppUrl(whatsappPhone, message),
-      });
+      await openContactDialogForInterest(featuredPet, interest);
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
@@ -165,7 +185,8 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {
-        await registrarInteresse(current.id);
+        const interest = await registrarInteresse(current.id);
+        await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
         setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
@@ -238,13 +259,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           </div>
         </section>
       </div>
-      {contactDialog && (
-        <AdoptionContactDialog
-          dialog={contactDialog}
-          onChange={setContactDialog}
-          onClose={() => setContactDialog(null)}
-        />
-      )}
+      {renderContactDialog()}
     </PageContainer>
   );
 }

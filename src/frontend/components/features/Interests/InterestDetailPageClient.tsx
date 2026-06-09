@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { carregarInteresse } from "@/lib/interessados";
 
 type DetailRecord = Record<string, unknown>;
@@ -48,9 +49,30 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
   const animalMatchingFields = getMatchingFields(asObject(animal.custom_fields));
   const tutorMatchingFields = getMatchingFields(asObject(tutor.custom_fields));
   const schedule = useMemo(() => Array.isArray(record?.schedule) ? record.schedule.map(asObject) : [], [record]);
-  const photoUrl = Array.isArray(animal.photoUrls) ? String(animal.photoUrls[0] ?? "") : String(animal.photoUrl ?? "");
+  const initialPhotoUrl = Array.isArray(animal.photoUrls) ? String(animal.photoUrls[0] ?? "") : String(animal.photoUrl ?? "");
+  const [photoUrl, setPhotoUrl] = useState("");
   const tutorName = String(tutor.name ?? "Tutor");
   const animalName = String(animal.name ?? "Animal");
+
+  useEffect(() => {
+    let mounted = true;
+    if (initialPhotoUrl) {
+      setPhotoUrl(initialPhotoUrl);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    if (status === "ready") {
+      fetchAnimalFallbackPhoto().then((fallbackUrl) => {
+        if (mounted) setPhotoUrl(fallbackUrl);
+      });
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [initialPhotoUrl, status]);
 
   function openInterviewDraft() {
     if (!record || !showCalendarConfig) return;
@@ -126,9 +148,11 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
             ]}
             title={animalName}
           >
-            {photoUrl && (
+            {photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img alt={`Foto de ${String(animal.name ?? "animal")}`} className="mb-4 aspect-[4/3] w-full rounded-md object-cover" src={photoUrl} />
+            ) : (
+              <div className="mb-4 grid aspect-[4/3] w-full animate-pulse place-items-center rounded-md bg-white/[0.035] text-sm text-slate-500">Carregando foto...</div>
             )}
             <div className="mb-4 flex flex-wrap gap-2">
               {Array.isArray(animal.traits) && animal.traits.map((trait) => <Badge key={String(trait)}>{String(trait)}</Badge>)}
