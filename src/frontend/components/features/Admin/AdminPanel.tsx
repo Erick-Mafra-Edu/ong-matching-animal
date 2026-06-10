@@ -113,6 +113,31 @@ type OnboardingQuestionRecord = AdminRecord & {
   is_active?: boolean;
   sort_order?: number;
 };
+type MatchingRuleRecord = AdminRecord & {
+  rule_name?: string;
+  tutor_field?: string;
+  animal_field?: string;
+  comparison_operator?: string;
+  weight?: number;
+  is_dealbreaker?: boolean;
+  is_active?: boolean;
+};
+type RuleSimulationDetail = {
+  rule: MatchingRuleRecord;
+  matched: boolean;
+  score: number;
+  tutorValue: unknown;
+  animalValue: unknown;
+  expression: string;
+  reason: string;
+};
+type RuleSimulationResult = {
+  animal: AdminRecord;
+  details: RuleSimulationDetail[];
+  disqualified: boolean;
+  failedDealbreakers: RuleSimulationDetail[];
+  score: number;
+};
 
 const fieldClass =
   "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
@@ -902,6 +927,26 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
               <ServiceConfigsPanel onRefresh={() => loadResource(activeResource)} rows={rows} />
             ) : activeResource === "calendar-oauth-connections" ? (
               <CalendarOAuthPanel onRefresh={() => loadResource(activeResource)} rows={rows} />
+            ) : activeResource === "matching-rules" ? (
+              <RuleEngineWorkspace
+                customFieldDefinitions={customFieldDefinitions}
+                customFieldOptions={customFieldOptions}
+                disabled={isSaving || (mode === "edit" && !selectedRow)}
+                formState={formState}
+                mode={mode}
+                onboardingQuestionOptions={onboardingQuestionOptions}
+                onChange={setFormState}
+                onDelete={handleDelete}
+                onRefresh={(nextSelectedId) => loadResource(activeResource, nextSelectedId)}
+                onSelect={selectRow}
+                onSubmit={handleSubmit}
+                query={query}
+                rows={filteredRows}
+                selectedId={selectedId}
+                selectedRow={selectedRow}
+                total={rows.length}
+                onQueryChange={setQuery}
+              />
             ) : (
               <div className="grid gap-5 lg:grid-cols-[minmax(300px,420px)_1fr]">
                 <RecordList
@@ -1038,6 +1083,248 @@ function MenuLoadingPanel({ label }: { label: string }) {
         </div>
       </section>
     </div>
+  );
+}
+
+function RuleEngineWorkspace({
+  customFieldDefinitions,
+  customFieldOptions,
+  disabled,
+  formState,
+  mode,
+  onboardingQuestionOptions,
+  onChange,
+  onDelete,
+  onRefresh,
+  onSelect,
+  onSubmit,
+  query,
+  rows,
+  selectedId,
+  selectedRow,
+  total,
+  onQueryChange,
+}: {
+  customFieldDefinitions: Record<CustomFieldEntity, CustomFieldDefinition[]>;
+  customFieldOptions: Record<CustomFieldEntity, Array<{ label: string; value: string }>>;
+  disabled: boolean;
+  formState: FormState;
+  mode: "create" | "edit";
+  onboardingQuestionOptions: Array<{ label: string; value: string }>;
+  onChange: (state: FormState) => void;
+  onDelete: () => void;
+  onRefresh: (nextSelectedId?: string) => Promise<void>;
+  onSelect: (row: AdminRecord) => void;
+  onSubmit: (event: FormEvent) => void;
+  query: string;
+  rows: AdminRecord[];
+  selectedId: string | null;
+  selectedRow: AdminRecord | null;
+  total: number;
+  onQueryChange: (value: string) => void;
+}) {
+  const [tutors, setTutors] = useState<AdminRecord[]>([]);
+  const [animals, setAnimals] = useState<AdminRecord[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [message, setMessage] = useState("");
+
+  const loadSimulatorData = useCallback(async () => {
+    setStatus("loading");
+    setMessage("");
+    try {
+      const [tutorRows, animalRows] = await Promise.all([
+        listAdminResource("tutors"),
+        listAdminResource("animals"),
+      ]);
+      setTutors(tutorRows.map(toRaRecord));
+      setAnimals(animalRows.map(toRaRecord));
+      setStatus("ready");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel carregar dados do simulador.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSimulatorData();
+  }, [loadSimulatorData]);
+
+  return (
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-xl border border-white/10 bg-[#111116]">
+        <div className="grid gap-5 border-b border-white/10 bg-black/30 p-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-none bg-cyan-400/10 text-cyan-200">Motor de Regras</Badge>
+              <Badge className="border-none bg-amber-400/10 text-amber-200">Maturidade: regras auditaveis</Badge>
+            </div>
+            <h3 className="mt-3 text-2xl font-bold tracking-tight text-white">Construa, teste e audite o matching</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              Cada regra abaixo alimenta o simulador: dealbreakers cortam animais da fila, regras de score somam pontos quando a comparacao passa.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <RuleEngineMetric label="Regras ativas" value={String(rows.filter((rule) => rule.is_active !== false).length)} tone="cyan" />
+            <RuleEngineMetric label="Dealbreakers" value={String(rows.filter((rule) => rule.is_dealbreaker).length)} tone="red" />
+            <RuleEngineMetric label="Campos" value={String(customFieldOptions.tutor.length + customFieldOptions.animal.length)} tone="green" />
+          </div>
+        </div>
+
+        <div className="grid gap-5 p-5 xl:grid-cols-[minmax(300px,400px)_1fr]">
+          <MatchingRuleQueue
+            onQueryChange={onQueryChange}
+            onRefresh={onRefresh}
+            onSelect={onSelect}
+            query={query}
+            rows={rows as MatchingRuleRecord[]}
+            selectedId={selectedId}
+            total={total}
+          />
+
+          <RecordForm
+            config={resourceUiConfigs["matching-rules"]}
+            customFieldDefinitions={customFieldDefinitions}
+            customFieldOptions={customFieldOptions}
+            disabled={disabled}
+            formState={formState}
+            mode={mode}
+            onboardingQuestionOptions={onboardingQuestionOptions}
+            onChange={onChange}
+            onDelete={onDelete}
+            onRefresh={onRefresh}
+            onSubmit={onSubmit}
+            selectedRow={selectedRow}
+          />
+        </div>
+      </section>
+
+      <RuleSimulatorPanel
+        animals={animals}
+        customFieldDefinitions={customFieldDefinitions}
+        loadStatus={status}
+        message={message}
+        rules={rows as MatchingRuleRecord[]}
+        tutors={tutors}
+        onReload={loadSimulatorData}
+      />
+    </div>
+  );
+}
+
+function RuleEngineMetric({ label, tone, value }: { label: string; tone: "cyan" | "green" | "red"; value: string }) {
+  const toneClass = {
+    cyan: "border-cyan-400/20 bg-cyan-400/10 text-cyan-100",
+    green: "border-emerald-400/20 bg-emerald-400/10 text-emerald-100",
+    red: "border-red-400/20 bg-red-400/10 text-red-100",
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${toneClass}`}>
+      <p className="text-2xl font-black leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest opacity-75">{label}</p>
+    </div>
+  );
+}
+
+function MatchingRuleQueue({
+  onQueryChange,
+  onRefresh,
+  onSelect,
+  query,
+  rows,
+  selectedId,
+  total,
+}: {
+  onQueryChange: (value: string) => void;
+  onRefresh: (nextSelectedId?: string) => Promise<void>;
+  onSelect: (row: AdminRecord) => void;
+  query: string;
+  rows: MatchingRuleRecord[];
+  selectedId: string | null;
+  total: number;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function toggleRuleStatus(rule: MatchingRuleRecord) {
+    const id = String(rule.id);
+    setBusyId(id);
+    try {
+      await updateAdminResource("matching-rules", id, { is_active: rule.is_active === false });
+      await onRefresh(id);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+      <div className="border-b border-white/10 bg-white/[0.01] p-5">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500" htmlFor="rule-search">
+          Buscar em {total} regras
+        </label>
+        <input
+          className={`${fieldClass} mt-2 h-12 border-white/5 bg-black/40`}
+          id="rule-search"
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Pesquisar por nome, campo ou operador..."
+          value={query}
+        />
+      </div>
+      <div className="flex-1 overflow-auto custom-scrollbar">
+        {rows.map((rule) => {
+          const isSelected = String(rule.id) === selectedId;
+          const isDealbreaker = Boolean(rule.is_dealbreaker);
+          const isActive = rule.is_active !== false;
+
+          return (
+            <article
+              className={`border-b border-white/5 p-4 transition-all ${isSelected ? "bg-cyan-400/10" : "hover:bg-white/[0.03]"}`}
+              key={String(rule.id)}
+            >
+              <button className="w-full text-left" onClick={() => onSelect(rule)} type="button">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className={`truncate text-sm font-bold ${isSelected ? "text-cyan-100" : "text-white"}`}>
+                      {rule.rule_name || "Regra sem nome"}
+                    </h4>
+                    <p className="mt-1 text-[11px] font-mono text-slate-500">{buildRuleExpression(rule)}</p>
+                  </div>
+                  <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${isActive ? "bg-emerald-400" : "bg-slate-600"}`} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge className={`border-none font-bold uppercase tracking-wider ${isDealbreaker ? "bg-red-500/10 text-red-200" : "bg-emerald-400/10 text-emerald-200"}`}>
+                    {isDealbreaker ? "Dealbreaker" : `+${Number(rule.weight ?? 0)} pts`}
+                  </Badge>
+                  <Badge className={`border-none font-bold uppercase tracking-wider ${isActive ? "bg-cyan-400/10 text-cyan-200" : "bg-slate-700 text-slate-300"}`}>
+                    {isActive ? "Ativa" : "Pausada"}
+                  </Badge>
+                </div>
+              </button>
+              <button
+                className={`mt-4 w-full rounded-lg border px-3 py-2 text-[10px] font-black uppercase tracking-widest transition ${
+                  isActive
+                    ? "border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15"
+                    : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/15"
+                }`}
+                disabled={busyId === String(rule.id)}
+                onClick={() => toggleRuleStatus(rule)}
+                type="button"
+              >
+                {busyId === String(rule.id) ? "Atualizando..." : isActive ? "Pausar para teste A/B" : "Reativar regra"}
+              </button>
+            </article>
+          );
+        })}
+        {!rows.length && (
+          <div className="px-6 py-12 text-center">
+            <Zap className="mx-auto h-8 w-8 text-slate-600" />
+            <p className="mt-4 text-sm font-medium text-slate-400">
+              {query ? "Nenhuma regra encontrada para sua busca." : "Nenhuma regra cadastrada."}
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -1281,26 +1568,28 @@ function RecordForm({
         </div>
 
           <div className={`flex-1 p-6 ${isModal ? "pb-28" : "pb-24"}`}>
-            <div className="grid gap-6 md:grid-cols-2">
-              {visibleFields.map((field) => (
-                <FieldInput
-                  disabled={formDisabled}
-                  field={field}
-                  key={field.name}
-                  customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
-                  dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
-                  value={formState[field.name]}
-                  onChange={(value) => handleFieldChange(field, value)}
-                />
-              ))}
-            </div>
-
-            {config.id === "matching-rules" && (
-              <RuleComparisonPreview
+            {config.id === "matching-rules" ? (
+              <RuleBuilderControls
                 animalOptions={customFieldOptions.animal}
+                disabled={formDisabled}
                 formState={formState}
+                onChange={onChange}
                 tutorOptions={customFieldOptions.tutor}
               />
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {visibleFields.map((field) => (
+                  <FieldInput
+                    disabled={formDisabled}
+                    field={field}
+                    key={field.name}
+                    customFieldDefinitions={field.customFieldsFor ? customFieldDefinitions[field.customFieldsFor] : undefined}
+                    dynamicOptions={field.dynamicOptionsFor ? customFieldOptions[field.dynamicOptionsFor] : field.dynamicOptionsSource === "onboardingQuestions" ? onboardingQuestionOptions : undefined}
+                    value={formState[field.name]}
+                    onChange={(value) => handleFieldChange(field, value)}
+                  />
+                ))}
+              </div>
             )}
 
             {config.id === "animals" && mode === "edit" && selectedRow && (
@@ -1327,6 +1616,213 @@ function RecordForm({
   );
 }
 
+function RuleBuilderControls({
+  animalOptions,
+  disabled,
+  formState,
+  onChange,
+  tutorOptions,
+}: {
+  animalOptions: Array<{ label: string; value: string }>;
+  disabled: boolean;
+  formState: FormState;
+  onChange: (state: FormState) => void;
+  tutorOptions: Array<{ label: string; value: string }>;
+}) {
+  const isDealbreaker = Boolean(formState.is_dealbreaker);
+  const isActive = formState.is_active !== false;
+  const weight = Number(formState.weight ?? 0);
+
+  function patch(next: Partial<FormState>) {
+    onChange({ ...formState, ...next });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400" htmlFor="rule-name">
+            Nome da regra<span className="ml-1 text-cyan-400">*</span>
+          </label>
+          <input
+            className={fieldClass}
+            disabled={disabled}
+            id="rule-name"
+            onChange={(event) => patch({ rule_name: event.target.value })}
+            placeholder="Ex.: Espaco minimo para porte grande"
+            required
+            value={String(formState.rule_name ?? "")}
+          />
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</p>
+          <button
+            className={`h-11 min-w-[160px] rounded-full border px-4 text-xs font-black uppercase tracking-widest transition ${
+              isActive
+                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                : "border-slate-500/30 bg-slate-700/40 text-slate-300"
+            }`}
+            disabled={disabled}
+            onClick={() => patch({ is_active: !isActive })}
+            type="button"
+          >
+            {isActive ? "Regra ativa" : "Regra pausada"}
+          </button>
+        </div>
+      </div>
+
+      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-cyan-200">Logica de comparacao</p>
+            <h4 className="mt-1 text-lg font-bold text-white">Construtor logico visual</h4>
+          </div>
+          <Badge className="border-none bg-white/5 font-mono text-slate-300">{buildRuleExpression(formState)}</Badge>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_220px_1fr]">
+          <HumanSelect
+            disabled={disabled}
+            label="Se o"
+            options={tutorOptions}
+            value={String(formState.tutor_field ?? "")}
+            onChange={(value) => patch({ tutor_field: value })}
+          />
+          <HumanSelect
+            disabled={disabled}
+            label="For"
+            options={[
+              { label: "Igual a", value: "=" },
+              { label: "Diferente de", value: "!=" },
+              { label: "Maior ou igual a", value: ">=" },
+              { label: "Menor ou igual a", value: "<=" },
+              { label: "Contiver", value: "contains" },
+            ]}
+            value={String(formState.comparison_operator ?? "=")}
+            onChange={(value) => patch({ comparison_operator: value })}
+          />
+          <HumanSelect
+            disabled={disabled}
+            label="Do que"
+            options={animalOptions}
+            value={String(formState.animal_field ?? "")}
+            onChange={(value) => patch({ animal_field: value })}
+          />
+        </div>
+      </section>
+
+      <section
+        className={`rounded-xl border p-5 transition-all ${
+          isDealbreaker
+            ? "border-red-400/30 bg-red-500/[0.07] shadow-[0_0_24px_rgba(248,113,113,0.08)]"
+            : "border-emerald-400/25 bg-emerald-400/[0.06] shadow-[0_0_24px_rgba(52,211,153,0.07)]"
+        }`}
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className={`text-[10px] font-black uppercase tracking-widest ${isDealbreaker ? "text-red-200" : "text-emerald-200"}`}>
+              Chaveador de impacto
+            </p>
+            <h4 className="mt-1 text-lg font-bold text-white">
+              {isDealbreaker ? "Dealbreaker: falhou, sai da fila" : "Score: passou, soma pontos"}
+            </h4>
+          </div>
+          <button
+            className={`relative h-12 w-[190px] rounded-full border p-1 text-xs font-black uppercase tracking-widest transition ${
+              isDealbreaker
+                ? "border-red-300/40 bg-red-500/20 text-red-100"
+                : "border-emerald-300/40 bg-emerald-500/20 text-emerald-100"
+            }`}
+            disabled={disabled}
+            onClick={() => patch({ is_dealbreaker: !isDealbreaker })}
+            type="button"
+          >
+            <span
+              className={`absolute top-1 h-10 w-[88px] rounded-full bg-white transition-all ${isDealbreaker ? "left-[96px]" : "left-1"}`}
+            />
+            <span className="relative grid grid-cols-2">
+              <span className={isDealbreaker ? "text-white/70" : "text-slate-950"}>Score</span>
+              <span className={isDealbreaker ? "text-slate-950" : "text-white/70"}>Corte</span>
+            </span>
+          </button>
+        </div>
+
+        {isDealbreaker ? (
+          <div className="mt-5 flex gap-3 rounded-xl border border-red-400/25 bg-black/20 p-4 text-red-100">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm leading-6">
+              Se essa comparacao falhar, o pet sera excluido dos resultados do tutor antes da pontuacao final.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 sm:grid-cols-[180px_1fr] sm:items-center">
+            <label className="text-[11px] font-black uppercase tracking-widest text-emerald-100" htmlFor="rule-weight">
+              Pontos somados
+            </label>
+            <div className="rounded-xl border border-emerald-400/20 bg-black/20 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-emerald-100">{impactLabel(weight)}</span>
+                <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-sm font-black text-emerald-100">+{weight || 0}</span>
+              </div>
+              <input
+                className="w-full accent-emerald-300"
+                disabled={disabled}
+                id="rule-weight"
+                max={100}
+                min={0}
+                onChange={(event) => patch({ weight: Number(event.target.value) })}
+                step={5}
+                type="range"
+                value={Number.isFinite(weight) ? Math.min(Math.max(weight, 0), 100) : 0}
+              />
+            </div>
+          </div>
+        )}
+      </section>
+
+      <RuleComparisonPreview animalOptions={animalOptions} formState={formState} tutorOptions={tutorOptions} />
+    </div>
+  );
+}
+
+function HumanSelect({
+  disabled,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+  value: string;
+}) {
+  const uniqueOptions = dedupeOptionsByValue(options);
+
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <div className="relative">
+        <select
+          className={`${fieldClass} appearance-none bg-black/50`}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          required
+          value={value}
+        >
+          <option value="">Selecione</option>
+          {uniqueOptions.map((option) => (
+            <option key={option.value} value={option.value}>{cleanOptionLabel(option.label)}</option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+      </div>
+    </label>
+  );
+}
+
 function RuleComparisonPreview({
   animalOptions,
   formState,
@@ -1336,38 +1832,386 @@ function RuleComparisonPreview({
   formState: FormState;
   tutorOptions: Array<{ label: string; value: string }>;
 }) {
-  const tutorLabel = findOptionLabel(tutorOptions, formState.tutor_field) || "campo_tutor";
-  const animalLabel = findOptionLabel(animalOptions, formState.animal_field) || "campo_animal";
+  const tutorLabel = cleanOptionLabel(findOptionLabel(tutorOptions, formState.tutor_field)) || "campo do tutor";
+  const animalLabel = cleanOptionLabel(findOptionLabel(animalOptions, formState.animal_field)) || "campo do pet";
   const conditionLabel = comparisonOperatorLabel(String(formState.comparison_operator ?? ""));
   const weight = Number(formState.weight ?? 0);
   const isDealbreaker = Boolean(formState.is_dealbreaker);
 
   return (
-    <div className="mt-5 rounded-md border border-cyan-200/20 bg-cyan-200/[0.06] p-4">
+    <div className={`rounded-xl border p-4 ${isDealbreaker ? "border-red-400/20 bg-red-500/[0.04]" : "border-emerald-400/20 bg-emerald-400/[0.04]"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase text-cyan-100">Construtor visual da regra</p>
+        <p className="text-xs font-semibold uppercase text-slate-300">Preview da regra</p>
         <div className="flex flex-wrap gap-2 text-xs font-bold uppercase">
-          <span className="rounded-full bg-cyan-200/15 px-3 py-1 text-cyan-100">{impactLabel(weight)}</span>
-          {isDealbreaker && <span className="rounded-full bg-pink-400/15 px-3 py-1 text-pink-200">Eliminatoria</span>}
+          <span className="rounded-full bg-white/10 px-3 py-1 font-mono text-slate-200">{buildRuleExpression(formState)}</span>
+          <span className={`rounded-full px-3 py-1 ${isDealbreaker ? "bg-red-400/15 text-red-100" : "bg-emerald-400/15 text-emerald-100"}`}>
+            {isDealbreaker ? "Eliminatoria" : impactLabel(weight)}
+          </span>
         </div>
       </div>
       <div className="mt-3 grid items-center gap-3 text-sm md:grid-cols-[1fr_auto_1fr]">
-        <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+        <div className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
           <span className="block text-[11px] uppercase text-slate-500">Perfil do tutor</span>
           <span className="font-semibold">{tutorLabel}</span>
         </div>
-        <div className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-center font-semibold text-cyan-100">
+        <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-center font-semibold text-cyan-100">
           {conditionLabel}
         </div>
-        <div className="min-h-11 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+        <div className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
           <span className="block text-[11px] uppercase text-slate-500">Atributo do animal</span>
           <span className="font-semibold">{animalLabel}</span>
         </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-300">
-        Quando essa frase for verdadeira, o animal recebe <span className="font-bold text-cyan-100">{weight || 0} pontos</span>.
-        {isDealbreaker && " Se for falsa, o animal sera removido dos resultados desse tutor."}
+        {isDealbreaker ? (
+          <>Quando essa frase for falsa, o animal e removido dos resultados desse tutor.</>
+        ) : (
+          <>Quando essa frase for verdadeira, o animal recebe <span className="font-bold text-emerald-100">+{weight || 0} pontos</span>.</>
+        )}
       </p>
+    </div>
+  );
+}
+
+function RuleSimulatorPanel({
+  animals,
+  customFieldDefinitions,
+  loadStatus,
+  message,
+  onReload,
+  rules,
+  tutors,
+}: {
+  animals: AdminRecord[];
+  customFieldDefinitions: Record<CustomFieldEntity, CustomFieldDefinition[]>;
+  loadStatus: "loading" | "ready" | "error";
+  message: string;
+  onReload: () => Promise<void>;
+  rules: MatchingRuleRecord[];
+  tutors: AdminRecord[];
+}) {
+  const [sandboxEnabled, setSandboxEnabled] = useState(false);
+  const [selectedTutorId, setSelectedTutorId] = useState("");
+  const [selectedAnimalId, setSelectedAnimalId] = useState("");
+  const [activeTab, setActiveTab] = useState<"score" | "dealbreakers">("score");
+  const [sandboxFields, setSandboxFields] = useState<Record<string, unknown>>({});
+  const tutorSandboxFieldDefinitions = useMemo(
+    () => dedupeCustomFieldDefinitionsByKey(customFieldDefinitions.tutor),
+    [customFieldDefinitions.tutor],
+  );
+
+  useEffect(() => {
+    if (!selectedTutorId && tutors[0]?.id) setSelectedTutorId(String(tutors[0].id));
+  }, [selectedTutorId, tutors]);
+
+  useEffect(() => {
+    setSandboxFields((current) => {
+      const next = { ...current };
+      for (const field of tutorSandboxFieldDefinitions) {
+        if (!(field.field_key in next)) next[field.field_key] = defaultCustomFieldValue(field);
+      }
+      return next;
+    });
+  }, [tutorSandboxFieldDefinitions]);
+
+  const selectedTutor = tutors.find((tutor) => String(tutor.id) === selectedTutorId) ?? tutors[0] ?? null;
+  const tutorFields = sandboxEnabled ? sandboxFields : normalizeCustomFields(selectedTutor?.custom_fields);
+  const activeRules = rules.filter((rule) => rule.is_active !== false);
+  const results = useMemo(
+    () => simulateRules(tutorFields, animals, activeRules),
+    [activeRules, animals, tutorFields],
+  );
+  const matches = results.filter((result) => !result.disqualified && result.score > 0).sort((a, b) => b.score - a.score);
+  const rejected = results.filter((result) => result.disqualified);
+  const selectedResult = matches.find((result) => String(result.animal.id) === selectedAnimalId) ?? matches[0] ?? null;
+  const dealbreakerCount = activeRules.filter((rule) => rule.is_dealbreaker).length;
+
+  useEffect(() => {
+    if (matches[0]?.animal.id && !matches.some((result) => String(result.animal.id) === selectedAnimalId)) {
+      setSelectedAnimalId(String(matches[0].animal.id));
+    }
+  }, [matches, selectedAnimalId]);
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/[0.03]">
+      <div className="border-b border-white/10 bg-black/20 p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-cyan-200">Simulador conectado</p>
+            <h3 className="mt-1 text-2xl font-bold tracking-tight text-white">Resultado em tempo real</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              Use tutores reais ou monte um cenario sandbox para validar como as regras afetam score e cortes.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(220px,320px)_auto]">
+            <label className="block">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Tutor de entrada</span>
+              <div className="relative">
+                <select
+                  className={`${fieldClass} appearance-none`}
+                  disabled={sandboxEnabled || loadStatus !== "ready"}
+                  onChange={(event) => setSelectedTutorId(event.target.value)}
+                  value={selectedTutorId}
+                >
+                  {tutors.map((tutor) => (
+                    <option key={String(tutor.id)} value={String(tutor.id)}>{String(tutor.name ?? tutor.id)}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              </div>
+            </label>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Modo</span>
+              <button
+                className={`h-12 min-w-[170px] rounded-full border px-4 text-xs font-black uppercase tracking-widest transition ${
+                  sandboxEnabled
+                    ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+                    : "border-cyan-300/30 bg-cyan-400/10 text-cyan-100"
+                }`}
+                onClick={() => setSandboxEnabled((current) => !current)}
+                type="button"
+              >
+                {sandboxEnabled ? "Sandbox ativo" : "Tutor real"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {sandboxEnabled && (
+          <div className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-100">Formulario sandbox</p>
+              <Badge className="border-none bg-amber-400/10 text-amber-100">Nao altera o banco</Badge>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {tutorSandboxFieldDefinitions.map((field) => (
+                <SandboxFieldControl
+                  definition={field}
+                  key={field.field_key}
+                  value={sandboxFields[field.field_key]}
+                  onChange={(value) => setSandboxFields((current) => ({ ...current, [field.field_key]: value }))}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {loadStatus === "error" && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3">
+            <p className="text-sm text-red-100">{message}</p>
+            <Button className="h-9 min-h-0 px-4 text-[10px]" onClick={() => void onReload()} type="button" variant="danger-outline">
+              Recarregar
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(300px,420px)_1fr]">
+        <section className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+          <div className="border-b border-white/10 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-bold text-white">Fila de matches</h4>
+                <p className="mt-1 text-xs text-slate-500">{matches.length} animais com score positivo</p>
+              </div>
+              <Badge className="border-none bg-emerald-400/10 text-emerald-100">Score</Badge>
+            </div>
+          </div>
+          <div className="max-h-[520px] overflow-auto custom-scrollbar">
+            {loadStatus === "loading" ? (
+              <div className="p-5 text-sm text-slate-400">Carregando tutores e animais...</div>
+            ) : matches.length ? (
+              matches.map((result, index) => (
+                <button
+                  className={`w-full border-b border-white/5 p-4 text-left transition ${selectedResult?.animal.id === result.animal.id ? "bg-emerald-400/10" : "hover:bg-white/[0.04]"}`}
+                  key={String(result.animal.id)}
+                  onClick={() => setSelectedAnimalId(String(result.animal.id))}
+                  type="button"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">#{index + 1}</p>
+                      <h5 className="truncate text-base font-bold text-white">{String(result.animal.name ?? result.animal.id)}</h5>
+                      <p className="mt-1 text-xs text-slate-500">{String(result.animal.species ?? "Animal")}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-emerald-100">{result.score}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-200/70">pontos</p>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="p-8 text-center">
+                <AlertTriangle className="mx-auto h-8 w-8 text-amber-300/70" />
+                <p className="mt-4 text-sm font-medium text-slate-300">Nenhum match com score positivo.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+          <div className="border-b border-white/10 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h4 className="text-lg font-bold text-white">Raio-X do resultado</h4>
+                <p className="mt-1 text-xs text-slate-500">
+                  {dealbreakerCount} dealbreakers ativos podem remover pets antes da soma de pontos.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+                <button
+                  className={`rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition ${activeTab === "score" ? "bg-emerald-400 text-slate-950" : "text-slate-400"}`}
+                  onClick={() => setActiveTab("score")}
+                  type="button"
+                >
+                  Score
+                </button>
+                <button
+                  className={`rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition ${activeTab === "dealbreakers" ? "bg-red-400 text-slate-950" : "text-slate-400"}`}
+                  onClick={() => setActiveTab("dealbreakers")}
+                  type="button"
+                >
+                  Cortes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {activeTab === "score" ? (
+            <ScoreBreakdown result={selectedResult} />
+          ) : (
+            <DealbreakerAudit rejected={rejected} />
+          )}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function SandboxFieldControl({
+  definition,
+  onChange,
+  value,
+}: {
+  definition: CustomFieldDefinition;
+  onChange: (value: unknown) => void;
+  value: unknown;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">{definition.label}</span>
+      {definition.field_type === "boolean" ? (
+        <select className={`${fieldClass} appearance-none`} onChange={(event) => onChange(event.target.value === "true")} value={String(Boolean(value))}>
+          <option value="true">Sim</option>
+          <option value="false">Nao</option>
+        </select>
+      ) : (definition.field_type === "select" || definition.field_type === "multiselect") && definition.options.length ? (
+        <select className={`${fieldClass} appearance-none`} onChange={(event) => onChange(event.target.value)} value={String(value ?? "")}>
+          {definition.options.map((option) => (
+            <option key={option} value={option}>{humanizeFieldKey(option)}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          className={fieldClass}
+          onChange={(event) => onChange(definition.field_type === "number" ? Number(event.target.value) : event.target.value)}
+          type={definition.field_type === "number" ? "number" : "text"}
+          value={String(value ?? "")}
+        />
+      )}
+    </label>
+  );
+}
+
+function ScoreBreakdown({ result }: { result: RuleSimulationResult | null }) {
+  if (!result) {
+    return (
+      <div className="p-8 text-center">
+        <ClipboardCheck className="mx-auto h-8 w-8 text-slate-600" />
+        <p className="mt-4 text-sm text-slate-400">Selecione um animal com match para ver o detalhamento.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 p-5">
+      <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-200">Resumo</p>
+            <h5 className="mt-1 text-xl font-bold text-white">{String(result.animal.name ?? result.animal.id)}</h5>
+          </div>
+          <p className="text-3xl font-black text-emerald-100">{result.score} pts</p>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          Gatilho: regras pausadas nao entram no calculo; regras de corte aprovadas apenas liberam a soma, sem adicionar pontos.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {result.details.map((detail) => (
+          <article
+            className={`rounded-xl border p-4 ${
+              detail.rule.is_dealbreaker
+                ? detail.matched
+                  ? "border-cyan-400/20 bg-cyan-400/[0.04]"
+                  : "border-red-400/20 bg-red-500/[0.06]"
+                : detail.matched
+                  ? "border-emerald-400/20 bg-emerald-400/[0.06]"
+                  : "border-white/10 bg-white/[0.02]"
+            }`}
+            key={String(detail.rule.id)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h6 className="text-sm font-bold text-white">{String(detail.rule.rule_name ?? "Regra")}</h6>
+                <p className="mt-1 text-[11px] font-mono text-slate-500">{detail.expression}</p>
+              </div>
+              <Badge className={`shrink-0 border-none ${detail.score > 0 ? "bg-emerald-400/10 text-emerald-100" : detail.rule.is_dealbreaker ? "bg-cyan-400/10 text-cyan-100" : "bg-white/5 text-slate-400"}`}>
+                {detail.score > 0 ? `+${detail.score} pts` : detail.rule.is_dealbreaker ? "Liberou" : "+0 pts"}
+              </Badge>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{detail.reason}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DealbreakerAudit({ rejected }: { rejected: RuleSimulationResult[] }) {
+  return (
+    <div className="space-y-4 p-5">
+      {rejected.length ? (
+        rejected.map((result) => (
+          <article className="rounded-xl border border-red-400/25 bg-red-500/[0.06] p-4" key={String(result.animal.id)}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-200">Excluido da fila</p>
+                <h5 className="mt-1 text-lg font-bold text-white">{String(result.animal.name ?? result.animal.id)}</h5>
+              </div>
+              <Badge className="border-none bg-red-400/15 text-red-100">{result.failedDealbreakers.length} bloqueio(s)</Badge>
+            </div>
+            <div className="mt-4 space-y-3">
+              {result.failedDealbreakers.map((detail) => (
+                <div className="rounded-xl border border-red-400/15 bg-black/20 p-3" key={String(detail.rule.id)}>
+                  <p className="text-sm font-bold text-red-100">{String(detail.rule.rule_name ?? "Regra eliminatoria")}</p>
+                  <p className="mt-1 text-[11px] font-mono text-red-100/70">{detail.expression}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{detail.reason}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))
+      ) : (
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.05] p-8 text-center">
+          <ShieldCheck className="mx-auto h-8 w-8 text-emerald-200" />
+          <p className="mt-4 text-sm font-medium text-emerald-100">Nenhum animal foi cortado por dealbreaker neste cenario.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -2150,6 +2994,47 @@ function findOptionLabel(options: Array<{ label: string; value: string }>, value
   return options.find((option) => option.value === String(value ?? ""))?.label ?? "";
 }
 
+function cleanOptionLabel(label: string) {
+  return label.replace(/\s\([^)]+\)$/, "");
+}
+
+function dedupeOptionsByValue(options: Array<{ label: string; value: string }>) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    if (seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
+}
+
+function dedupeCustomFieldDefinitionsByKey(definitions: CustomFieldDefinition[]) {
+  const seen = new Set<string>();
+  return definitions.filter((definition) => {
+    if (seen.has(definition.field_key)) return false;
+    seen.add(definition.field_key);
+    return true;
+  });
+}
+
+function buildRuleExpression(rule: Pick<MatchingRuleRecord, "tutor_field" | "animal_field" | "comparison_operator"> | FormState) {
+  const tutorField = String(rule.tutor_field ?? "tutor_field");
+  const animalField = String(rule.animal_field ?? "animal_field");
+  const operator = String(rule.comparison_operator ?? "=");
+  return `${tutorField || "tutor_field"} ${operatorSymbol(operator)} ${animalField || "animal_field"}`;
+}
+
+function operatorSymbol(operator: string) {
+  const labels: Record<string, string> = {
+    "=": "=",
+    "!=": "!=",
+    contains: "contains",
+    ">=": ">=",
+    "<=": "<=",
+  };
+
+  return labels[operator] ?? operator;
+}
+
 function comparisonOperatorLabel(operator: string) {
   const labels: Record<string, string> = {
     "=": "Deve ser igual a",
@@ -2160,6 +3045,122 @@ function comparisonOperatorLabel(operator: string) {
   };
 
   return labels[operator] ?? "condicao";
+}
+
+function simulateRules(tutorFields: Record<string, unknown>, animals: AdminRecord[], rules: MatchingRuleRecord[]): RuleSimulationResult[] {
+  return animals.map((animal) => {
+    const animalFields = normalizeCustomFields(animal.custom_fields);
+    const details = rules.map((rule) => evaluateRuleForPreview(rule, tutorFields, animalFields));
+    const failedDealbreakers = details.filter((detail) => detail.rule.is_dealbreaker && !detail.matched);
+    const disqualified = failedDealbreakers.length > 0;
+    const score = disqualified
+      ? 0
+      : details.reduce((total, detail) => total + detail.score, 0);
+
+    return {
+      animal,
+      details,
+      disqualified,
+      failedDealbreakers,
+      score,
+    };
+  });
+}
+
+function evaluateRuleForPreview(
+  rule: MatchingRuleRecord,
+  tutorFields: Record<string, unknown>,
+  animalFields: Record<string, unknown>,
+): RuleSimulationDetail {
+  const tutorValue = tutorFields[String(rule.tutor_field ?? "")];
+  const animalValue = animalFields[String(rule.animal_field ?? "")];
+  const matched = tutorValue !== undefined && animalValue !== undefined
+    ? compareRuleValues(tutorValue, animalValue, String(rule.comparison_operator ?? "="))
+    : false;
+  const score = matched && !rule.is_dealbreaker ? Number(rule.weight ?? 0) : 0;
+  const expression = buildRuleExpression(rule);
+
+  return {
+    rule,
+    matched,
+    score,
+    tutorValue,
+    animalValue,
+    expression,
+    reason: describeRuleEvaluation(rule, matched, tutorValue, animalValue),
+  };
+}
+
+function compareRuleValues(tutorValue: unknown, animalValue: unknown, operator: string) {
+  if (operator === "=") return tutorValue === animalValue;
+  if (operator === "!=") return tutorValue !== animalValue;
+  if (operator === ">=") return valueRank(tutorValue) >= valueRank(animalValue);
+  if (operator === "<=") return valueRank(tutorValue) <= valueRank(animalValue);
+  if (operator === "contains") {
+    if (Array.isArray(animalValue)) {
+      return Array.isArray(tutorValue)
+        ? tutorValue.some((item) => animalValue.includes(item))
+        : animalValue.includes(tutorValue);
+    }
+    if (Array.isArray(tutorValue)) {
+      return tutorValue.some((item) => typeof animalValue === "string" && animalValue.includes(String(item)));
+    }
+    if (typeof tutorValue === "string" && typeof animalValue === "string") {
+      return animalValue.includes(tutorValue);
+    }
+  }
+  return false;
+}
+
+function valueRank(value: unknown) {
+  const rankMap: Record<string, number> = {
+    baixo: 1,
+    medio: 2,
+    alto: 3,
+    apartamento: 1,
+    casa_quintal_pequeno: 2,
+    casa_quintal_grande: 3,
+  };
+
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return rankMap[value] ?? (Number(value) || 0);
+  return 0;
+}
+
+function describeRuleEvaluation(rule: MatchingRuleRecord, matched: boolean, tutorValue: unknown, animalValue: unknown) {
+  const tutorText = formatComparableValue(tutorValue);
+  const animalText = formatComparableValue(animalValue);
+  const operator = String(rule.comparison_operator ?? "=");
+
+  if (operator === ">=" || operator === "<=") {
+    return `${matched ? "Passou" : "Falhou"}: exige rank ${valueRank(animalValue)}, tutor tem rank ${valueRank(tutorValue)}. Valores: tutor ${tutorText}, pet ${animalText}.`;
+  }
+
+  if (operator === "contains") {
+    return `${matched ? "Passou" : "Falhou"}: o valor do pet precisa conter a preferencia do tutor. Tutor ${tutorText}; pet ${animalText}.`;
+  }
+
+  return `${matched ? "Passou" : "Falhou"}: tutor ${tutorText} ${operatorSymbol(operator)} pet ${animalText}.`;
+}
+
+function formatComparableValue(value: unknown): string {
+  if (value === undefined) return "sem valor";
+  if (Array.isArray(value)) return value.map(formatComparableValue).join(", ");
+  if (typeof value === "boolean") return value ? "sim" : "nao";
+  if (value === null || value === "") return "sem valor";
+  return humanizeFieldKey(String(value));
+}
+
+function normalizeCustomFields(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function defaultCustomFieldValue(field: CustomFieldDefinition) {
+  if (field.field_type === "boolean") return false;
+  if (field.field_type === "number") return 0;
+  if ((field.field_type === "select" || field.field_type === "multiselect") && field.options.length) return field.options[0];
+  return "";
 }
 
 function impactLabel(weight: number) {

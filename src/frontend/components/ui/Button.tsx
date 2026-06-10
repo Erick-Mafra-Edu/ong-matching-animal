@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 type ButtonVariant = "primary" | "danger" | "danger-outline" | "outline";
 
@@ -14,18 +14,19 @@ const variants: Record<ButtonVariant, string> = {
   outline: "border border-amber-500 text-amber-500 hover:bg-amber-500/10",
 };
 
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   children,
   className = "",
   variant = "primary",
   ...props
-}: ButtonProps) {
+}, ref) {
   return (
     <button
       className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-xs font-bold uppercase tracking-wide transition duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0e12] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${variants[variant]} ${className}`}
+      ref={ref}
       {...props}
     >
       {children}
     </button>
   );
-}
+});

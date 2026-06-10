@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 import { backendApiUrl } from "@/lib/backend";
@@ -35,6 +35,19 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
+interface AnimalsPageResponse {
+  items: AnimalListItem[];
+  pagination: {
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
+}
+
+const DISCOVER_ANIMALS_PAGE_SIZE = 2;
+const IMAGE_PRELOAD_WINDOW = 2;
+
 async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
   if (animal.photoUrl || animal.photoUrls?.length) return animal;
 
@@ -42,11 +55,72 @@ async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem
   return { ...animal, photoUrl, photoUrls: [photoUrl] };
 }
 
+function getPrimaryPhotoUrl(animal: AnimalListItem) {
+  return animal.photoUrl || animal.photoUrls?.[0] || "";
+}
+
+function preloadImage(url: string) {
+  if (typeof window === "undefined" || !url) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = url;
+  });
+}
+
+async function preloadPrimaryAnimalPhotos(animals: AnimalListItem[]) {
+  await Promise.all(animals.slice(0, IMAGE_PRELOAD_WINDOW).map((animal) => preloadImage(getPrimaryPhotoUrl(animal))));
+}
+
+async function fetchAnimalsPage(offset: number): Promise<AnimalsPageResponse> {
+  const params = new URLSearchParams({
+    limit: String(DISCOVER_ANIMALS_PAGE_SIZE),
+    offset: String(offset),
+  });
+  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`));
+
+  if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
+
+  const body = await response.json() as AnimalsPageResponse | AnimalListItem[];
+  if (Array.isArray(body)) {
+    const items = await Promise.all(body.map(withFallbackPhoto));
+    await preloadPrimaryAnimalPhotos(items);
+    return {
+      items,
+      pagination: {
+        limit: items.length,
+        offset,
+        nextOffset: null,
+        hasMore: false,
+      },
+    };
+  }
+
+  const pageItems = Array.isArray(body.items) ? body.items : [];
+  const items = await Promise.all(pageItems.map(withFallbackPhoto));
+  await preloadPrimaryAnimalPhotos(items);
+  return {
+    items,
+    pagination: body.pagination ?? {
+      limit: items.length,
+      offset,
+      nextOffset: null,
+      hasMore: false,
+    },
+  };
+}
+
 export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) {
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [pets, setPets] = useState<AnimalListItem[]>([]);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
   const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(0);
+  const [hasMoreAnimals, setHasMoreAnimals] = useState(true);
+  const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
   const [ongSettings, setOngSettings] = useState<OngSettings | null>(null);
@@ -78,19 +152,18 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
     let isMounted = true;
     setLoadStatus("loading");
+    setPets([]);
+    setHistory([]);
+    setNextAnimalsOffset(0);
+    setHasMoreAnimals(true);
 
-    fetch(backendApiUrl("/api/animals"))
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
-        return response.json() as Promise<AnimalListItem[]>;
-      })
-      .then((animals) => {
-        return Promise.all(animals.map(withFallbackPhoto));
-      })
-      .then((availableAnimals) => {
+    fetchAnimalsPage(0)
+      .then((page) => {
         if (!isMounted) return;
-        setPets(availableAnimals);
-        setLoadStatus(availableAnimals.length ? "ready" : "empty");
+        setPets(page.items);
+        setNextAnimalsOffset(page.pagination.nextOffset);
+        setHasMoreAnimals(page.pagination.hasMore);
+        setLoadStatus(page.items.length ? "ready" : "empty");
       })
       .catch(() => {
         if (!isMounted) return;
@@ -101,6 +174,35 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
       isMounted = false;
     };
   }, [status]);
+
+  const loadNextAnimalsPage = useCallback(async () => {
+    if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
+
+    setIsLoadingMoreAnimals(true);
+    try {
+      const page = await fetchAnimalsPage(nextAnimalsOffset);
+      setPets((currentPets) => {
+        const existingIds = new Set(currentPets.map((pet) => pet.id));
+        const newItems = page.items.filter((pet) => !existingIds.has(pet.id));
+        return [...currentPets, ...newItems];
+      });
+      setNextAnimalsOffset(page.pagination.nextOffset);
+      setHasMoreAnimals(page.pagination.hasMore);
+    } catch {
+      if (pets.length === 0) setLoadStatus("error");
+    } finally {
+      setIsLoadingMoreAnimals(false);
+    }
+  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length]);
+
+  useEffect(() => {
+    if (status !== "ready" || loadStatus !== "ready" || pets.length > 1) return;
+    void loadNextAnimalsPage();
+  }, [loadNextAnimalsPage, loadStatus, pets.length, status]);
+
+  useEffect(() => {
+    void preloadPrimaryAnimalPhotos(pets.slice(0, IMAGE_PRELOAD_WINDOW));
+  }, [pets]);
 
   function renderContactDialog() {
     if (!contactDialog) return null;
@@ -127,7 +229,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   if (!featuredPet) {
     return (
       <>
-        <DashboardState status="empty" />
+        <DashboardState status={hasMoreAnimals || isLoadingMoreAnimals ? "loading" : "empty"} />
         {renderContactDialog()}
       </>
     );
@@ -198,7 +300,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
     setPets(remaining);
     setCardAction(null);
-    if (remaining.length === 0) {
+    if (remaining.length === 0 && !hasMoreAnimals) {
       setLoadStatus("empty");
     }
   }

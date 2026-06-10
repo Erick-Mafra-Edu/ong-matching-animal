@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthenticatedUserId, getSupabaseBackendConfig, pickFields, validateTutorCustomFields } from "./apiSupport";
+import { getAuthenticatedUserId, getSupabaseBackendConfig, pickFields, requireAuthenticated, validateTutorCustomFields } from "./apiSupport";
 
 export class TutorsController {
   create = async (req: Request, res: Response) => {
@@ -95,6 +95,39 @@ export class TutorsController {
       const profile = Array.isArray(body) ? body[0] : null;
       const customFields = profile?.custom_fields && typeof profile.custom_fields === "object" ? profile.custom_fields : {};
       res.json({ onboarding_complete: customFields.onboarding_complete === true });
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel conectar ao Supabase",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  getDiscoverAccess = async (req: Request, res: Response) => {
+    try {
+      const context = await requireAuthenticated(req, res);
+      if (!context) return;
+
+      const response = await fetch(`${context.supabaseUrl}/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.${encodeURIComponent(context.userId)}&limit=1`, {
+        headers: {
+          apikey: context.serviceRoleKey,
+          authorization: `Bearer ${context.serviceRoleKey}`,
+        },
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({ message: "Nao foi possivel carregar o acesso ao discover", details: body });
+        return;
+      }
+
+      const profile = Array.isArray(body) ? body[0] : null;
+      const customFields = profile?.custom_fields && typeof profile.custom_fields === "object" ? profile.custom_fields : {};
+      res.json({
+        authenticated: true,
+        onboarding_complete: customFields.onboarding_complete === true,
+        tutor_id: profile?.id ?? null,
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",

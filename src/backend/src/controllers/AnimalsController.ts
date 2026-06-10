@@ -21,15 +21,19 @@ export class AnimalsController {
     limits: { fileSize: maxAnimalPhotoSizeBytes, files: 1 },
   });
 
-  list = async (_req: Request, res: Response) => {
+  list = async (req: Request, res: Response) => {
     const { supabaseUrl, serviceRoleKey } = getSupabaseBackendConfig();
     if (!supabaseUrl || !serviceRoleKey) {
       res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
       return;
     }
 
+    const limit = parseBoundedInteger(req.query.limit, 12, 1, 50);
+    const offset = parseBoundedInteger(req.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+    const supabaseLimit = limit + 1;
+
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/animals?select=id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)&order=created_at.desc`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/animals?select=id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)&order=created_at.desc&limit=${supabaseLimit}&offset=${offset}`, {
         headers: {
           apikey: serviceRoleKey,
           authorization: `Bearer ${serviceRoleKey}`,
@@ -42,7 +46,19 @@ export class AnimalsController {
         return;
       }
 
-      res.json(Array.isArray(body) ? body.map(normalizeAnimal) : []);
+      const rows = Array.isArray(body) ? body : [];
+      const items = rows.slice(0, limit).map(normalizeAnimal);
+      const hasMore = rows.length > limit;
+
+      res.json({
+        items,
+        pagination: {
+          limit,
+          offset,
+          nextOffset: hasMore ? offset + items.length : null,
+          hasMore,
+        },
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -260,4 +276,11 @@ export class AnimalsController {
 
     res.status(201).json(Array.isArray(metadataBody) ? metadataBody[0] : metadataBody);
   }
+}
+
+function parseBoundedInteger(value: unknown, fallback: number, min: number, max: number) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const parsed = Number.parseInt(String(rawValue ?? ""), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, min), max);
 }
