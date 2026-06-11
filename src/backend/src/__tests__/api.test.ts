@@ -177,6 +177,14 @@ describe("API Endpoints", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => [{ id: "q1" }, { id: "q2" }], // active onboarding questions
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ field_key: "home_type", source_question_id: "q1" }], // tutor custom fields
+        })
+        .mockResolvedValueOnce({
+          ok: true,
           json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
         }) as jest.Mock;
 
@@ -201,7 +209,7 @@ describe("API Endpoints", () => {
         }),
       );
       expect(global.fetch).toHaveBeenNthCalledWith(
-        2,
+        4,
         "https://example.supabase.co/rest/v1/tutors?on_conflict=auth_user_id",
         expect.objectContaining({
           method: "POST",

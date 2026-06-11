@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Request, Response } from "express";
 import { getSupabaseBackendConfig, readJsonResponse, requireAdmin } from "./apiSupport";
+import { encrypt, tryDecrypt } from "../lib/crypto";
 
 type Provider = "google" | "microsoft";
 
@@ -286,7 +287,14 @@ async function loadConnection(supabaseUrl: string, serviceRoleKey: string, provi
     return { ok: false as const, missingTable: isMissingCalendarOAuthTable(body), details: body };
   }
   const body = await response.json() as Array<Record<string, unknown>>;
-  return { ok: true as const, connection: body[0] ?? null };
+  const connection = body[0] ?? null;
+
+  if (connection) {
+    connection.access_token = tryDecrypt(connection.access_token as string);
+    connection.refresh_token = tryDecrypt(connection.refresh_token as string);
+  }
+
+  return { ok: true as const, connection };
 }
 
 async function loadAdminById(supabaseUrl: string, serviceRoleKey: string, adminId: string) {
@@ -299,13 +307,16 @@ async function loadAdminById(supabaseUrl: string, serviceRoleKey: string, adminI
 }
 
 async function saveConnection(supabaseUrl: string, serviceRoleKey: string, provider: Provider, tokenBody: Record<string, unknown>, adminId: string, existingId?: string) {
+  const accessToken = String(tokenBody.access_token ?? tokenBody.accessToken ?? "");
+  const refreshToken = tokenBody.refresh_token ? String(tokenBody.refresh_token) : undefined;
+
   const payload = {
     provider,
     calendar_id: String(tokenBody.calendar_id ?? tokenBody.calendarId ?? "primary"),
     account_email: String(tokenBody.account_email ?? tokenBody.accountEmail ?? ""),
     tenant_id: String(tokenBody.tenant_id ?? tokenBody.tenantId ?? ""),
-    access_token: String(tokenBody.access_token ?? tokenBody.accessToken ?? ""),
-    refresh_token: tokenBody.refresh_token ? String(tokenBody.refresh_token) : undefined,
+    access_token: accessToken ? encrypt(accessToken) : "",
+    refresh_token: refreshToken ? encrypt(refreshToken) : undefined,
     token_type: String(tokenBody.token_type ?? tokenBody.tokenType ?? "Bearer"),
     scope: String(tokenBody.scope ?? ""),
     expires_at: tokenBody.expires_in ? new Date(Date.now() + Number(tokenBody.expires_in) * 1000).toISOString() : undefined,

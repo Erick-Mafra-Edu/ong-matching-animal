@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 
 export const animalPhotosBucket = "animal-photos";
 export const maxAnimalPhotoSizeBytes = 5 * 1024 * 1024;
@@ -36,7 +37,7 @@ export const adminTables = {
     table: "animal_photos",
     select: "id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at",
     order: "created_at.desc",
-    createFields: ["animal_id", "bucket_id", "storage_path", "public_url", "content_type", "size_bytes", "is_primary"],
+    createFields: ["id", "animal_id", "bucket_id", "storage_path", "public_url", "content_type", "size_bytes", "is_primary"],
     updateFields: ["animal_id", "bucket_id", "storage_path", "public_url", "content_type", "size_bytes", "is_primary"],
   },
   "tutor-interessados": {
@@ -320,18 +321,255 @@ export function buildCalendarEventPayload(source: Record<string, unknown>, admin
   return payload;
 }
 
+const CalendarEventStatusSchema = z.enum(["scheduled", "completed", "cancelled"]);
+const CalendarProviderSchema = z.enum(["google", "microsoft"]);
+const JsonObjectSchema = z.record(z.string(), z.unknown());
+
+const CalendarEventPayloadBaseSchema = z.object({
+  tutor_id: z.string().uuid().nullable().optional(),
+  animal_id: z.string().uuid().nullable().optional(),
+  interest_id: z.string().uuid().nullable().optional(),
+  title: z.string().min(1, "Informe o titulo do evento."),
+  description: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  starts_at: z.string().datetime({ message: "Data de inicio invalida." }),
+  ends_at: z.string().datetime({ message: "Data de fim invalida." }),
+  status: CalendarEventStatusSchema.default("scheduled").optional(),
+  provider: CalendarProviderSchema.nullable().optional(),
+  external_event_id: z.string().nullable().optional(),
+  external_event_url: z.string().nullable().optional(),
+  metadata: JsonObjectSchema.nullable().optional(),
+  created_by: z.string().nullable().optional(),
+  updated_at: z.string().datetime().nullable().optional(),
+});
+
+const CalendarEventPayloadSchema = CalendarEventPayloadBaseSchema.refine((data) => new Date(data.ends_at) > new Date(data.starts_at), {
+  message: "A data de fim deve ser posterior ao inicio.",
+  path: ["ends_at"],
+});
+
+const CalendarEventPayloadSchemaUpdate = CalendarEventPayloadBaseSchema.partial().refine((data) => {
+  if (!data.starts_at || !data.ends_at) return true;
+  return new Date(data.ends_at) > new Date(data.starts_at);
+}, {
+  message: "A data de fim deve ser posterior ao inicio.",
+  path: ["ends_at"],
+}).and(z.object({
+  title: z.string().min(1, "Informe o titulo do evento.").optional(),
+  starts_at: z.string().datetime({ message: "Data de inicio invalida." }).optional(),
+  ends_at: z.string().datetime({ message: "Data de fim invalida." }).optional(),
+}));
+
+function getZodMessage(error: z.ZodError) {
+  return error.issues[0]?.message ?? "Payload invalido.";
+}
+
 export function validateCalendarEventPayload(payload: Record<string, unknown>, isUpdate = false) {
-  if (!isUpdate && !payload.title) return "Informe o titulo do evento.";
-  if (!isUpdate && !payload.starts_at) return "Informe a data de inicio do evento.";
-  if (!isUpdate && !payload.ends_at) return "Informe a data de fim do evento.";
+  try {
+    if (isUpdate) {
+      CalendarEventPayloadSchemaUpdate.parse(payload);
+    } else {
+      CalendarEventPayloadSchema.parse(payload);
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Erro de validacao desconhecido.";
+  }
+}
 
-  const startsAt = payload.starts_at ? new Date(String(payload.starts_at)) : null;
-  const endsAt = payload.ends_at ? new Date(String(payload.ends_at)) : null;
+export async function validateResourcePayload(resource: string, payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string, isUpdate = false) {
+  if (resource === "custom-fields") {
+    return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
+  }
 
-  if (startsAt && Number.isNaN(startsAt.getTime())) return "Data de inicio invalida.";
-  if (endsAt && Number.isNaN(endsAt.getTime())) return "Data de fim invalida.";
-  if (startsAt && endsAt && endsAt <= startsAt) return "A data de fim deve ser posterior ao inicio.";
-  if (payload.status && !["scheduled", "completed", "cancelled"].includes(String(payload.status))) return "Status de evento invalido.";
-  if (payload.provider && !["google", "microsoft"].includes(String(payload.provider))) return "Provider de calendario invalido.";
+  if (resource === "ong-settings") {
+    return validateOngSettingsPayload(payload);
+  }
+
+  if (resource === "matching-rules") {
+    return validateMatchingRulePayload(payload, isUpdate);
+  }
+
+  if (resource === "tutors" && Object.prototype.hasOwnProperty.call(payload, "custom_fields")) {
+    return validateTutorCustomFields(payload.custom_fields, supabaseUrl, serviceRoleKey);
+  }
+
   return null;
+}
+
+const MatchingRuleComparisonOperatorSchema = z.enum(["=", "!=", ">=", "<=", "contains"]);
+
+const MatchingRulePayloadSchema = z.object({
+  rule_name: z.string().min(1, "Preencha nome, campos comparados e condicao da regra."),
+  tutor_field: z.string().min(1, "Preencha nome, campos comparados e condicao da regra."),
+  animal_field: z.string().min(1, "Preencha nome, campos comparados e condicao da regra."),
+  comparison_operator: MatchingRuleComparisonOperatorSchema,
+  weight: z.coerce.number().int().min(0, "O impacto da regra deve ficar entre 0 e 100.").max(100, "O impacto da regra deve ficar entre 0 e 100.").optional(),
+  is_dealbreaker: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+});
+
+function validateMatchingRulePayload(payload: Record<string, unknown>, isUpdate = false) {
+  try {
+    const parsed = (isUpdate ? MatchingRulePayloadSchema.partial() : MatchingRulePayloadSchema).parse(payload);
+    if (Object.prototype.hasOwnProperty.call(parsed, "weight")) payload.weight = parsed.weight;
+    return null;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Erro de validacao desconhecido.";
+  }
+}
+
+const OngSettingsPayloadSchema = z.object({
+  ong_name: z.string().optional(),
+  contact_email: z.string().email("Email de contato invalido.").nullable().optional(),
+  contact_phone: z.string().nullable().optional(),
+  whatsapp_phone: z.string().nullable().optional(),
+  website_url: z.string().url("URL do website invalida.").nullable().optional(),
+  address_line: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  postal_code: z.string().nullable().optional(),
+  social_links: z.unknown().optional(),
+  business_hours: z.unknown().optional(),
+  adoption_message_template: z.string().nullable().optional(),
+  settings: z.unknown().optional(),
+  is_active: z.boolean().optional(),
+  updated_at: z.string().datetime().optional(),
+}).partial().superRefine((data, ctx) => {
+  for (const field of ["social_links", "business_hours", "settings"] as const) {
+    if (Object.prototype.hasOwnProperty.call(data, field)) {
+      const value = data[field];
+      if (value !== null && (typeof value !== "object" || Array.isArray(value))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field} deve ser um objeto JSON.`,
+          path: [field],
+        });
+      }
+    }
+  }
+});
+
+function validateOngSettingsPayload(payload: Record<string, unknown>) {
+  // Coerce empty strings to null before validation
+  for (const field of ["contact_email", "contact_phone", "whatsapp_phone", "website_url", "address_line", "city", "state", "postal_code", "adoption_message_template"]) {
+    if (payload[field] === "") payload[field] = null;
+  }
+
+  try {
+    OngSettingsPayloadSchema.parse(payload);
+    return null;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Erro de validacao desconhecido.";
+  }
+}
+
+const CustomFieldPayloadSchema = z.object({
+  entity_type: z.enum(["tutor", "animal"], { message: "Informe se o campo customizado serve para tutores ou animais." }),
+  field_key: z.string().min(1),
+  label: z.string().min(1),
+  field_type: z.string().min(1),
+  options: z.array(z.string()).optional(),
+  source_question_id: z.string().uuid().nullable().optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
+
+async function validateCustomFieldPayload(payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
+  if (payload.source_question_id === "") payload.source_question_id = null;
+
+  try {
+    const parsedPayload = CustomFieldPayloadSchema.parse(payload);
+
+    if (parsedPayload.entity_type !== "tutor") {
+      parsedPayload.source_question_id = null;
+      payload.source_question_id = null; // Update the original payload if necessary
+    }
+
+    if (parsedPayload.entity_type === "tutor") {
+      const sourceQuestionId = typeof parsedPayload.source_question_id === "string" ? parsedPayload.source_question_id.trim() : "";
+      if (!sourceQuestionId) {
+        return "Campos customizados de tutor precisam estar vinculados a uma pergunta de onboarding.";
+      }
+
+      const questionIds = await fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey);
+      if (!questionIds.has(sourceQuestionId)) {
+        return "A pergunta vinculada ao campo customizado de tutor nao existe ou esta inativa.";
+      }
+      parsedPayload.source_question_id = sourceQuestionId;
+      payload.source_question_id = sourceQuestionId; // Update the original payload if necessary
+    }
+
+    return null;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Erro de validacao desconhecido.";
+  }
+}
+
+export async function validateTutorCustomFields(customFields: unknown, supabaseUrl: string, serviceRoleKey: string) {
+  const CustomFieldsSchema = JsonObjectSchema;
+
+  try {
+    CustomFieldsSchema.parse(customFields);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Campos customizados do tutor devem ser um objeto.";
+  }
+
+  const allowedKeys = await fetchTutorCustomFieldKeys(supabaseUrl, serviceRoleKey);
+  const invalidKeys = Object.keys(customFields as Record<string, unknown>)
+    .filter((key) => !allowedKeys.has(key));
+
+  if (invalidKeys.length > 0) {
+    return `Campos customizados de tutor sem pergunta vinculada: ${invalidKeys.join(", ")}.`;
+  }
+
+  return null;
+}
+
+async function fetchActiveOnboardingQuestionIds(supabaseUrl: string, serviceRoleKey: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=id&is_active=eq.true`, {
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+    },
+  });
+  const body = await response.json() as Array<{ id?: string }>;
+  return new Set(body.map((question) => question.id).filter((id): id is string => Boolean(id)));
+}
+
+async function fetchTutorCustomFieldKeys(supabaseUrl: string, serviceRoleKey: string) {
+  const [questions, customFieldsResponse] = await Promise.all([
+    fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey),
+    fetch(`${supabaseUrl}/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true&source_question_id=not.is.null`, {
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+      },
+    }),
+  ]);
+  const customFields = await customFieldsResponse.json() as Array<{ field_key?: string; source_question_id?: string | null }>;
+  const allowedKeys = new Set<string>(["onboarding_complete", ...questions]);
+
+  for (const field of customFields) {
+    if (field.field_key && field.source_question_id && questions.has(field.source_question_id)) {
+      allowedKeys.add(field.field_key);
+    }
+  }
+
+  return allowedKeys;
 }

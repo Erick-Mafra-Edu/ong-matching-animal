@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthenticatedUserId, getSupabaseBackendConfig } from "./apiSupport";
+import { getAuthenticatedUserId, getSupabaseBackendConfig, pickFields, validateTutorCustomFields } from "./apiSupport";
 
 export class TutorsController {
   create = async (req: Request, res: Response) => {
@@ -9,7 +9,8 @@ export class TutorsController {
       return;
     }
 
-    const { auth_user_id, name, custom_fields } = req.body as {
+    const payload = pickFields(req.body ?? {}, ["auth_user_id", "name", "custom_fields"]);
+    const { auth_user_id, name, custom_fields } = payload as {
       auth_user_id?: string;
       name?: string;
       custom_fields?: Record<string, unknown>;
@@ -29,6 +30,12 @@ export class TutorsController {
 
       if (authenticatedUserId !== auth_user_id) {
         res.status(403).json({ message: "Nao e permitido salvar perfil de outro usuario." });
+        return;
+      }
+
+      const validationMessage = await validateTutorCustomFields(custom_fields, supabaseUrl, serviceRoleKey);
+      if (validationMessage) {
+        res.status(400).json({ message: validationMessage });
         return;
       }
 

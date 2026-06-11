@@ -4,6 +4,8 @@ import { config } from "dotenv";
 import { initialize } from "express-openapi";
 import path from "path";
 import swaggerUi from "swagger-ui-express";
+import { rateLimit } from "express-rate-limit";
+import helmet from "helmet";
 import { apiDoc, openApiOperations } from "./openapi";
 import { createApiRouter } from "./routes/apiRouter";
 
@@ -41,11 +43,42 @@ const corsOptions: CorsOptions = {
   optionsSuccessStatus: 200,
 };
 
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Muitas requisicoes vindas deste IP, tente novamente mais tarde." },
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Limite de tentativas excedido. Tente novamente em uma hora." },
+});
+
 export function createApp() {
   const app = express();
 
+  const isDevelopment = process.env.NODE_ENV === "development";
+
+  app.use(helmet({
+    contentSecurityPolicy: false, // Desabilitado pois e uma API REST que retorna JSON
+    hsts: !isDevelopment, // Habilitar HSTS apenas em producao
+  }));
+  app.use(globalLimiter);
   app.use(cors(corsOptions));
   app.use(express.json());
+
+  app.use("/api/match", rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    message: { message: "Muitas solicitacoes de matching. Tente novamente em breve." },
+  }));
+
+  app.use("/api/admin/admin-users", strictLimiter);
 
   app.get("/api/openapi.json", (_req, res) => {
     res.json(apiDoc);
