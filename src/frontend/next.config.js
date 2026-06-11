@@ -54,7 +54,10 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
-  skipMiddlewareUrlNormalize: true,
+  skipProxyUrlNormalize: true,
+  turbopack: {
+    root: path.resolve(__dirname, '../..'),
+  },
   async headers() {
     return [
       {
@@ -64,6 +67,8 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    const backendDest = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+
     if (process.env.NODE_ENV === 'development') {
       return {
         beforeFiles: [
@@ -73,12 +78,12 @@ const nextConfig = {
           },
         ],
       };
-    }else{
+    } else {
       return {
         beforeFiles: [
           {
             source: '/api/:path*',
-            destination: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/:path*`,
+            destination: `${backendDest}/api/:path*`,
           },
         ],
       };

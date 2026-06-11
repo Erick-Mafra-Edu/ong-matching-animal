@@ -2,12 +2,14 @@ import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import multer from "multer";
 import {
+  adminTables,
   allowedAnimalPhotoTypes,
   animalPhotoExtensions,
   animalPhotosBucket,
   getSupabaseBackendConfig,
   maxAnimalPhotoSizeBytes,
   normalizeAnimal,
+  pickFields,
   readJsonResponse,
   requireAdmin,
   toPublicStorageUrl,
@@ -216,22 +218,20 @@ export class AnimalsController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
-      const { id, storage_path, public_url, content_type, size_bytes, is_primary = false } = req.body;
-      if (!id || !storage_path || !public_url || !content_type) {
+      const rawPayload = req.body ?? {};
+      const payload = pickFields(rawPayload, adminTables["animal-photos"].createFields);
+
+      if (!payload.id || !payload.storage_path || !payload.content_type) {
         res.status(400).json({ message: "Dados da foto incompletos para registro." });
         return;
       }
 
-      await this.persistPhotoMetadata(req, res, {
-        id,
-        animal_id: req.params.id,
-        bucket_id: animalPhotosBucket,
-        storage_path,
-        public_url,
-        content_type,
-        size_bytes: size_bytes || 0,
-        is_primary,
-      }, context);
+      // Garante que o animal_id seja o da rota e gera public_url no servidor
+      payload.animal_id = req.params.id;
+      payload.bucket_id = animalPhotosBucket;
+      payload.public_url = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, String(payload.storage_path));
+
+      await this.persistPhotoMetadata(req, res, payload, context);
     } catch (error) {
       res.status(500).json({
         message: "Erro ao registrar metadados da foto.",

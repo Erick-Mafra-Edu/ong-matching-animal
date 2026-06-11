@@ -9,7 +9,9 @@ import {
   readJsonResponse,
   requireAdmin,
   validateCalendarEventPayload,
+  validateResourcePayload,
 } from "./apiSupport";
+import { logAdminAction } from "../lib/audit";
 
 export class AdminController {
   getMe = async (req: Request, res: Response) => {
@@ -152,6 +154,13 @@ export class AdminController {
       }
 
       res.status(201).json(Array.isArray(insertBody) ? insertBody[0] : insertBody);
+      await logAdminAction({
+        auth_user_id: context.admin.auth_user_id,
+        action: "CREATE",
+        resource: "admin-user",
+        resource_id: authUserId,
+        details: { email, full_name, is_active },
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel criar o administrador.",
@@ -174,7 +183,7 @@ export class AdminController {
       const payload = req.params.resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id)
         : pickFields(req.body ?? {}, config.createFields);
-      const validationMessage = await validateAdminPayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
+      const validationMessage = await validateResourcePayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
         return;
@@ -204,7 +213,16 @@ export class AdminController {
         return;
       }
 
-      res.status(201).json(Array.isArray(body) ? body[0] : body);
+      const createdResource = Array.isArray(body) ? body[0] : body;
+      res.status(201).json(createdResource);
+      const newResourceId = createdResource?.id;
+      await logAdminAction({
+        auth_user_id: context.admin.auth_user_id,
+        action: "CREATE",
+        resource: req.params.resource,
+        resource_id: String(newResourceId),
+        details: payload,
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -227,7 +245,7 @@ export class AdminController {
       const payload = req.params.resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id, true)
         : pickFields(req.body ?? {}, config.updateFields);
-      const validationMessage = await validateAdminPayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
+      const validationMessage = await validateResourcePayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey, true);
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
         return;
@@ -261,6 +279,13 @@ export class AdminController {
       }
 
       res.json(Array.isArray(body) ? body[0] : body);
+      await logAdminAction({
+        auth_user_id: context.admin.auth_user_id,
+        action: "UPDATE",
+        resource: req.params.resource,
+        resource_id: req.params.id,
+        details: payload,
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -297,6 +322,13 @@ export class AdminController {
       }
 
       res.status(200).json({ deleted: true, rows: body });
+      await logAdminAction({
+        auth_user_id: context.admin.auth_user_id,
+        action: "DELETE",
+        resource: req.params.resource,
+        resource_id: req.params.id,
+        details: { deletedRows: body },
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -304,138 +336,4 @@ export class AdminController {
       });
     }
   };
-}
-
-async function validateAdminPayload(resource: string, payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
-  if (resource === "custom-fields") {
-    return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
-  }
-
-  if (resource === "ong-settings") {
-    return validateOngSettingsPayload(payload);
-  }
-
-  if (resource === "matching-rules") {
-    return validateMatchingRulePayload(payload);
-  }
-
-  if (resource === "tutors" && Object.prototype.hasOwnProperty.call(payload, "custom_fields")) {
-    return validateTutorCustomFields(payload.custom_fields, supabaseUrl, serviceRoleKey);
-  }
-
-  return null;
-}
-
-function validateMatchingRulePayload(payload: Record<string, unknown>) {
-  for (const field of ["rule_name", "tutor_field", "animal_field", "comparison_operator"]) {
-    if (Object.prototype.hasOwnProperty.call(payload, field) && !String(payload[field] ?? "").trim()) {
-      return "Preencha nome, campos comparados e condicao da regra.";
-    }
-  }
-
-  if (Object.prototype.hasOwnProperty.call(payload, "comparison_operator")) {
-    const operator = String(payload.comparison_operator);
-    if (!["=", "!=", ">=", "<=", "contains"].includes(operator)) {
-      return "Condicao de matching invalida.";
-    }
-  }
-
-  if (Object.prototype.hasOwnProperty.call(payload, "weight")) {
-    const weight = Number(payload.weight);
-    if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
-      return "O impacto da regra deve ficar entre 0 e 100.";
-    }
-    payload.weight = Math.round(weight);
-  }
-
-  return null;
-}
-
-function validateOngSettingsPayload(payload: Record<string, unknown>) {
-  for (const field of ["social_links", "business_hours", "settings"]) {
-    if (!Object.prototype.hasOwnProperty.call(payload, field)) continue;
-    const value = payload[field];
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return `${field} deve ser um objeto JSON.`;
-    }
-  }
-
-  for (const field of ["contact_email", "contact_phone", "whatsapp_phone", "website_url", "address_line", "city", "state", "postal_code", "adoption_message_template"]) {
-    if (payload[field] === "") payload[field] = null;
-  }
-
-  return null;
-}
-
-async function validateCustomFieldPayload(payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
-  const entityType = String(payload.entity_type ?? "");
-  if (!["tutor", "animal"].includes(entityType)) {
-    return "Informe se o campo customizado serve para tutores ou animais.";
-  }
-
-  if (payload.source_question_id === "") payload.source_question_id = null;
-  if (entityType !== "tutor") {
-    payload.source_question_id = null;
-    return null;
-  }
-
-  const sourceQuestionId = typeof payload.source_question_id === "string" ? payload.source_question_id.trim() : "";
-  if (!sourceQuestionId) {
-    return "Campos customizados de tutor precisam estar vinculados a uma pergunta de onboarding.";
-  }
-
-  const questionIds = await fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey);
-  if (!questionIds.has(sourceQuestionId)) {
-    return "A pergunta vinculada ao campo customizado de tutor nao existe ou esta inativa.";
-  }
-
-  payload.source_question_id = sourceQuestionId;
-  return null;
-}
-
-async function validateTutorCustomFields(customFields: unknown, supabaseUrl: string, serviceRoleKey: string) {
-  if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return null;
-
-  const allowedKeys = await fetchTutorCustomFieldKeys(supabaseUrl, serviceRoleKey);
-  const invalidKeys = Object.keys(customFields as Record<string, unknown>)
-    .filter((key) => !allowedKeys.has(key));
-
-  if (invalidKeys.length > 0) {
-    return `Campos customizados de tutor sem pergunta vinculada: ${invalidKeys.join(", ")}.`;
-  }
-
-  return null;
-}
-
-async function fetchActiveOnboardingQuestionIds(supabaseUrl: string, serviceRoleKey: string) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=id&is_active=eq.true`, {
-    headers: {
-      apikey: serviceRoleKey,
-      authorization: `Bearer ${serviceRoleKey}`,
-    },
-  });
-  const body = await response.json() as Array<{ id?: string }>;
-  return new Set(body.map((question) => question.id).filter((id): id is string => Boolean(id)));
-}
-
-async function fetchTutorCustomFieldKeys(supabaseUrl: string, serviceRoleKey: string) {
-  const [questions, customFieldsResponse] = await Promise.all([
-    fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey),
-    fetch(`${supabaseUrl}/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true&source_question_id=not.is.null`, {
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-      },
-    }),
-  ]);
-  const customFields = await customFieldsResponse.json() as Array<{ field_key?: string; source_question_id?: string | null }>;
-  const allowedKeys = new Set<string>(["onboarding_complete", ...questions]);
-
-  for (const field of customFields) {
-    if (field.field_key && field.source_question_id && questions.has(field.source_question_id)) {
-      allowedKeys.add(field.field_key);
-    }
-  }
-
-  return allowedKeys;
 }

@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
-import type { AnimalProfile, MatchResponse, MatchingRule, TutorProfile } from "@ong-matching-animal/shared/types";
-import { MatchingAlgorithm } from "../lib/matching";
-import { getSupabaseBackendConfig } from "./apiSupport";
+import type { MatchResponse, MatchResult } from "@ong-matching-animal/shared/types";
+import { getSupabaseBackendConfig, readJsonResponse } from "./apiSupport";
 
 export class SystemController {
   getHealth = (_req: Request, res: Response) => {
@@ -71,7 +70,11 @@ export class SystemController {
   };
 
   match = async (req: Request, res: Response) => {
-    const { tutor_id, limit = 10 } = req.body as { tutor_id?: string; limit?: number };
+    const { tutor_id, limit = 10, max_distance_km = 50 } = req.body as {
+      tutor_id?: string;
+      limit?: number;
+      max_distance_km?: number | null;
+    };
     if (!tutor_id) {
       res.status(400).json({ message: "Informe tutor_id." });
       return;
@@ -84,32 +87,56 @@ export class SystemController {
     }
 
     try {
-      const [tutorResponse, animalsResponse, rulesResponse] = await Promise.all([
+      const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 50) : 10;
+      const safeDistanceKm = max_distance_km === null
+        ? null
+        : (Number.isFinite(Number(max_distance_km)) ? Math.max(Number(max_distance_km), 0) : 50);
+
+      const [tutorResponse, matchesResponse, animalsCountResponse] = await Promise.all([
         fetch(`${supabaseUrl}/rest/v1/tutors?select=id,auth_user_id,name,location,custom_fields,created_at&id=eq.${encodeURIComponent(tutor_id)}&limit=1`, {
           headers: { apikey: serviceRoleKey, authorization: `Bearer ${serviceRoleKey}` },
         }),
-        fetch(`${supabaseUrl}/rest/v1/animals?select=id,owner_id,name,species,location,custom_fields,created_at&order=created_at.desc`, {
-          headers: { apikey: serviceRoleKey, authorization: `Bearer ${serviceRoleKey}` },
+        fetch(`${supabaseUrl}/rest/v1/rpc/calculate_match_score`, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            target_tutor_id: tutor_id,
+            result_limit: safeLimit,
+            max_distance_km: safeDistanceKm,
+          }),
         }),
-        fetch(`${supabaseUrl}/rest/v1/matching_rules?select=id,rule_name,tutor_field,animal_field,comparison_operator,weight,is_dealbreaker,is_active,created_at&is_active=eq.true`, {
-          headers: { apikey: serviceRoleKey, authorization: `Bearer ${serviceRoleKey}` },
+        fetch(`${supabaseUrl}/rest/v1/rpc/count_match_candidates_for_tutor`, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            target_tutor_id: tutor_id,
+            max_distance_km: safeDistanceKm,
+          }),
         }),
       ]);
 
-      const tutorBody = await tutorResponse.json();
-      const animalsBody = await animalsResponse.json();
-      const rulesBody = await rulesResponse.json();
+      const tutorBody = await readJsonResponse(tutorResponse);
+      const matchesBody = await readJsonResponse(matchesResponse);
+      const animalsCountBody = await readJsonResponse(animalsCountResponse);
 
       if (!tutorResponse.ok) {
         res.status(tutorResponse.status).json({ message: "Nao foi possivel carregar o tutor.", details: tutorBody });
         return;
       }
-      if (!animalsResponse.ok) {
-        res.status(animalsResponse.status).json({ message: "Nao foi possivel carregar os animais.", details: animalsBody });
+      if (!matchesResponse.ok) {
+        res.status(matchesResponse.status).json({ message: "Nao foi possivel calcular os matches via RPC.", details: matchesBody });
         return;
       }
-      if (!rulesResponse.ok) {
-        res.status(rulesResponse.status).json({ message: "Nao foi possivel carregar as regras de matching.", details: rulesBody });
+      if (!animalsCountResponse.ok) {
+        res.status(animalsCountResponse.status).json({ message: "Nao foi possivel carregar a contagem de animais.", details: animalsCountBody });
         return;
       }
 
@@ -119,16 +146,16 @@ export class SystemController {
         return;
       }
 
-      const animals = Array.isArray(animalsBody) ? animalsBody.map(toAnimalProfile) : [];
-      const rules = Array.isArray(rulesBody) ? rulesBody as MatchingRule[] : [];
-      const algorithm = new MatchingAlgorithm();
-      const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 50) : 10;
+      const totalAnimalsEvaluated = typeof animalsCountBody === "number"
+        ? animalsCountBody
+        : Number(animalsCountBody ?? 0);
+      const matches = Array.isArray(matchesBody) ? matchesBody.map(toMatchResult) : [];
 
       const response: MatchResponse = {
         tutor_id: tutor.id,
         tutor_name: tutor.name,
-        total_animals_evaluated: animals.length,
-        matches: algorithm.findBestMatches(toTutorProfile(tutor), animals, rules, safeLimit),
+        total_animals_evaluated: totalAnimalsEvaluated,
+        matches,
         timestamp: new Date().toISOString(),
       };
 
@@ -142,29 +169,20 @@ export class SystemController {
   };
 }
 
-function toTutorProfile(rawTutor: any): TutorProfile {
+function toMatchResult(rawMatch: any): MatchResult {
   return {
-    id: rawTutor.id,
-    auth_user_id: rawTutor.auth_user_id,
-    name: rawTutor.name,
-    location: normalizeLocation(rawTutor.location),
-    custom_fields: rawTutor.custom_fields && typeof rawTutor.custom_fields === "object" ? rawTutor.custom_fields : {},
-    created_at: rawTutor.created_at,
+    animal_id: String(rawMatch.animal_id),
+    animal_name: String(rawMatch.animal_name ?? ""),
+    compatibility_score: Number(rawMatch.compatibility_score ?? 0),
+    matched_rules: Array.isArray(rawMatch.matched_rules) ? rawMatch.matched_rules.map(String) : [],
+    details: Array.isArray(rawMatch.details)
+      ? rawMatch.details.map((detail: any) => ({
+        rule_id: String(detail?.rule_id ?? ""),
+        rule_name: String(detail?.rule_name ?? ""),
+        matched: Boolean(detail?.matched),
+        weight: Number(detail?.weight ?? 0),
+        is_dealbreaker: detail?.is_dealbreaker === undefined ? undefined : Boolean(detail.is_dealbreaker),
+      }))
+      : [],
   };
-}
-
-function toAnimalProfile(rawAnimal: any): AnimalProfile {
-  return {
-    id: rawAnimal.id,
-    owner_id: rawAnimal.owner_id,
-    name: rawAnimal.name,
-    species: rawAnimal.species,
-    location: normalizeLocation(rawAnimal.location),
-    custom_fields: rawAnimal.custom_fields && typeof rawAnimal.custom_fields === "object" ? rawAnimal.custom_fields : {},
-    created_at: rawAnimal.created_at,
-  };
-}
-
-function normalizeLocation(_value: unknown) {
-  return { lat: 0, lng: 0 };
 }

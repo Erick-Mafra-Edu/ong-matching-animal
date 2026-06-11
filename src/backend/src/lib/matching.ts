@@ -28,16 +28,16 @@ export class MatchingAlgorithm {
       return tutorNum <= animalNum;
     },
     contains: (tutor: unknown, animal: unknown) => {
-      if (Array.isArray(animal)) {
-        return Array.isArray(tutor)
-          ? tutor.some((item) => animal.includes(item))
-          : animal.includes(tutor);
-      }
       if (Array.isArray(tutor)) {
-        return tutor.some((item) => typeof animal === "string" && animal.includes(String(item)));
+        return Array.isArray(animal)
+          ? animal.some((item) => tutor.includes(item))
+          : tutor.includes(animal);
+      }
+      if (typeof tutor === "string" && Array.isArray(animal)) {
+        return animal.some((item) => typeof item === "string" && tutor.includes(item));
       }
       if (typeof tutor === "string" && typeof animal === "string") {
-        return animal.includes(tutor);
+        return tutor.includes(animal);
       }
       return false;
     },
