@@ -33,7 +33,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "concurrently": "^9.2.0"
+    "concurrently": "^10.0.3"
   },
   "dependencies": {
     "next": "^16.2.9"
