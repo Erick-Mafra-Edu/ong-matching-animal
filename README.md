@@ -232,9 +232,9 @@ Scores mais recentes da home (`/`) com base no relatório público do PageSpeed 
 Referências:
 
 - Link do relatório mobile: `https://pagespeed.web.dev/analysis/https-ong-matching-animalfrontend-vercel-app/t81so00amb?form_factor=mobile`
-- Captura mobile: [insightsMobile.png](/C:/Users/Erick/ong-matching-animal/docs/reports_lighthouse/insightsMobile.png)
-- Captura desktop: [insightsDesktop.png](/C:/Users/Erick/ong-matching-animal/docs/reports_lighthouse/insightsDesktop.png)
-- Export Lighthouse local da home: [ong-matching-animalfrontend.vercel.app-20260614T194526.json](/C:/Users/Erick/ong-matching-animal/docs/reports_lighthouse/ong-matching-animalfrontend.vercel.app-20260614T194526.json)
+- Captura mobile: [insightsMobile.png](docs/reports_lighthouse/insightsMobile.png)
+- Captura desktop: [insightsDesktop.png](docs/reports_lighthouse/insightsDesktop.png)
+- Export Lighthouse local da home: [ong-matching-animalfrontend.vercel.app-20260614T194526.json](docs/reports_lighthouse/ong-matching-animalfrontend.vercel.app-20260614T194526.json)
 
 ### Tipos Compartilhados
 
