@@ -9,7 +9,7 @@ interface SyncAuthSessionInput {
 }
 
 export async function syncAuthSessionCookies(input: SyncAuthSessionInput) {
-  const response = await fetch("/api/auth/session", {
+  const response = await fetch("/auth/session", {
     method: "POST",
     headers: {
       "content-type": "application/json",
