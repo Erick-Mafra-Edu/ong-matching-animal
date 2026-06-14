@@ -2949,7 +2949,7 @@ function buildCustomFieldDefinitions(customFields: CustomFieldRecord[], onboardi
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.label ?? "").localeCompare(String(b.label ?? "")));
 
   return {
-    tutor: [
+    tutor: dedupeCustomFieldDefinitionsByKey([
       ...activeFields
       .filter((field) => field.entity_type === "tutor")
       .filter((field) => hasActiveSourceQuestion(field, onboardingQuestions))
@@ -2957,10 +2957,11 @@ function buildCustomFieldDefinitions(customFields: CustomFieldRecord[], onboardi
       ...onboardingQuestions
         .filter((question) => question.is_active !== false && question.id)
         .map(toQuestionCustomFieldDefinition),
-    ],
-    animal: activeFields
+    ]),
+    animal: dedupeCustomFieldDefinitionsByKey(activeFields
       .filter((field) => field.entity_type === "animal")
       .map(toCustomFieldDefinition),
+    ),
   };
 }
 

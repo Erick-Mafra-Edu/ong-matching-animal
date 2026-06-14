@@ -114,7 +114,7 @@ export function PetPhotoCard({ action, onActionComplete, pet }: PetPhotoCardProp
         />
         <div className="absolute inset-x-0 top-0 flex gap-3 p-2" aria-hidden="true">
           {photos.map((photo, index) => (
-            <span className={`h-1 flex-1 rounded ${index === activePhoto ? "bg-white" : "bg-slate-600/80"}`} key={photo} />
+            <span className={`h-1 flex-1 rounded ${index === activePhoto ? "bg-white" : "bg-slate-600/80"}`} key={`${photo}-${index}`} />
           ))}
         </div>
         <div
