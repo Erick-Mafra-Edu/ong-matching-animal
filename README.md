@@ -263,7 +263,7 @@ Veja [src/shared/README.md](src/shared/README.md) para mais detalhes.
 
 **Por que?** Não baixar 10.000 animais para memória. Postgres calcula e retorna Top N.
 
-**A implementar:** Stored Procedure `calculate_match_score(tutor_id)`.
+**Implementado:** RPC `calculate_match_score(target_tutor_id, result_limit)` no Postgres, consumida pelo endpoint `/api/match`.
 
 ### 4. Separação Frontend/Backend no Vercel
 
@@ -325,7 +325,7 @@ npm run lint            # ESLint
 
 ## 📝 Próximas Etapas
 
-- [ ] Implementar RPC de Match Score no Postgres
+- [x] Implementar RPC de Match Score no Postgres
 - [ ] Criar endpoints REST para CRUD de Tutores/Animais
 - [ ] Dashboard administrativo para configurar Regras
 - [ ] Autenticação com Supabase Auth

@@ -344,7 +344,7 @@ describe("MatchingAlgorithm", () => {
         name: "Test",
         location: { lat: 0, lng: 0 },
         custom_fields: {
-          preferencias: "gato",
+          preferencias: "gato, coelho, passaro",
         },
       };
 
@@ -355,7 +355,7 @@ describe("MatchingAlgorithm", () => {
         species: "Gato",
         location: { lat: 0, lng: 0 },
         custom_fields: {
-          tipos_aceitaveis: "gato, coelho, passaro",
+          estilo: "gato",
         },
       };
 
@@ -364,7 +364,7 @@ describe("MatchingAlgorithm", () => {
           id: "rule1",
           rule_name: "Type Preference",
           tutor_field: "preferencias",
-          animal_field: "tipos_aceitaveis",
+          animal_field: "estilo",
           comparison_operator: "contains",
           weight: 50,
           is_active: true,
@@ -1103,4 +1103,3 @@ describe("MatchingAlgorithm", () => {
     });
   });
 });
-

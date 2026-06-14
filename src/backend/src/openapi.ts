@@ -172,6 +172,12 @@ export const apiDoc = {
       type: "object",
       properties: {
         tutor_id: { type: "string" },
+        limit: { type: "number", minimum: 1, maximum: 50 },
+        max_distance_km: {
+          type: "number",
+          minimum: 0,
+          description: "Raio maximo em km. Envie null na API para desabilitar o filtro geográfico.",
+        },
       },
       required: ["tutor_id"],
     },

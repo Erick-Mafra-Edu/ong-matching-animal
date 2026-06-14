@@ -28,6 +28,10 @@ O algoritmo suporta os seguintes operadores para comparar os campos do tutor com
 | `<=` | Menor ou igual | `tutor.tempo` <= `animal.esforco_necessario` |
 | `contains` | Contém valor | `tutor.estilos` contém `animal.estilo` |
 
+No operador `contains`, a direção da comparação é sempre `tutor contém animal`.
+Se o campo do tutor for array, o valor do animal precisa existir dentro desse array.
+Se o campo do tutor for texto, o valor do animal precisa aparecer no texto do tutor.
+
 ### Conversão de Escalas
 
 Para operadores numéricos (`>=`, `<=`), o sistema converte escalas textuais em valores numéricos:
@@ -61,13 +65,14 @@ O cálculo utiliza a **Fórmula de Haversine** para determinar a distância em q
 
 ## Implementação Técnica
 
-A lógica reside em `src/backend/src/lib/matching.ts` e é exposta pelo endpoint `POST /api/match`.
+A lógica de referência reside em `src/backend/src/lib/matching.ts`.
+Na API, a execução principal ocorre no Postgres via RPC `calculate_match_score(...)`, consumida pelo endpoint `POST /api/match`.
 
 ### Fluxo de Execução
 
-1. **Entrada:** Perfil do tutor, lista de animais, lista de regras.
-2. **Filtragem:** Remove animais fora do raio de distância.
-3. **Cálculo:** Para cada animal, avalia cada regra ativa.
+1. **Entrada:** Tutor alvo, limite de resultados e raio máximo em km.
+2. **Filtragem:** Remove animais fora do raio de distância antes do score.
+3. **Cálculo:** Para cada animal restante, avalia cada regra ativa.
 4. **Disqualificação:** Se falhar em um `is_dealbreaker`, score = 0.
 5. **Ordenação:** Retorna a lista de animais com score > 0, ordenados de forma decrescente pelo score.
 
@@ -75,4 +80,4 @@ A lógica reside em `src/backend/src/lib/matching.ts` e é exposta pelo endpoint
 
 - [ ] Implementar pesos dinâmicos ajustáveis por interface administrativa.
 - [ ] Adicionar mais escalas de conversão (ex: tempo disponível, experiência).
-- [ ] Otimizar consulta de animais próximos usando PostGIS.
+- [x] Otimizar consulta de animais próximos usando PostGIS.

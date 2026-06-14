@@ -1186,34 +1186,34 @@ describe("API Endpoints", () => {
       global.fetch = jest.fn()
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
+          text: async () => JSON.stringify([{
             id: "tutor123",
             name: "Tutor Teste",
             custom_fields: { pref_energia: "alto" },
-          }],
+          }]),
+          headers: new Headers(),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
-            id: "animal123",
-            owner_id: "owner123",
-            name: "Rex",
-            species: "Cachorro",
-            custom_fields: { nivel_energia: "alto" },
-          }],
+          text: async () => JSON.stringify([{
+            animal_id: "animal123",
+            animal_name: "Rex",
+            compatibility_score: 50,
+            matched_rules: ["rule123"],
+            details: [{
+              rule_id: "rule123",
+              rule_name: "Energia",
+              matched: true,
+              weight: 50,
+              is_dealbreaker: false,
+            }],
+          }]),
+          headers: new Headers(),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
-            id: "rule123",
-            rule_name: "Energia",
-            tutor_field: "pref_energia",
-            animal_field: "nivel_energia",
-            comparison_operator: "=",
-            weight: 50,
-            is_dealbreaker: false,
-            is_active: true,
-          }],
+          text: async () => "1",
+          headers: new Headers(),
         }) as jest.Mock;
     });
 
@@ -1231,6 +1231,27 @@ describe("API Endpoints", () => {
       expect(Array.isArray(response.body.matches)).toBe(true);
       expect(response.body.matches[0]).toHaveProperty("animal_id", "animal123");
       expect(response.body.matches[0]).toHaveProperty("compatibility_score", 50);
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.supabase.co/rest/v1/rpc/calculate_match_score",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            target_tutor_id: "tutor123",
+            result_limit: 10,
+            max_distance_km: 50,
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.supabase.co/rest/v1/rpc/count_match_candidates_for_tutor",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            target_tutor_id: "tutor123",
+            max_distance_km: 50,
+          }),
+        }),
+      );
     });
 
     it("should accept tutor_id in request body", async () => {
