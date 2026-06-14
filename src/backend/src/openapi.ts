@@ -106,6 +106,15 @@ export const apiDoc = {
         },
       ],
     },
+    DiscoverAccess: {
+      type: "object",
+      properties: {
+        authenticated: { type: "boolean" },
+        onboarding_complete: { type: "boolean" },
+        tutor_id: { type: "string" },
+      },
+      required: ["authenticated", "onboarding_complete"],
+    },
     AnimalPhoto: {
       type: "object",
       properties: {
@@ -138,6 +147,26 @@ export const apiDoc = {
         created_at: { type: "string", format: "date-time" },
       },
       required: ["id", "name", "species", "photoUrl", "photoUrls", "photos"],
+    },
+    AnimalPage: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: { $ref: "#/definitions/Animal" },
+        },
+        pagination: {
+          type: "object",
+          properties: {
+            limit: { type: "number" },
+            offset: { type: "number" },
+            nextOffset: { type: "number" },
+            hasMore: { type: "boolean" },
+          },
+          required: ["limit", "offset", "hasMore"],
+        },
+      },
+      required: ["items", "pagination"],
     },
     MatchRequest: {
       type: "object",
@@ -252,18 +281,32 @@ export const apiDoc = {
         },
       },
     },
+    "/tutors/me/discover-access": {
+      get: {
+        tags: ["Tutors"],
+        operationId: "getDiscoverAccess",
+        summary: "Retorna apenas os dados necessarios para liberar a tela Discover.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: "Status de acesso ao Discover.", schema: { $ref: "#/definitions/DiscoverAccess" } },
+          401: { description: "Sessão ausente ou inválida.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          500: { description: "Erro de configuração ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
+        },
+      },
+    },
     "/animals": {
       get: {
         tags: ["Animals"],
         operationId: "listAnimals",
-        summary: "Lista animais com URLs publicas das fotos.",
+        summary: "Lista animais com URLs publicas das fotos em paginas.",
+        parameters: [
+          { in: "query", name: "limit", required: false, type: "number", description: "Quantidade de itens por pagina. Maximo 50." },
+          { in: "query", name: "offset", required: false, type: "number", description: "Indice inicial da pagina." },
+        ],
         responses: {
           200: {
-            description: "Animais ordenados por criacao.",
-            schema: {
-              type: "array",
-              items: { $ref: "#/definitions/Animal" },
-            },
+            description: "Pagina de animais ordenados por criacao.",
+            schema: { $ref: "#/definitions/AnimalPage" },
           },
           500: { description: "Erro de configuração ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
         },
@@ -391,6 +434,7 @@ export const openApiOperations = {
   getOngSettings: operationPassThrough,
   listOnboardingQuestions: operationPassThrough,
   upsertTutor: operationPassThrough,
+  getDiscoverAccess: operationPassThrough,
   getTutorById: operationPassThrough,
   listAnimals: operationPassThrough,
   createAnimal: operationPassThrough,

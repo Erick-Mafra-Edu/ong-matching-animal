@@ -1,0 +1,8 @@
+interface:
+  display_name: "Admin Panel Forms"
+  short_description: "Admin UI and dense form patterns"
+  default_prompt: "Use $admin-panel-forms to update the project admin UI or design a long form with many fields."
+  brand_color: "#22D3EE"
+
+policy:
+  allow_implicit_invocation: true

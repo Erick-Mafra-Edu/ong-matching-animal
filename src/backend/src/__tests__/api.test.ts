@@ -222,6 +222,58 @@ describe("API Endpoints", () => {
     });
   });
 
+  describe("GET /api/tutors/me/discover-access", () => {
+    it("should return only the data needed to load discover", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123", email: "tutor@example.com" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "tutor-123",
+            custom_fields: {
+              onboarding_complete: true,
+              preferred_energy: "alto",
+            },
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/tutors/me/discover-access")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        authenticated: true,
+        onboarding_complete: true,
+        tutor_id: "tutor-123",
+      });
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        "https://example.supabase.co/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.user-123&limit=1",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+    });
+
+    it("should require an authenticated session", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+
+      const response = await request(app).get("/api/tutors/me/discover-access");
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty("message");
+    });
+  });
+
   describe("Admin endpoints", () => {
     it("should require admin access (401 when no token)", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -865,19 +917,69 @@ describe("API Endpoints", () => {
         ],
       }) as jest.Mock;
 
-      const response = await request(app).get("/api/animals");
+      const response = await request(app).get("/api/animals?limit=2&offset=0");
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0]).toHaveProperty("photoUrl", "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp");
-      expect(response.body[0]).toHaveProperty("photoUrls");
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0]).toHaveProperty("photoUrl", "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp");
+      expect(response.body.items[0]).toHaveProperty("photoUrls");
+      expect(response.body.pagination).toMatchObject({
+        limit: 2,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      });
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/rest/v1/animals"),
+        expect.stringContaining("/rest/v1/animals?select="),
         expect.objectContaining({
           headers: expect.objectContaining({
             authorization: "Bearer service-key",
           }),
         }),
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("limit=3&offset=0"),
+        expect.any(Object),
+      );
+    });
+
+    it("should expose the next offset when more animals are available", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          { id: "animal-1", name: "Yolo", species: "Cachorro", custom_fields: {} },
+          { id: "animal-2", name: "Lua", species: "Gato", custom_fields: {} },
+        ],
+      }) as jest.Mock;
+
+      const response = await request(app).get("/api/animals?limit=1&offset=4");
+
+      expect(response.status).toBe(200);
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.pagination).toEqual({
+        limit: 1,
+        offset: 4,
+        nextOffset: 5,
+        hasMore: true,
+      });
+    });
+
+    it("should cap the page size to the backend safety limit", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      }) as jest.Mock;
+
+      const response = await request(app).get("/api/animals?limit=999&offset=0");
+
+      expect(response.status).toBe(200);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("limit=51&offset=0"),
+        expect.any(Object),
       );
     });
   });

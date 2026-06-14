@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { fetchDiscoverAccess } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface DiscoverGateProps {
@@ -16,18 +16,18 @@ export function DiscoverGate({ children }: DiscoverGateProps) {
   useEffect(() => {
     async function validateAccess() {
       try {
-        const { data, error } = await getSupabaseBrowserClient().auth.getUser();
-        if (error || !data.user) {
+        const access = await fetchDiscoverAccess(getSupabaseBrowserClient());
+        if (!access.authenticated) {
           router.replace("/login");
           return;
         }
-        if (!await hasCompletedOnboarding(getSupabaseBrowserClient(), data.user.id)) {
+        if (!access.onboarding_complete) {
           router.replace("/onboarding");
           return;
         }
         setAllowed(true);
       } catch {
-        router.replace("/onboarding");
+        router.replace("/login");
       }
     }
 

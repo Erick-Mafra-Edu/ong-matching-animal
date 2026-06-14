@@ -46,6 +46,7 @@ export function createApiRouter() {
   router.get("/interessados/:uuid_registro", interests.getDetail);
 
   router.post("/tutors", tutors.create);
+  router.get("/tutors/me/discover-access", tutors.getDiscoverAccess);
   router.get("/tutors/me/onboarding-status", tutors.getOnboardingStatus);
   router.get("/tutors/:id", tutors.getById);
 

@@ -20,7 +20,7 @@ export function ProfileSummary({ pet, compact = false }: ProfileSummaryProps) {
         {pet.traits.map((trait, index) => (
           <span
             className="animate-badge-enter"
-            key={trait}
+            key={`${trait}-${index}`}
             style={{ animationDelay: `${280 + index * 70}ms` }}
           >
             <Badge>{trait}</Badge>

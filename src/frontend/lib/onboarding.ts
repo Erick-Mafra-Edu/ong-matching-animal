@@ -128,6 +128,31 @@ export async function hasCompletedOnboarding(supabase: SupabaseClient<Database>,
   return body.onboarding_complete === true;
 }
 
+export async function fetchDiscoverAccess(supabase: SupabaseClient<Database>) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+  if (sessionError || !sessionData.session?.access_token) {
+    throw sessionError ?? new Error("Sessao ausente para verificar acesso ao discover.");
+  }
+
+  const response = await fetch(backendApiUrl("/api/tutors/me/discover-access"), {
+    headers: {
+      authorization: `Bearer ${sessionData.session.access_token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(body?.message ?? "Nao foi possivel verificar acesso ao discover.");
+  }
+
+  return response.json() as Promise<{
+    authenticated: boolean;
+    onboarding_complete: boolean;
+    tutor_id: string | null;
+  }>;
+}
+
 export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, user: User, answers: OnboardingAnswers) {
   const customFields = buildTutorCustomFields(answers);
   const name = String(user.user_metadata.full_name ?? user.email?.split("@")[0] ?? "Adotante");
