@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OnboardingForm } from "@/components/features/Onboarding/OnboardingForm";
+import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/ScreenOnboardingRuntime";
 
 export default function OnboardingPage() {
   return (
@@ -16,6 +17,7 @@ export default function OnboardingPage() {
         </section>
         <OnboardingForm />
       </div>
+      <ScreenOnboardingRuntime />
     </main>
   );
 }

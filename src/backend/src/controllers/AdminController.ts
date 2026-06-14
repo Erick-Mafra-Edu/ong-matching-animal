@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  AdminContext,
   buildCalendarEventPayload,
   getAdminTable,
   normalizeAnimal,
@@ -12,6 +13,54 @@ import {
   validateResourcePayload,
 } from "./apiSupport";
 import { logAdminAction } from "../lib/audit";
+
+async function fetchAdminResourceRows(resource: string, context: NonNullable<AdminContext>, q?: string) {
+  const config = getAdminTable(resource);
+  if (!config) {
+    throw new Error("Recurso administrativo nao encontrado.");
+  }
+
+  let url = `${context.supabaseUrl}/rest/v1/${config.table}?select=${config.select}&order=${config.order}`;
+  if (q) {
+    if (resource === "tutors" || resource === "animals") {
+      url += `&name=ilike.*${encodeURIComponent(q)}*`;
+    } else if (resource === "admin-users") {
+      url += `&email=ilike.*${encodeURIComponent(q)}*`;
+    } else if (resource === "calendar-events") {
+      url += `&title=ilike.*${encodeURIComponent(q)}*`;
+    } else if (resource === "tutor-interessados") {
+      url += `&or=(tutor.name.ilike.*${encodeURIComponent(q)}*,animal.name.ilike.*${encodeURIComponent(q)}*)`;
+    }
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      apikey: context.serviceRoleKey,
+      authorization: `Bearer ${context.serviceRoleKey}`,
+    },
+  });
+  const body = await response.json();
+
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      response,
+      body,
+    };
+  }
+
+  if (Array.isArray(body) && resource === "animals") {
+    return { ok: true as const, body: body.map(normalizeAnimal) };
+  }
+  if (Array.isArray(body) && resource === "tutor-interessados") {
+    return { ok: true as const, body: body.map(normalizeInterestSummary) };
+  }
+  if (Array.isArray(body) && resource === "calendar-events") {
+    return { ok: true as const, body: body.map(normalizeCalendarEvent) };
+  }
+
+  return { ok: true as const, body };
+}
 
 export class AdminController {
   getMe = async (req: Request, res: Response) => {
@@ -37,51 +86,59 @@ export class AdminController {
     try {
       const context = await requireAdmin(req, res);
       if (!context) return;
+      const result = await fetchAdminResourceRows(req.params.resource, context, req.query.q as string | undefined);
 
-      let url = `${context.supabaseUrl}/rest/v1/${config.table}?select=${config.select}&order=${config.order}`;
-      const q = req.query.q as string;
-      if (q) {
-        if (req.params.resource === "tutors" || req.params.resource === "animals") {
-          url += `&name=ilike.*${encodeURIComponent(q)}*`;
-        } else if (req.params.resource === "admin-users") {
-          url += `&email=ilike.*${encodeURIComponent(q)}*`;
-        } else if (req.params.resource === "calendar-events") {
-          url += `&title=ilike.*${encodeURIComponent(q)}*`;
-        } else if (req.params.resource === "tutor-interessados") {
-          url += `&or=(tutor.name.ilike.*${encodeURIComponent(q)}*,animal.name.ilike.*${encodeURIComponent(q)}*)`;
-        }
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          apikey: context.serviceRoleKey,
-          authorization: `Bearer ${context.serviceRoleKey}`,
-        },
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        res.status(response.status).json({ message: "Nao foi possivel listar o recurso.", details: body });
+      if (!result.ok) {
+        res.status(result.response.status).json({ message: "Nao foi possivel listar o recurso.", details: result.body });
         return;
       }
 
-      if (Array.isArray(body) && req.params.resource === "animals") {
-        res.json(body.map(normalizeAnimal));
-        return;
-      }
-      if (Array.isArray(body) && req.params.resource === "tutor-interessados") {
-        res.json(body.map(normalizeInterestSummary));
-        return;
-      }
-      if (Array.isArray(body) && req.params.resource === "calendar-events") {
-        res.json(body.map(normalizeCalendarEvent));
-        return;
-      }
-
-      res.json(body);
+      res.json(result.body);
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  getBootstrap = async (req: Request, res: Response) => {
+    const resource = String(req.query.resource ?? "admin-users");
+    const config = getAdminTable(resource);
+    if (!config) {
+      res.status(404).json({ message: "Recurso administrativo nao encontrado." });
+      return;
+    }
+
+    try {
+      const context = await requireAdmin(req, res);
+      if (!context) return;
+
+      const [customFieldsResult, onboardingQuestionsResult, resourceResult] = await Promise.all([
+        fetchAdminResourceRows("custom-fields", context),
+        fetchAdminResourceRows("onboarding-questions", context),
+        fetchAdminResourceRows(resource, context),
+      ]);
+
+      const firstFailure = [customFieldsResult, onboardingQuestionsResult, resourceResult].find((result) => !result.ok);
+      if (firstFailure && !firstFailure.ok) {
+        res.status(firstFailure.response.status).json({
+          message: "Nao foi possivel carregar o bootstrap do painel.",
+          details: firstFailure.body,
+        });
+        return;
+      }
+
+      res.json({
+        admin: context.admin,
+        custom_fields: customFieldsResult.body,
+        onboarding_questions: onboardingQuestionsResult.body,
+        resource,
+        rows: resourceResult.body,
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel carregar o bootstrap do painel.",
         details: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
