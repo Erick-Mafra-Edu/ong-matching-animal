@@ -12,9 +12,9 @@
   "dependencies": {
     "@flags-sdk/vercel": "^1.4.0",
     "@ong-matching-animal/shared": "file:../shared",
-    "@radix-ui/react-dialog": "^1.1.16",
-    "@radix-ui/react-tabs": "^1.1.14",
-    "@supabase/supabase-js": "^2.107.0",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-tabs": "^1.1.15",
+    "@supabase/supabase-js": "^2.108.2",
     "clsx": "^2.1.1",
     "concurrently": "10.0.3",
     "date-fns": "^4.4.0",
