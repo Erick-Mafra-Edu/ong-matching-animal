@@ -774,12 +774,17 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setIsMobileFormOpen(false);
   }
 
+  function shouldOpenMobileForm() {
+    if (typeof window === "undefined") return false;
+    return !window.matchMedia("(min-width: 1024px)").matches;
+  }
+
   function startCreate() {
     setMode("create");
     setSelectedId(null);
     setMessage("");
     setFormState(createInitialState(activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   function selectRow(row: AdminRecord) {
@@ -787,7 +792,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(String(row.id));
     setMessage("");
     setFormState(recordToFormState(row, activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   async function handleSubmit(event: FormEvent) {
