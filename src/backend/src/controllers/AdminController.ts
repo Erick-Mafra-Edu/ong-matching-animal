@@ -80,7 +80,7 @@ export class AdminController {
   listResource = async (req: Request, res: Response) => {
     const resource = getRouteParam(req.params.resource);
     const config = resource ? getAdminTable(resource) : null;
-    if (!config) {
+    if (!resource || !config) {
       res.status(404).json({ message: "Recurso administrativo nao encontrado." });
       return;
     }
@@ -88,20 +88,7 @@ export class AdminController {
     try {
       const context = await requireAdmin(req, res);
       if (!context) return;
-      const result = await fetchAdminResourceRows(req.params.resource, context, req.query.q as string | undefined);
-
-      let url = `${context.supabaseUrl}/rest/v1/${config.table}?select=${config.select}&order=${config.order}`;
-      const q = req.query.q as string;
-      if (q) {
-        if (resource === "tutors" || resource === "animals") {
-          url += `&name=ilike.*${encodeURIComponent(q)}*`;
-        } else if (resource === "admin-users") {
-          url += `&email=ilike.*${encodeURIComponent(q)}*`;
-        } else if (resource === "calendar-events") {
-          url += `&title=ilike.*${encodeURIComponent(q)}*`;
-        } else if (resource === "tutor-interessados") {
-          url += `&or=(tutor.name.ilike.*${encodeURIComponent(q)}*,animal.name.ilike.*${encodeURIComponent(q)}*)`;
-        }
+      const result = await fetchAdminResourceRows(resource, context, req.query.q as string | undefined);
       if (!result.ok) {
         res.status(result.response.status).json({ message: "Nao foi possivel listar o recurso.", details: result.body });
         return;
@@ -124,16 +111,6 @@ export class AdminController {
       return;
     }
 
-      if (Array.isArray(body) && resource === "animals") {
-        res.json(body.map(normalizeAnimal));
-        return;
-      }
-      if (Array.isArray(body) && resource === "tutor-interessados") {
-        res.json(body.map(normalizeInterestSummary));
-        return;
-      }
-      if (Array.isArray(body) && resource === "calendar-events") {
-        res.json(body.map(normalizeCalendarEvent));
     try {
       const context = await requireAdmin(req, res);
       if (!context) return;
