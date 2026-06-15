@@ -28,6 +28,14 @@ export interface NewAdminUserInput {
   is_active: boolean;
 }
 
+export interface AdminBootstrapPayload {
+  admin: Record<string, unknown>;
+  custom_fields: Record<string, unknown>[];
+  onboarding_questions: Record<string, unknown>[];
+  resource: AdminResource;
+  rows: Record<string, unknown>[];
+}
+
 export const adminResources: AdminResourceConfig[] = [
   {
     id: "admin-users",
@@ -204,6 +212,10 @@ async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function getAdminMe() {
   return adminFetch<Record<string, unknown>>("/api/admin/me");
+}
+
+export function getAdminBootstrap(resource: AdminResource) {
+  return adminFetch<AdminBootstrapPayload>(`/api/admin/bootstrap?resource=${encodeURIComponent(resource)}`);
 }
 
 export function listAdminResource(resource: AdminResource, q?: string) {

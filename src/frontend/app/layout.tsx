@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { AuthCallbackHandler } from "@/components/features/Auth/AuthCallbackHandler";
-import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/ScreenOnboardingRuntime";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,13 +13,9 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning style={{ backgroundColor: "var(--color-bg)" }}>
+    <html lang="pt-BR" style={{ backgroundColor: "var(--color-bg)" }}>
       <body className="min-h-screen bg-surface-bg text-surface-text" style={{ backgroundColor: "var(--color-bg)" }}>
-        <ThemeProvider>
-          <AuthCallbackHandler />
-          {children}
-          <ScreenOnboardingRuntime />
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   );

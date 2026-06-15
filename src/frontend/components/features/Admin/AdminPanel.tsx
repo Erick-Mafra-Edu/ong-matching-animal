@@ -41,7 +41,7 @@ import {
   createAdminUser,
   deleteAdminResource,
   disconnectCalendarOAuthConnection,
-  getAdminMe,
+  getAdminBootstrap,
   getCalendarOAuthAuthorizationUrl,
   listAdminResource,
   refreshCalendarOAuthConnection,
@@ -642,6 +642,8 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const [isResourceLoading, setIsResourceLoading] = useState(false);
   const [customFields, setCustomFields] = useState<CustomFieldRecord[]>([]);
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestionRecord[]>([]);
+  const [isBootstrapped, setIsBootstrapped] = useState(false);
+  const [bootstrappedResource, setBootstrappedResource] = useState<AdminResource | null>(null);
 
   const activeConfig = resourceUiConfigs[activeResource];
   const selectedRow = useMemo(
@@ -663,6 +665,24 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setOnboardingQuestions(data.map(toRaRecord) as OnboardingQuestionRecord[]);
   }, []);
 
+  const hydrateResourceState = useCallback((resource: AdminResource, data: AdminRecord[], nextSelectedId?: string) => {
+    setRows(data);
+
+    const resolvedId = nextSelectedId && data.some((row) => String(row.id) === String(nextSelectedId))
+      ? nextSelectedId
+      : data[0]?.id
+        ? String(data[0].id)
+        : null;
+
+    setSelectedId(resolvedId);
+    setMode(resolvedId ? "edit" : "create");
+    setFormState(
+      resolvedId
+        ? recordToFormState(data.find((row) => String(row.id) === resolvedId) ?? null, resourceUiConfigs[resource])
+        : createInitialState(resourceUiConfigs[resource]),
+    );
+  }, []);
+
   const loadResource = useCallback(async (resource: AdminResource, nextSelectedId?: string) => {
     setMessage("");
     setIsResourceLoading(true);
@@ -674,29 +694,25 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         filter: {},
       });
       const data = response.data as AdminRecord[];
-      setRows(data);
-
-      const resolvedId = nextSelectedId && data.some((row) => String(row.id) === String(nextSelectedId))
-        ? nextSelectedId
-        : data[0]?.id
-          ? String(data[0].id)
-          : null;
-
-      setSelectedId(resolvedId);
-      setMode(resolvedId ? "edit" : "create");
-      setFormState(resolvedId ? recordToFormState(data.find((row) => String(row.id) === resolvedId) ?? null, activeConfig) : createInitialState(activeConfig));
+      hydrateResourceState(resource, data, nextSelectedId);
     } finally {
       setIsResourceLoading(false);
     }
-  }, [activeConfig, dataProvider]);
+  }, [dataProvider, hydrateResourceState]);
 
   useEffect(() => {
     let mounted = true;
 
-    getAdminMe()
-      .then(() => Promise.all([loadCustomFields(), loadOnboardingQuestions(), loadResource(activeResource)]))
-      .then(() => {
-        if (mounted) setStatus("ready");
+    setStatus("loading");
+    getAdminBootstrap("admin-users")
+      .then((payload) => {
+        if (!mounted) return;
+        setCustomFields(payload.custom_fields.map(toRaRecord) as CustomFieldRecord[]);
+        setOnboardingQuestions(payload.onboarding_questions.map(toRaRecord) as OnboardingQuestionRecord[]);
+        hydrateResourceState("admin-users", payload.rows.map(toRaRecord) as AdminRecord[]);
+        setBootstrappedResource("admin-users");
+        setIsBootstrapped(true);
+        setStatus("ready");
       })
       .catch((error) => {
         if (!mounted) return;
@@ -714,7 +730,37 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     return () => {
       mounted = false;
     };
-  }, [activeResource, loadCustomFields, loadOnboardingQuestions, loadResource, router]);
+  }, [hydrateResourceState, router]);
+
+  useEffect(() => {
+    if (!isBootstrapped) return;
+    if (bootstrappedResource === activeResource) {
+      setBootstrappedResource(null);
+      return;
+    }
+
+    let mounted = true;
+    loadResource(activeResource)
+      .catch((error) => {
+        if (!mounted) return;
+        const errorMessage = error instanceof Error ? error.message : "";
+
+        if (errorMessage.includes("Sessao ausente")) {
+          router.push("/login?redirect=/admin");
+          return;
+        }
+
+        setStatus(errorMessage.includes("administrativo") ? "denied" : "error");
+        setMessage(errorMessage || "Nao foi possivel carregar o painel.");
+      })
+      .then(() => {
+        if (mounted) setStatus("ready");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activeResource, bootstrappedResource, isBootstrapped, loadResource, router]);
 
   function changeResource(resource: AdminResource) {
     setIsResourceLoading(true);
@@ -728,12 +774,17 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setIsMobileFormOpen(false);
   }
 
+  function shouldOpenMobileForm() {
+    if (typeof window === "undefined") return false;
+    return !window.matchMedia("(min-width: 1024px)").matches;
+  }
+
   function startCreate() {
     setMode("create");
     setSelectedId(null);
     setMessage("");
     setFormState(createInitialState(activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   function selectRow(row: AdminRecord) {
@@ -741,7 +792,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(String(row.id));
     setMessage("");
     setFormState(recordToFormState(row, activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   async function handleSubmit(event: FormEvent) {

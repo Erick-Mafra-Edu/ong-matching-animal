@@ -108,6 +108,12 @@ export function getSupabaseBackendConfig() {
   return { supabaseUrl, serviceRoleKey };
 }
 
+export function getSupabasePublicConfig() {
+  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  return { supabaseUrl, publishableKey };
+}
+
 export function pickFields(source: Record<string, unknown>, fields: readonly string[]) {
   return fields.reduce<Record<string, unknown>>((payload, field) => {
     if (Object.prototype.hasOwnProperty.call(source, field)) payload[field] = source[field];
@@ -129,6 +135,21 @@ export async function getAuthenticatedUserId(supabaseUrl: string, serviceRoleKey
   if (!response.ok) return null;
   const user = await response.json() as { id?: string };
   return user.id ?? null;
+}
+
+export function getAuthenticatedUserIdFromTokenPayload(authorization?: string) {
+  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!accessToken) return null;
+
+  const [, payloadSegment] = accessToken.split(".");
+  if (!payloadSegment) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(payloadSegment, "base64url").toString("utf8")) as { sub?: unknown };
+    return typeof payload.sub === "string" && payload.sub.trim() ? payload.sub : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireAdmin(req: Request, res: Response) {

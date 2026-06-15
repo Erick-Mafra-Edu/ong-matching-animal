@@ -225,12 +225,9 @@ describe("API Endpoints", () => {
   describe("GET /api/tutors/me/discover-access", () => {
     it("should return only the data needed to load discover", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
+      const accessToken = "header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature";
       global.fetch = jest.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ id: "user-123", email: "tutor@example.com" }),
-        })
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [{
@@ -244,7 +241,7 @@ describe("API Endpoints", () => {
 
       const response = await request(app)
         .get("/api/tutors/me/discover-access")
-        .set("Authorization", "Bearer access-token");
+        .set("Authorization", `Bearer ${accessToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -252,12 +249,12 @@ describe("API Endpoints", () => {
         onboarding_complete: true,
         tutor_id: "tutor-123",
       });
-      expect(global.fetch).toHaveBeenNthCalledWith(
-        2,
+      expect(global.fetch).toHaveBeenCalledWith(
         "https://example.supabase.co/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.user-123&limit=1",
         expect.objectContaining({
           headers: expect.objectContaining({
-            authorization: "Bearer service-key",
+            apikey: "publishable-key",
+            authorization: `Bearer ${accessToken}`,
           }),
         }),
       );
@@ -265,9 +262,27 @@ describe("API Endpoints", () => {
 
     it("should require an authenticated session", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
-      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
 
       const response = await request(app).get("/api/tutors/me/discover-access");
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty("message");
+    });
+
+    it("should return 401 when Supabase rejects the user token", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
+      const accessToken = "header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature";
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: "JWT expired" }),
+      }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/tutors/me/discover-access")
+        .set("Authorization", `Bearer ${accessToken}`);
 
       expect(response.status).toBe(401);
       expect(response.body).toHaveProperty("message");

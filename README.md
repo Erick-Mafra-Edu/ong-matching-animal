@@ -222,6 +222,20 @@ if (process.env.NODE_ENV !== "production" && require.main === module) {
 
 App moderno com SSR, otimizado para SEO e performance. Usa tipos compartilhados de `src/shared/types`.
 
+## 📈 PageSpeed Insights
+
+Scores mais recentes da home (`/`) com base no relatório público do PageSpeed Insights:
+
+- Mobile: `98` Performance, `100` Accessibility, `100` Best Practices, `100` SEO
+- Desktop: `100` Performance, `100` Accessibility, `100` Best Practices, `100` SEO
+
+Referências:
+
+- Link do relatório mobile: `https://pagespeed.web.dev/analysis/https-ong-matching-animalfrontend-vercel-app/t81so00amb?form_factor=mobile`
+- Captura mobile: [insightsMobile.png](docs/reports_lighthouse/insightsMobile.png)
+- Captura desktop: [insightsDesktop.png](docs/reports_lighthouse/insightsDesktop.png)
+- Export Lighthouse local da home: [ong-matching-animalfrontend.vercel.app-20260614T194526.json](docs/reports_lighthouse/ong-matching-animalfrontend.vercel.app-20260614T194526.json)
+
 ### Tipos Compartilhados
 
 Os tipos estão centralizados em `src/shared/types/index.ts` para evitar duplicação:

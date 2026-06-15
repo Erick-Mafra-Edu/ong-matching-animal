@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
-import { backendApiUrl } from "@/lib/backend";
-import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
-import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
+import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
+import type { InteresseRegistro } from "@/lib/interessados";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { DashboardState } from "./DashboardState";
@@ -16,7 +15,7 @@ import { PetPhotoCard } from "./PetPhotoCard";
 import { ProfileSummary } from "./ProfileSummary";
 
 interface AdoptionDashboardProps {
-  status?: DashboardStatus;
+  initialPage: AnimalsPageResponse;
 }
 
 export type SwipeDirection = "left" | "right";
@@ -35,145 +34,23 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-interface AnimalsPageResponse {
-  items: AnimalListItem[];
-  pagination: {
-    limit: number;
-    offset: number;
-    nextOffset: number | null;
-    hasMore: boolean;
-  };
+async function registrarInteresse(animalId: string) {
+  const mod = await import("@/lib/interessados");
+  return mod.registrarInteresse(animalId);
 }
 
-const DISCOVER_ANIMALS_PAGE_SIZE = 2;
-const IMAGE_PRELOAD_WINDOW = 2;
-
-async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
-  if (animal.photoUrl || animal.photoUrls?.length) return animal;
-
-  const photoUrl = await fetchAnimalFallbackPhoto();
-  return { ...animal, photoUrl, photoUrls: [photoUrl] };
-}
-
-function getPrimaryPhotoUrl(animal: AnimalListItem) {
-  return animal.photoUrl || animal.photoUrls?.[0] || "";
-}
-
-function preloadImage(url: string) {
-  if (typeof window === "undefined" || !url) return Promise.resolve();
-
-  return new Promise<void>((resolve) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve();
-    image.onerror = () => resolve();
-    image.src = url;
-  });
-}
-
-async function preloadPrimaryAnimalPhotos(animals: AnimalListItem[]) {
-  await Promise.all(animals.slice(0, IMAGE_PRELOAD_WINDOW).map((animal) => preloadImage(getPrimaryPhotoUrl(animal))));
-}
-
-async function fetchAnimalsPage(offset: number): Promise<AnimalsPageResponse> {
-  const params = new URLSearchParams({
-    limit: String(DISCOVER_ANIMALS_PAGE_SIZE),
-    offset: String(offset),
-  });
-  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`));
-
-  if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
-
-  const body = await response.json() as AnimalsPageResponse | AnimalListItem[];
-  if (Array.isArray(body)) {
-    const items = await Promise.all(body.map(withFallbackPhoto));
-    await preloadPrimaryAnimalPhotos(items);
-    return {
-      items,
-      pagination: {
-        limit: items.length,
-        offset,
-        nextOffset: null,
-        hasMore: false,
-      },
-    };
-  }
-
-  const pageItems = Array.isArray(body.items) ? body.items : [];
-  const items = await Promise.all(pageItems.map(withFallbackPhoto));
-  await preloadPrimaryAnimalPhotos(items);
-  return {
-    items,
-    pagination: body.pagination ?? {
-      limit: items.length,
-      offset,
-      nextOffset: null,
-      hasMore: false,
-    },
-  };
-}
-
-export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) {
+export function AdoptionDashboard({ initialPage }: AdoptionDashboardProps) {
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
-  const [pets, setPets] = useState<AnimalListItem[]>([]);
+  const [pets, setPets] = useState<AnimalListItem[]>(initialPage.items);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
-  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(0);
-  const [hasMoreAnimals, setHasMoreAnimals] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(initialPage.items.length ? "ready" : "empty");
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPage.pagination.nextOffset);
+  const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPage.pagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
-  const [ongSettings, setOngSettings] = useState<OngSettings | null>(null);
+  const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
-
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    carregarOngSettings()
-      .then((settings) => {
-        if (isMounted) setOngSettings(settings);
-      })
-      .catch(() => {
-        if (isMounted) setOngSettings(null);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (status !== "ready") {
-      setLoadStatus(status);
-      return;
-    }
-
-    let isMounted = true;
-    setLoadStatus("loading");
-    setPets([]);
-    setHistory([]);
-    setNextAnimalsOffset(0);
-    setHasMoreAnimals(true);
-
-    fetchAnimalsPage(0)
-      .then((page) => {
-        if (!isMounted) return;
-        setPets(page.items);
-        setNextAnimalsOffset(page.pagination.nextOffset);
-        setHasMoreAnimals(page.pagination.hasMore);
-        setLoadStatus(page.items.length ? "ready" : "empty");
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setLoadStatus("error");
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [status]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
@@ -196,9 +73,9 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length]);
 
   useEffect(() => {
-    if (status !== "ready" || loadStatus !== "ready" || pets.length > 1) return;
+    if (loadStatus !== "ready" || pets.length > 1) return;
     void loadNextAnimalsPage();
-  }, [loadNextAnimalsPage, loadStatus, pets.length, status]);
+  }, [loadNextAnimalsPage, loadStatus, pets.length]);
 
   useEffect(() => {
     void preloadPrimaryAnimalPhotos(pets.slice(0, IMAGE_PRELOAD_WINDOW));
@@ -240,8 +117,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }
 
   async function openContactDialogForInterest(animal: AnimalListItem, interest: InteresseRegistro) {
-    const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
-    if (settings && !ongSettings) setOngSettings(settings);
+    const settings = await carregarOngSettings().catch(() => null) as OngSettings | null;
 
     const interestLink = toAbsoluteInterestLink(interest.detail_url);
     const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
@@ -259,9 +135,9 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }
 
   async function handleAdopt() {
-    if (!featuredPet || isRegisteringInterest) return;
+    if (!featuredPet || pendingAdoptionId) return;
 
-    setIsRegisteringInterest(true);
+    setPendingAdoptionId(featuredPet.id);
     setLastActionMessageId(featuredPet.id);
     setActionMessage("Registrando interesse...");
 
@@ -272,10 +148,9 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
       requestCardAction("right");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
-      // Se falhou, limpamos o ID para permitir nova tentativa (via swipe ou botão)
       setLastActionMessageId(null);
     } finally {
-      setIsRegisteringInterest(false);
+      setPendingAdoptionId(null);
     }
   }
 
@@ -287,17 +162,20 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {
+        setPendingAdoptionId(current.id);
         const interest = await registrarInteresse(current.id);
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
         setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+      } finally {
+        setPendingAdoptionId(null);
       }
     } else if (direction === "left") {
-      setActionMessage(""); // Limpa mensagens anteriores no swipe para esquerda
+      setActionMessage("");
     }
 
-    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
+    setHistory((prev) => [current, ...prev].slice(0, 10));
     setPets(remaining);
     setCardAction(null);
     if (remaining.length === 0 && !hasMoreAnimals) {
@@ -316,7 +194,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
   const actions = (
     <MatchActions
-      disabled={isRegisteringInterest}
+      disabled={Boolean(pendingAdoptionId)}
       onAdopt={handleAdopt}
       onReject={() => requestCardAction("left")}
       onUndo={history.length > 0 ? handleUndo : undefined}

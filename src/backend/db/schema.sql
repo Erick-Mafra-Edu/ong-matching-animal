@@ -23,10 +23,6 @@ CREATE TABLE admin_users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX admin_users_auth_user_id_idx
-  ON admin_users (auth_user_id)
-  WHERE is_active;
-
 CREATE OR REPLACE FUNCTION is_admin(check_user_id UUID DEFAULT auth.uid())
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -56,6 +52,12 @@ CREATE TABLE animals (
   custom_fields JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_animals_owner_id
+  ON animals (owner_id);
+
+CREATE INDEX idx_animals_location_gist
+  ON animals USING gist (location);
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

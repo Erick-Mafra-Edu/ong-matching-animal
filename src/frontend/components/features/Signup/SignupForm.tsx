@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { syncAuthSessionCookies } from "@/lib/auth/session";
 import { backendApiUrl } from "@/lib/backend";
 import { saveOnboardingAnswers } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -100,6 +101,10 @@ export function SignupForm() {
         return;
       }
 
+      await syncAuthSessionCookies({
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+      });
       await saveOnboardingAnswers(supabase, data.user, answers);
 
       router.push("/discover");
