@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   AdminContext,
   buildCalendarEventPayload,
+  getRouteParam,
   getAdminTable,
   normalizeAnimal,
   normalizeCalendarEvent,
@@ -77,8 +78,9 @@ export class AdminController {
   };
 
   listResource = async (req: Request, res: Response) => {
-    const config = getAdminTable(req.params.resource);
-    if (!config) {
+    const resource = getRouteParam(req.params.resource);
+    const config = resource ? getAdminTable(resource) : null;
+    if (!resource || !config) {
       res.status(404).json({ message: "Recurso administrativo nao encontrado." });
       return;
     }
@@ -86,8 +88,7 @@ export class AdminController {
     try {
       const context = await requireAdmin(req, res);
       if (!context) return;
-      const result = await fetchAdminResourceRows(req.params.resource, context, req.query.q as string | undefined);
-
+      const result = await fetchAdminResourceRows(resource, context, req.query.q as string | undefined);
       if (!result.ok) {
         res.status(result.response.status).json({ message: "Nao foi possivel listar o recurso.", details: result.body });
         return;
@@ -227,8 +228,9 @@ export class AdminController {
   };
 
   createResource = async (req: Request, res: Response) => {
-    const config = getAdminTable(req.params.resource);
-    if (!config || req.params.resource === "admin-users") {
+    const resource = getRouteParam(req.params.resource);
+    const config = resource ? getAdminTable(resource) : null;
+    if (!resource || !config || resource === "admin-users") {
       res.status(404).json({ message: "Recurso administrativo nao encontrado." });
       return;
     }
@@ -237,15 +239,15 @@ export class AdminController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
-      const payload = req.params.resource === "calendar-events"
+      const payload = resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id)
         : pickFields(req.body ?? {}, config.createFields);
-      const validationMessage = await validateResourcePayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey);
+      const validationMessage = await validateResourcePayload(resource, payload, context.supabaseUrl, context.serviceRoleKey);
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
         return;
       }
-      if (req.params.resource === "calendar-events") {
+      if (resource === "calendar-events") {
         const calendarValidationMessage = validateCalendarEventPayload(payload);
         if (calendarValidationMessage) {
           res.status(400).json({ message: calendarValidationMessage });
@@ -276,7 +278,7 @@ export class AdminController {
       await logAdminAction({
         auth_user_id: context.admin.auth_user_id,
         action: "CREATE",
-        resource: req.params.resource,
+        resource,
         resource_id: String(newResourceId),
         details: payload,
       });
@@ -289,8 +291,10 @@ export class AdminController {
   };
 
   updateResource = async (req: Request, res: Response) => {
-    const config = getAdminTable(req.params.resource);
-    if (!config) {
+    const resource = getRouteParam(req.params.resource);
+    const resourceId = getRouteParam(req.params.id);
+    const config = resource ? getAdminTable(resource) : null;
+    if (!resource || !config) {
       res.status(404).json({ message: "Recurso administrativo nao encontrado." });
       return;
     }
@@ -299,26 +303,31 @@ export class AdminController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
-      const payload = req.params.resource === "calendar-events"
+      const payload = resource === "calendar-events"
         ? buildCalendarEventPayload(req.body ?? {}, context.admin.id, true)
         : pickFields(req.body ?? {}, config.updateFields);
-      const validationMessage = await validateResourcePayload(req.params.resource, payload, context.supabaseUrl, context.serviceRoleKey, true);
+      const validationMessage = await validateResourcePayload(resource, payload, context.supabaseUrl, context.serviceRoleKey, true);
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
         return;
       }
-      if (req.params.resource === "calendar-events") {
+      if (resource === "calendar-events") {
         const calendarValidationMessage = validateCalendarEventPayload(payload, true);
         if (calendarValidationMessage) {
           res.status(400).json({ message: calendarValidationMessage });
           return;
         }
       }
-      if (req.params.resource === "admin-users") payload.updated_at = new Date().toISOString();
-      if (req.params.resource === "ong-settings") payload.updated_at = new Date().toISOString();
+      if (resource === "admin-users") payload.updated_at = new Date().toISOString();
+      if (resource === "ong-settings") payload.updated_at = new Date().toISOString();
+
+      if (!resourceId) {
+        res.status(400).json({ message: "Identificador do recurso invalido." });
+        return;
+      }
 
       const idField = "idField" in config ? config.idField : "id";
-      const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?${idField}=eq.${encodeURIComponent(req.params.id)}`, {
+      const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?${idField}=eq.${encodeURIComponent(resourceId)}`, {
         method: "PATCH",
         headers: {
           apikey: context.serviceRoleKey,
@@ -339,8 +348,8 @@ export class AdminController {
       await logAdminAction({
         auth_user_id: context.admin.auth_user_id,
         action: "UPDATE",
-        resource: req.params.resource,
-        resource_id: req.params.id,
+        resource,
+        resource_id: resourceId,
         details: payload,
       });
     } catch (error) {
@@ -352,8 +361,10 @@ export class AdminController {
   };
 
   deleteResource = async (req: Request, res: Response) => {
-    const config = getAdminTable(req.params.resource);
-    if (!config) {
+    const resource = getRouteParam(req.params.resource);
+    const resourceId = getRouteParam(req.params.id);
+    const config = resource ? getAdminTable(resource) : null;
+    if (!resource || !config) {
       res.status(404).json({ message: "Recurso administrativo nao encontrado." });
       return;
     }
@@ -362,8 +373,13 @@ export class AdminController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
+      if (!resourceId) {
+        res.status(400).json({ message: "Identificador do recurso invalido." });
+        return;
+      }
+
       const idField = "idField" in config ? config.idField : "id";
-      const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?${idField}=eq.${encodeURIComponent(req.params.id)}`, {
+      const response = await fetch(`${context.supabaseUrl}/rest/v1/${config.table}?${idField}=eq.${encodeURIComponent(resourceId)}`, {
         method: "DELETE",
         headers: {
           apikey: context.serviceRoleKey,
@@ -382,8 +398,8 @@ export class AdminController {
       await logAdminAction({
         auth_user_id: context.admin.auth_user_id,
         action: "DELETE",
-        resource: req.params.resource,
-        resource_id: req.params.id,
+        resource,
+        resource_id: resourceId,
         details: { deletedRows: body },
       });
     } catch (error) {

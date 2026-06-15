@@ -209,6 +209,10 @@ export function getAdminTable(resource: string) {
   return adminTables[resource as AdminResource];
 }
 
+export function getRouteParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export async function readJsonResponse(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return null;

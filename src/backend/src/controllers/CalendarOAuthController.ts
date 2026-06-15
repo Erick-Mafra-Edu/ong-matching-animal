@@ -1,13 +1,13 @@
 import crypto from "crypto";
 import { Request, Response } from "express";
-import { getSupabaseBackendConfig, readJsonResponse, requireAdmin } from "./apiSupport";
+import { getRouteParam, getSupabaseBackendConfig, readJsonResponse, requireAdmin } from "./apiSupport";
 import { encrypt, tryDecrypt } from "../lib/crypto";
 
 type Provider = "google" | "microsoft";
 
 export class CalendarOAuthController {
   start = async (req: Request, res: Response) => {
-    const provider = parseProvider(req.params.provider);
+    const provider = parseProvider(getRouteParam(req.params.provider));
     if (!provider) {
       res.status(400).json({ message: "Provider invalido." });
       return;
@@ -36,7 +36,7 @@ export class CalendarOAuthController {
   };
 
   callback = async (req: Request, res: Response) => {
-    const provider = parseProvider(req.params.provider);
+    const provider = parseProvider(getRouteParam(req.params.provider));
     if (!provider) {
       res.status(400).send("Provider invalido.");
       return;
@@ -99,7 +99,7 @@ export class CalendarOAuthController {
   };
 
   refresh = async (req: Request, res: Response) => {
-    const provider = parseProvider(req.params.provider);
+    const provider = parseProvider(getRouteParam(req.params.provider));
     if (!provider) {
       res.status(400).json({ message: "Provider invalido." });
       return;
@@ -162,7 +162,7 @@ export class CalendarOAuthController {
   };
 
   disconnect = async (req: Request, res: Response) => {
-    const provider = parseProvider(req.params.provider);
+    const provider = parseProvider(getRouteParam(req.params.provider));
     if (!provider) {
       res.status(400).json({ message: "Provider invalido." });
       return;
@@ -196,7 +196,7 @@ export class CalendarOAuthController {
   };
 
   status = async (req: Request, res: Response) => {
-    const provider = parseProvider(req.params.provider);
+    const provider = parseProvider(getRouteParam(req.params.provider));
     if (!provider) {
       res.status(400).json({ message: "Provider invalido." });
       return;
