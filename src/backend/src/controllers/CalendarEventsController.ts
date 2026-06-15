@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import {
   buildCalendarEventPayload,
+  getRouteParam,
   normalizeCalendarEvent,
   readJsonResponse,
   requireAdmin,
@@ -86,7 +87,11 @@ export class CalendarEventsController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
-      const { id } = req.params;
+      const id = getRouteParam(req.params.id);
+      if (!id) {
+        res.status(400).json({ message: "Identificador do evento invalido." });
+        return;
+      }
       const payload = buildCalendarEventPayload(req.body ?? {}, context.admin.id, true);
       const validationMessage = validateCalendarEventPayload(payload, true);
       if (validationMessage) {
@@ -125,7 +130,11 @@ export class CalendarEventsController {
       const context = await requireAdmin(req, res);
       if (!context) return;
 
-      const { id } = req.params;
+      const id = getRouteParam(req.params.id);
+      if (!id) {
+        res.status(400).json({ message: "Identificador do evento invalido." });
+        return;
+      }
       const response = await fetch(`${context.supabaseUrl}/rest/v1/calendar_events?id=eq.${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: {

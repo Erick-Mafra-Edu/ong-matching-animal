@@ -6,6 +6,7 @@ import {
   allowedAnimalPhotoTypes,
   animalPhotoExtensions,
   animalPhotosBucket,
+  getRouteParam,
   getSupabaseBackendConfig,
   maxAnimalPhotoSizeBytes,
   normalizeAnimal,
@@ -77,14 +78,19 @@ export class AnimalsController {
       if (!context) return;
 
       const { contentType, fileName } = req.body as { contentType?: string; fileName?: string };
+      const animalId = getRouteParam(req.params.id);
       if (!contentType) {
         res.status(400).json({ message: "Informe o contentType da imagem." });
+        return;
+      }
+      if (!animalId) {
+        res.status(400).json({ message: "Identificador do animal invalido." });
         return;
       }
 
       const photoId = randomUUID();
       const extension = fileName?.split(".").pop() || animalPhotoExtensions[contentType] || "bin";
-      const storagePath = `animals/${req.params.id}/${photoId}.${extension}`;
+      const storagePath = `animals/${animalId}/${photoId}.${extension}`;
       const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
 
       const supabaseResponse = await fetch(`${context.supabaseUrl}/storage/v1/object/upload/sign/${animalPhotosBucket}/${storagePath}`, {
@@ -126,7 +132,13 @@ export class AnimalsController {
     }
 
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/animal_photos?select=id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at&animal_id=eq.${encodeURIComponent(req.params.id)}&order=is_primary.desc,created_at.asc`, {
+      const animalId = getRouteParam(req.params.id);
+      if (!animalId) {
+        res.status(400).json({ message: "Identificador do animal invalido." });
+        return;
+      }
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/animal_photos?select=id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at&animal_id=eq.${encodeURIComponent(animalId)}&order=is_primary.desc,created_at.asc`, {
         headers: {
           apikey: serviceRoleKey,
           authorization: `Bearer ${serviceRoleKey}`,
@@ -188,9 +200,15 @@ export class AnimalsController {
         return;
       }
 
+      const animalId = getRouteParam(req.params.id);
+      if (!animalId) {
+        res.status(400).json({ message: "Identificador do animal invalido." });
+        return;
+      }
+
       const photoId = randomUUID();
       const extension = animalPhotoExtensions[file.mimetype];
-      const storagePath = `animals/${req.params.id}/${photoId}.${extension}`;
+      const storagePath = `animals/${animalId}/${photoId}.${extension}`;
       const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
 
       try {
@@ -213,7 +231,7 @@ export class AnimalsController {
 
         await this.persistPhotoMetadata(req, res, {
           id: photoId,
-          animal_id: req.params.id,
+          animal_id: animalId,
           bucket_id: animalPhotosBucket,
           storage_path: storagePath,
           public_url: publicUrl,
@@ -236,14 +254,15 @@ export class AnimalsController {
 
       const rawPayload = req.body ?? {};
       const payload = pickFields(rawPayload, adminTables["animal-photos"].createFields);
+      const animalId = getRouteParam(req.params.id);
 
-      if (!payload.id || !payload.storage_path || !payload.content_type) {
+      if (!animalId || !payload.id || !payload.storage_path || !payload.content_type) {
         res.status(400).json({ message: "Dados da foto incompletos para registro." });
         return;
       }
 
       // Garante que o animal_id seja o da rota e gera public_url no servidor
-      payload.animal_id = req.params.id;
+      payload.animal_id = animalId;
       payload.bucket_id = animalPhotosBucket;
       payload.public_url = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, String(payload.storage_path));
 
