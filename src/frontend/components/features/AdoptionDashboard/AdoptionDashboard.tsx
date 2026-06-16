@@ -20,6 +20,7 @@ import { ProfileSummary } from "./ProfileSummary";
 interface AdoptionDashboardProps {
   initialPage?: AnimalsPageResponse;
   status?: DashboardStatus;
+  tutorId?: string | null;
 }
 
 export type SwipeDirection = "left" | "right";
@@ -38,8 +39,9 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDashboardProps) {
-  const { tutorId } = useDiscoverAccess();
+export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tutorIdProp = null }: AdoptionDashboardProps) {
+  const discoverAccess = useDiscoverAccess();
+  const tutorId = tutorIdProp ?? discoverAccess.tutorId;
   const initialItems = initialPage?.items ?? [];
   const initialPagination = initialPage?.pagination ?? {
     limit: 0,
