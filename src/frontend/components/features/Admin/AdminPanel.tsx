@@ -20,6 +20,9 @@ import {
   AlertTriangle,
   ChevronDown,
   Star,
+  Plus,
+  Save,
+  X,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -1684,12 +1687,12 @@ function RecordForm({
                 <>
                   {deleteAction}
                   <Button aria-label="Fechar registro" className="h-11 w-11 shrink-0 px-0" onClick={onClose} title="Fechar registro" type="button" variant="outline">
-                    <PanelLeftClose className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </>
               )}
               <Button aria-label={mode === "create" ? "Criar registro" : "Salvar alterações"} className={`${isModal ? "flex-1" : "min-w-[160px]"} shadow-xl shadow-cyan-400/10`} disabled={formDisabled} title={mode === "create" ? "Criar registro" : "Salvar alterações"} type="submit">
-                <Star className="h-4 w-4" />
+                {mode === "create" ? <Plus className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                 {mode === "create" ? "Criar Registro" : "Salvar Alterações"}
               </Button>
             </div>
