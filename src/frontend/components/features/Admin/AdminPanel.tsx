@@ -1550,6 +1550,42 @@ function RecordForm({
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
   const formDisabled = disabled || config.readonly === true;
   const isModal = variant === "modal";
+  const canDelete = mode === "edit" && !config.readonly;
+
+  const deleteAction = canDelete ? (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          aria-label="Excluir registro"
+          className={isModal ? "h-11 w-11 shrink-0 px-0" : "h-9 px-4 text-[10px]"}
+          disabled={formDisabled}
+          title="Excluir registro"
+          type="button"
+          variant={isModal ? "danger-outline" : "danger"}
+        >
+          <Trash2 className="h-4 w-4" />
+          {!isModal && "Excluir"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
+          <DialogDescription className="text-center">
+            Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4 gap-2 sm:justify-center">
+          <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
+          <DialogClose asChild>
+            <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null;
 
   function handleFieldChange(field: FieldConfig, value: unknown) {
     if (config.id !== "custom-fields" && config.id !== "onboarding-questions") {
@@ -1598,33 +1634,7 @@ function RecordForm({
                 Ver Detalhes
               </Link>
             )}
-            {mode === "edit" && !config.readonly && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="h-9 px-4 text-[10px]" disabled={formDisabled} type="button" variant="danger">
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Excluir
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
-                      <AlertTriangle className="h-6 w-6" />
-                    </div>
-                    <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
-                    <DialogDescription className="text-center">
-                      Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter className="mt-4 gap-2 sm:justify-center">
-                    <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
-                    <DialogClose asChild>
-                      <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+            {deleteAction}
           </div>
         </div>
 
@@ -1663,11 +1673,15 @@ function RecordForm({
           {!config.readonly && (
             <div className={`sticky bottom-0 z-20 flex gap-3 border-t border-white/10 bg-[#16161a]/90 p-4 backdrop-blur-md ${isModal ? "justify-between" : "justify-end"}`}>
               {isModal && (
-                <Button className="flex-1" onClick={onClose} type="button" variant="outline">
-                  Fechar registro
-                </Button>
+                <>
+                  {deleteAction}
+                  <Button aria-label="Fechar registro" className="h-11 w-11 shrink-0 px-0" onClick={onClose} title="Fechar registro" type="button" variant="outline">
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </>
               )}
-              <Button className="min-w-[160px] shadow-xl shadow-cyan-400/10" disabled={formDisabled} type="submit">
+              <Button aria-label={mode === "create" ? "Criar registro" : "Salvar alterações"} className={`${isModal ? "flex-1" : "min-w-[160px]"} shadow-xl shadow-cyan-400/10`} disabled={formDisabled} title={mode === "create" ? "Criar registro" : "Salvar alterações"} type="submit">
+                <Star className="h-4 w-4" />
                 {mode === "create" ? "Criar Registro" : "Salvar Alterações"}
               </Button>
             </div>
