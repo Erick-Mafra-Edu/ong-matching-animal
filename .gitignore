@@ -143,3 +143,5 @@ vite.config.ts.timestamp-*
 .vite/
 .vercel
 .env*.local
+.worktrees/
+tmp-jest/
