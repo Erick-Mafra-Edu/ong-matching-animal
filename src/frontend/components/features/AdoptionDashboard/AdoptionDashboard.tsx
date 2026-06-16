@@ -4,11 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
-import { backendApiUrl } from "@/lib/backend";
-import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
+import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { useDiscoverAccess } from "../Auth/DiscoverGate";
 import { DashboardState } from "./DashboardState";
@@ -18,6 +16,7 @@ import { PetPhotoCard } from "./PetPhotoCard";
 import { ProfileSummary } from "./ProfileSummary";
 
 interface AdoptionDashboardProps {
+  initialPage?: AnimalsPageResponse;
   status?: DashboardStatus;
 }
 
@@ -37,103 +36,23 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-interface AnimalsPageResponse {
-  items: AnimalListItem[];
-  pagination: {
-    limit: number;
-    offset: number;
-    nextOffset: number | null;
-    hasMore: boolean;
-  };
-}
-
-const DISCOVER_ANIMALS_PAGE_SIZE = 2;
-const IMAGE_PRELOAD_WINDOW = 2;
-
-async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
-  if (animal.photoUrl || animal.photoUrls?.length) return animal;
-
-  const photoUrl = await fetchAnimalFallbackPhoto();
-  return { ...animal, photoUrl, photoUrls: [photoUrl] };
-}
-
-function getPrimaryPhotoUrl(animal: AnimalListItem) {
-  return animal.photoUrl || animal.photoUrls?.[0] || "";
-}
-
-function preloadImage(url: string) {
-  if (typeof window === "undefined" || !url) return Promise.resolve();
-
-  return new Promise<void>((resolve) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve();
-    image.onerror = () => resolve();
-    image.src = url;
-  });
-}
-
-async function preloadPrimaryAnimalPhotos(animals: AnimalListItem[]) {
-  await Promise.all(animals.slice(0, IMAGE_PRELOAD_WINDOW).map((animal) => preloadImage(getPrimaryPhotoUrl(animal))));
-}
-
-async function fetchAnimalsPage(offset: number, tutorId?: string | null): Promise<AnimalsPageResponse> {
-  const params = new URLSearchParams({
-    limit: String(DISCOVER_ANIMALS_PAGE_SIZE),
-    offset: String(offset),
-  });
-  const headers: HeadersInit = {};
-
-  if (tutorId) {
-    params.set("tutor_id", tutorId);
-    const { data, error } = await getSupabaseBrowserClient().auth.getSession();
-    if (error || !data.session?.access_token) {
-      throw error ?? new Error("Sessao ausente para carregar os matches.");
-    }
-    headers.authorization = `Bearer ${data.session.access_token}`;
-  }
-
-  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`), { headers });
-
-  if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
-
-  const body = await response.json() as AnimalsPageResponse | AnimalListItem[];
-  if (Array.isArray(body)) {
-    const items = await Promise.all(body.map(withFallbackPhoto));
-    await preloadPrimaryAnimalPhotos(items);
-    return {
-      items,
-      pagination: {
-        limit: items.length,
-        offset,
-        nextOffset: null,
-        hasMore: false,
-      },
-    };
-  }
-
-  const pageItems = Array.isArray(body.items) ? body.items : [];
-  const items = await Promise.all(pageItems.map(withFallbackPhoto));
-  await preloadPrimaryAnimalPhotos(items);
-  return {
-    items,
-    pagination: body.pagination ?? {
-      limit: items.length,
-      offset,
-      nextOffset: null,
-      hasMore: false,
-    },
-  };
-}
-
-export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) {
+export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDashboardProps) {
   const { tutorId } = useDiscoverAccess();
+  const initialItems = initialPage?.items ?? [];
+  const initialPagination = initialPage?.pagination ?? {
+    limit: 0,
+    offset: 0,
+    nextOffset: 0,
+    hasMore: true,
+  };
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
-  const [pets, setPets] = useState<AnimalListItem[]>([]);
+  const [pets, setPets] = useState<AnimalListItem[]>(initialItems);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
-  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(0);
-  const [hasMoreAnimals, setHasMoreAnimals] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
+    status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
+  );
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);
+  const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
@@ -165,11 +84,11 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     }
 
     let isMounted = true;
-    setLoadStatus("loading");
-    setPets([]);
+    setLoadStatus(initialItems.length ? "ready" : "loading");
+    setPets(initialItems);
     setHistory([]);
-    setNextAnimalsOffset(0);
-    setHasMoreAnimals(true);
+    setNextAnimalsOffset(initialPagination.nextOffset);
+    setHasMoreAnimals(initialPagination.hasMore);
 
     fetchAnimalsPage(0, tutorId)
       .then((page) => {
@@ -187,7 +106,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     return () => {
       isMounted = false;
     };
-  }, [status, tutorId]);
+  }, [initialItems, initialPagination.hasMore, initialPagination.nextOffset, status, tutorId]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
@@ -210,9 +129,9 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length, tutorId]);
 
   useEffect(() => {
-    if (status !== "ready" || loadStatus !== "ready" || pets.length > 1) return;
+    if (loadStatus !== "ready" || pets.length > 1) return;
     void loadNextAnimalsPage();
-  }, [loadNextAnimalsPage, loadStatus, pets.length, status]);
+  }, [loadNextAnimalsPage, loadStatus, pets.length]);
 
   useEffect(() => {
     void preloadPrimaryAnimalPhotos(pets.slice(0, IMAGE_PRELOAD_WINDOW));
