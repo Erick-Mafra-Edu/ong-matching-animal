@@ -56,7 +56,30 @@ export class TutorsController {
         return;
       }
 
-      res.status(201).json(Array.isArray(body) ? body[0] : body);
+      const savedTutor = Array.isArray(body) ? body[0] : body;
+
+      if (custom_fields.onboarding_complete === true && savedTutor?.id) {
+        const refreshResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/refresh_tutor_animal_matches`, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ target_tutor_id: savedTutor.id }),
+        });
+
+        if (!refreshResponse.ok) {
+          const refreshBody = await refreshResponse.json().catch(() => null);
+          res.status(502).json({
+            message: "Tutor salvo, mas nao foi possivel atualizar o cache de matching.",
+            details: refreshBody,
+          });
+          return;
+        }
+      }
+
+      res.status(201).json(savedTutor);
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",

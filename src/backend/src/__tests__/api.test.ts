@@ -186,6 +186,10 @@ describe("API Endpoints", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => 12,
         }) as jest.Mock;
 
       const response = await request(app)
@@ -219,6 +223,54 @@ describe("API Endpoints", () => {
           }),
         }),
       );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        5,
+        "https://example.supabase.co/rest/v1/rpc/refresh_tutor_animal_matches",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            target_tutor_id: "tutor-123",
+          }),
+        }),
+      );
+    });
+
+    it("should return 502 when onboarding save succeeds but cache refresh fails", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "q1" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ field_key: "home_type", source_question_id: "q1" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ message: "rpc failure" }),
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/tutors")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          auth_user_id: "user-123",
+          name: "Tutor Teste",
+          custom_fields: { onboarding_complete: true, home_type: "apartamento" },
+        });
+
+      expect(response.status).toBe(502);
+      expect(response.body.message).toContain("cache de matching");
     });
   });
 
@@ -1232,7 +1284,7 @@ describe("API Endpoints", () => {
       expect(response.body.matches[0]).toHaveProperty("animal_id", "animal123");
       expect(response.body.matches[0]).toHaveProperty("compatibility_score", 50);
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://example.supabase.co/rest/v1/rpc/calculate_match_score",
+        "https://example.supabase.co/rest/v1/rpc/match_animals_for_tutor",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({
