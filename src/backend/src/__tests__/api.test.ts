@@ -489,6 +489,145 @@ describe("API Endpoints", () => {
       );
     });
 
+    it("should allow creating a custom field with null options", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "custom-field-123",
+            entity_type: "animal",
+            field_key: "pelagem",
+            label: "Pelagem",
+            field_type: "text",
+            options: null,
+            source_question_id: null,
+            is_active: true,
+            sort_order: 0,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/custom-fields")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          entity_type: "animal",
+          field_key: "pelagem",
+          label: "Pelagem",
+          field_type: "text",
+          options: null,
+          source_question_id: null,
+          is_active: true,
+          sort_order: 0,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("field_key", "pelagem");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/custom_fields",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"field_key\":\"pelagem\""),
+        }),
+      );
+    });
+
+    it("should reject custom select fields without options", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/custom-fields")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          entity_type: "animal",
+          field_key: "porte",
+          label: "Porte",
+          field_type: "select",
+          options: null,
+          source_question_id: null,
+          is_active: true,
+          sort_order: 0,
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toContain("pelo menos uma opcao");
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should allow creating an onboarding question with null options", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "pet_name",
+            label: "Qual nome voce imagina para o pet?",
+            description: null,
+            placeholder: "Ex.: Sol",
+            type: "text",
+            options: null,
+            required: true,
+            is_active: true,
+            sort_order: 10,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/onboarding-questions")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          id: "pet_name",
+          label: "Qual nome voce imagina para o pet?",
+          description: "",
+          placeholder: "Ex.: Sol",
+          type: "text",
+          options: null,
+          required: true,
+          is_active: true,
+          sort_order: 10,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("id", "pet_name");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/onboarding_questions",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"id\":\"pet_name\""),
+        }),
+      );
+    });
+
     it("should update ONG settings for active admins", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
