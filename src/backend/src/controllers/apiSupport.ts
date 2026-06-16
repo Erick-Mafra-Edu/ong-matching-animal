@@ -515,7 +515,7 @@ const CustomFieldPayloadSchema = z.object({
   label: z.string().min(1),
   field_type: z.string().min(1),
   options: z.array(z.string()).nullable().optional(),
-  source_question_id: z.string().uuid().nullable().optional(),
+  source_question_id: AdminIdentifierSchema.nullable().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
 });
