@@ -8,7 +8,9 @@ import { backendApiUrl } from "@/lib/backend";
 import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
+import { useDiscoverAccess } from "../Auth/DiscoverGate";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
 import { MobileNavigation } from "./MobileNavigation";
@@ -75,12 +77,23 @@ async function preloadPrimaryAnimalPhotos(animals: AnimalListItem[]) {
   await Promise.all(animals.slice(0, IMAGE_PRELOAD_WINDOW).map((animal) => preloadImage(getPrimaryPhotoUrl(animal))));
 }
 
-async function fetchAnimalsPage(offset: number): Promise<AnimalsPageResponse> {
+async function fetchAnimalsPage(offset: number, tutorId?: string | null): Promise<AnimalsPageResponse> {
   const params = new URLSearchParams({
     limit: String(DISCOVER_ANIMALS_PAGE_SIZE),
     offset: String(offset),
   });
-  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`));
+  const headers: HeadersInit = {};
+
+  if (tutorId) {
+    params.set("tutor_id", tutorId);
+    const { data, error } = await getSupabaseBrowserClient().auth.getSession();
+    if (error || !data.session?.access_token) {
+      throw error ?? new Error("Sessao ausente para carregar os matches.");
+    }
+    headers.authorization = `Bearer ${data.session.access_token}`;
+  }
+
+  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`), { headers });
 
   if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
 
@@ -114,6 +127,7 @@ async function fetchAnimalsPage(offset: number): Promise<AnimalsPageResponse> {
 }
 
 export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) {
+  const { tutorId } = useDiscoverAccess();
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [pets, setPets] = useState<AnimalListItem[]>([]);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
@@ -157,7 +171,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     setNextAnimalsOffset(0);
     setHasMoreAnimals(true);
 
-    fetchAnimalsPage(0)
+    fetchAnimalsPage(0, tutorId)
       .then((page) => {
         if (!isMounted) return;
         setPets(page.items);
@@ -173,14 +187,14 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     return () => {
       isMounted = false;
     };
-  }, [status]);
+  }, [status, tutorId]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
 
     setIsLoadingMoreAnimals(true);
     try {
-      const page = await fetchAnimalsPage(nextAnimalsOffset);
+      const page = await fetchAnimalsPage(nextAnimalsOffset, tutorId);
       setPets((currentPets) => {
         const existingIds = new Set(currentPets.map((pet) => pet.id));
         const newItems = page.items.filter((pet) => !existingIds.has(pet.id));
@@ -193,7 +207,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     } finally {
       setIsLoadingMoreAnimals(false);
     }
-  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length]);
+  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length, tutorId]);
 
   useEffect(() => {
     if (status !== "ready" || loadStatus !== "ready" || pets.length > 1) return;

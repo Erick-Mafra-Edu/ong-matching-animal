@@ -11,9 +11,12 @@ import {
   normalizeAnimal,
   pickFields,
   readJsonResponse,
+  requireAuthenticated,
   requireAdmin,
   toPublicStorageUrl,
 } from "./apiSupport";
+
+const animalSelect = "id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)";
 
 export class AnimalsController {
   private readonly uploadAnimalPhoto = multer({
@@ -31,14 +34,26 @@ export class AnimalsController {
     const limit = parseBoundedInteger(req.query.limit, 12, 1, 50);
     const offset = parseBoundedInteger(req.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
     const supabaseLimit = limit + 1;
+    const tutorId = typeof req.query.tutor_id === "string" ? req.query.tutor_id.trim() : "";
 
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/animals?select=id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)&order=created_at.desc&limit=${supabaseLimit}&offset=${offset}`, {
-        headers: {
-          apikey: serviceRoleKey,
-          authorization: `Bearer ${serviceRoleKey}`,
-        },
-      });
+      const response = tutorId
+        ? await this.listCachedMatches(req, res, {
+          tutorId,
+          supabaseUrl,
+          serviceRoleKey,
+          limit,
+          offset,
+          supabaseLimit,
+        })
+        : await fetch(`${supabaseUrl}/rest/v1/animals?select=${animalSelect}&order=created_at.desc&limit=${supabaseLimit}&offset=${offset}`, {
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+
+      if (!response) return;
       const body = await response.json();
 
       if (!response.ok) {
@@ -47,7 +62,7 @@ export class AnimalsController {
       }
 
       const rows = Array.isArray(body) ? body : [];
-      const items = rows.slice(0, limit).map(normalizeAnimal);
+      const items = rows.slice(0, limit).map((row) => normalizeAnimal(row.animal ?? row));
       const hasMore = rows.length > limit;
 
       res.json({
@@ -66,6 +81,47 @@ export class AnimalsController {
       });
     }
   };
+
+  private async listCachedMatches(
+    req: Request,
+    res: Response,
+    options: {
+      tutorId: string;
+      supabaseUrl: string;
+      serviceRoleKey: string;
+      limit: number;
+      offset: number;
+      supabaseLimit: number;
+    },
+  ) {
+    const context = await requireAuthenticated(req, res);
+    if (!context) return null;
+
+    const tutorResponse = await fetch(`${options.supabaseUrl}/rest/v1/tutors?select=id&auth_user_id=eq.${encodeURIComponent(context.userId)}&id=eq.${encodeURIComponent(options.tutorId)}&limit=1`, {
+      headers: {
+        apikey: options.serviceRoleKey,
+        authorization: `Bearer ${options.serviceRoleKey}`,
+      },
+    });
+    const tutorBody = await tutorResponse.json();
+
+    if (!tutorResponse.ok) {
+      res.status(tutorResponse.status).json({ message: "Nao foi possivel validar o tutor do discover.", details: tutorBody });
+      return null;
+    }
+
+    if (!Array.isArray(tutorBody) || tutorBody.length === 0) {
+      res.status(403).json({ message: "Nao e permitido listar matches de outro tutor." });
+      return null;
+    }
+
+    return fetch(`${options.supabaseUrl}/rest/v1/tutor_animal_matches?select=compatibility_score,animal:animals(${animalSelect})&tutor_id=eq.${encodeURIComponent(options.tutorId)}&order=compatibility_score.desc,animal_id.asc&limit=${options.supabaseLimit}&offset=${options.offset}`, {
+        headers: {
+          apikey: options.serviceRoleKey,
+          authorization: `Bearer ${options.serviceRoleKey}`,
+        },
+      });
+  }
 
   create = (_req: Request, res: Response) => {
     res.status(201).json({ message: "Animal criado com sucesso" });
