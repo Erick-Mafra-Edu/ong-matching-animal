@@ -456,6 +456,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     secondaryFields: ["type", "sort_order"],
     searchFields: ["id", "label", "description", "placeholder"],
     createDefaults: {
+      id: "",
       label: "",
       description: "",
       placeholder: "",
@@ -466,6 +467,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       sort_order: 0,
     },
     fields: [
+      { name: "id", label: "Identificador", type: "text", createOnly: true, required: true, helper: "Use apenas letras minusculas, numeros e underscore. Ex.: preferred_energy." },
       { name: "label", label: "Pergunta", type: "text", required: true },
       { name: "description", label: "Descricao", type: "textarea" },
       { name: "placeholder", label: "Texto de apoio", type: "text" },
@@ -1550,20 +1552,28 @@ function RecordForm({
   const isModal = variant === "modal";
 
   function handleFieldChange(field: FieldConfig, value: unknown) {
-    if (config.id !== "custom-fields") {
+    if (config.id !== "custom-fields" && config.id !== "onboarding-questions") {
       onChange({ ...formState, [field.name]: value });
       return;
     }
 
-    if (field.name === "field_key") {
-      onChange({ ...formState, field_key: sanitizeCustomFieldKey(String(value ?? "")) });
+    if (config.id === "custom-fields" && field.name === "field_key") {
+      onChange({ ...formState, field_key: sanitizeAdminIdentifier(String(value ?? "")) });
+      return;
+    }
+
+    if (config.id === "onboarding-questions" && field.name === "id") {
+      onChange({ ...formState, id: sanitizeAdminIdentifier(String(value ?? "")) });
       return;
     }
 
     if (field.name === "label") {
       const nextState: FormState = { ...formState, label: value };
-      if (!String(formState.field_key ?? "").trim()) {
-        nextState.field_key = sanitizeCustomFieldKey(String(value ?? ""));
+      if (config.id === "custom-fields" && !String(formState.field_key ?? "").trim()) {
+        nextState.field_key = sanitizeAdminIdentifier(String(value ?? ""));
+      }
+      if (config.id === "onboarding-questions" && !String(formState.id ?? "").trim()) {
+        nextState.id = sanitizeAdminIdentifier(String(value ?? ""));
       }
       onChange(nextState);
       return;
@@ -3589,7 +3599,7 @@ function humanizeFieldKey(value: string) {
     .join(" ");
 }
 
-function sanitizeCustomFieldKey(value: string) {
+function sanitizeAdminIdentifier(value: string) {
   const sanitized = value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

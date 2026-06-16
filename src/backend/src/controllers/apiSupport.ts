@@ -349,6 +349,13 @@ export function buildCalendarEventPayload(source: Record<string, unknown>, admin
 const CalendarEventStatusSchema = z.enum(["scheduled", "completed", "cancelled"]);
 const CalendarProviderSchema = z.enum(["google", "microsoft"]);
 const JsonObjectSchema = z.record(z.string(), z.unknown());
+const AdminIdentifierSchema = z.string().trim().min(1).regex(/^[a-z0-9_]+$/, "Use apenas letras minusculas, numeros e underscore.");
+const ChoiceOptionSchema = z.object({
+  label: z.string().trim().min(1, "Cada opcao precisa de um label."),
+  value: z.string().trim().min(1, "Cada opcao precisa de um value."),
+});
+const ChoiceOptionsSchema = z.array(ChoiceOptionSchema).nullable().optional();
+const ChoiceFieldTypes = new Set(["select", "multiselect", "radio"]);
 
 const CalendarEventPayloadBaseSchema = z.object({
   tutor_id: z.string().uuid().nullable().optional(),
@@ -408,6 +415,10 @@ export function validateCalendarEventPayload(payload: Record<string, unknown>, i
 export async function validateResourcePayload(resource: string, payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string, isUpdate = false) {
   if (resource === "custom-fields") {
     return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
+  }
+
+  if (resource === "onboarding-questions") {
+    return validateOnboardingQuestionPayload(payload, isUpdate);
   }
 
   if (resource === "ong-settings") {
@@ -500,20 +511,30 @@ function validateOngSettingsPayload(payload: Record<string, unknown>) {
 
 const CustomFieldPayloadSchema = z.object({
   entity_type: z.enum(["tutor", "animal"], { message: "Informe se o campo customizado serve para tutores ou animais." }),
-  field_key: z.string().min(1),
+  field_key: AdminIdentifierSchema,
   label: z.string().min(1),
   field_type: z.string().min(1),
-  options: z.array(z.string()).optional(),
+  options: z.array(z.string()).nullable().optional(),
   source_question_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
 });
 
 async function validateCustomFieldPayload(payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string) {
+  if (payload.options === null) payload.options = undefined;
   if (payload.source_question_id === "") payload.source_question_id = null;
 
   try {
     const parsedPayload = CustomFieldPayloadSchema.parse(payload);
+    const fieldType = String(parsedPayload.field_type).trim();
+
+    if ((fieldType === "select" || fieldType === "multiselect") && (!parsedPayload.options || parsedPayload.options.length === 0)) {
+      return "Campos do tipo lista precisam de pelo menos uma opcao.";
+    }
+
+    if (fieldType !== "select" && fieldType !== "multiselect") {
+      payload.options = undefined;
+    }
 
     if (parsedPayload.entity_type !== "tutor") {
       parsedPayload.source_question_id = null;
@@ -534,6 +555,47 @@ async function validateCustomFieldPayload(payload: Record<string, unknown>, supa
       payload.source_question_id = sourceQuestionId; // Update the original payload if necessary
     }
 
+    return null;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return getZodMessage(error);
+    }
+    return "Erro de validacao desconhecido.";
+  }
+}
+
+const OnboardingQuestionPayloadSchema = z.object({
+  id: AdminIdentifierSchema,
+  label: z.string().trim().min(1, "Informe o texto da pergunta."),
+  description: z.string().nullable().optional(),
+  placeholder: z.string().nullable().optional(),
+  type: z.enum(["text", "number", "select", "multiselect", "radio", "boolean"], { message: "Tipo de pergunta invalido." }),
+  options: ChoiceOptionsSchema,
+  required: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
+
+function validateOnboardingQuestionPayload(payload: Record<string, unknown>, isUpdate = false) {
+  for (const field of ["description", "placeholder"] as const) {
+    if (payload[field] === "") payload[field] = null;
+  }
+  if (payload.options === null) payload.options = undefined;
+
+  try {
+    const parsedPayload = (isUpdate ? OnboardingQuestionPayloadSchema.partial() : OnboardingQuestionPayloadSchema).parse(payload);
+    const questionType = typeof parsedPayload.type === "string" ? parsedPayload.type : undefined;
+    const hasChoiceOptions = Array.isArray(parsedPayload.options) && parsedPayload.options.length > 0;
+
+    if (questionType && ChoiceFieldTypes.has(questionType) && !hasChoiceOptions) {
+      return "Perguntas de escolha precisam de pelo menos uma opcao.";
+    }
+
+    if (questionType && !ChoiceFieldTypes.has(questionType)) {
+      payload.options = undefined;
+    }
+
+    if (parsedPayload.id) payload.id = parsedPayload.id;
     return null;
   } catch (error) {
     if (error instanceof z.ZodError) {

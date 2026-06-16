@@ -7,7 +7,8 @@
     "build": "next build",
     "security:urls": "node scripts/security-url-check.mjs",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@flags-sdk/vercel": "^1.4.0",
@@ -30,6 +31,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/node": "^20.12.12",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",

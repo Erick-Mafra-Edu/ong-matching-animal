@@ -1,6 +1,10 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { backendApiUrl } from "@/lib/backend";
 
+type E2EWindow = Window & {
+  __E2E_ACCESS_TOKEN__?: unknown;
+};
+
 export type AdminResource =
   | "admin-users"
   | "tutors"
@@ -185,6 +189,13 @@ export const adminResources: AdminResourceConfig[] = [
 ];
 
 async function getAccessToken() {
+  if (typeof window !== "undefined") {
+    const e2eAccessToken = (window as E2EWindow).__E2E_ACCESS_TOKEN__;
+    if (typeof e2eAccessToken === "string" && e2eAccessToken.trim()) {
+      return e2eAccessToken;
+    }
+  }
+
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
   if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
   return data.session.access_token;
