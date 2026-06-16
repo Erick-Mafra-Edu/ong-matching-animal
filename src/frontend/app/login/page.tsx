@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { AuthCallbackHandler } from "@/components/features/Auth/AuthCallbackHandler";
+import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/ScreenOnboardingRuntime";
 import { LoginForm } from "@/components/features/Auth/LoginForm";
 
 interface LoginPageProps {
@@ -29,6 +31,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       </section>
       <section className="flex items-center justify-center px-6 py-12">
         <div className="animate-state-enter w-full max-w-sm space-y-8">
+          <AuthCallbackHandler />
           <Link className="text-lg font-black tracking-tight text-cyan-100 lg:hidden" href="/">MATCH<span className="text-pink-400">PET</span></Link>
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Bem-vindo</p>
@@ -42,6 +45,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           <p className="text-center text-xs text-slate-500">Ainda nao tem conta? <Link className="text-cyan-200 hover:text-cyan-100" href="/cadastro">Cadastre-se</Link></p>
         </div>
       </section>
+      <ScreenOnboardingRuntime />
     </main>
   );
 }

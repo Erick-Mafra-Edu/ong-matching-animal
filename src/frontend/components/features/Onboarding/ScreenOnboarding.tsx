@@ -34,8 +34,10 @@ interface PopoverPlacement {
 const tourStoragePrefix = "matchpet-screen-onboarding";
 const spotlightPadding = 10;
 const popoverMargin = 22;
+const viewportPadding = 16;
 const popoverMaxWidth = 544;
 const popoverEstimatedHeight = 300;
+const popoverMinHeight = 220;
 
 const screenTours: Record<string, ScreenTour> = {
   "/": {
@@ -358,7 +360,7 @@ export function ScreenOnboarding() {
           )}
 
           <div
-            className="fixed z-[60] w-[min(calc(100vw-2rem),34rem)] overflow-hidden rounded-2xl border border-cyan-200/15 bg-[#14141b] text-white shadow-2xl shadow-black/55 transition-all duration-300"
+            className="fixed z-[60] flex w-[min(calc(100vw-2rem),34rem)] flex-col overflow-hidden rounded-2xl border border-cyan-200/15 bg-[#14141b] text-white shadow-2xl shadow-black/55 transition-all duration-300"
             style={popoverPlacement.style}
           >
             {popoverPlacement.side !== "center" && (
@@ -374,7 +376,7 @@ export function ScreenOnboarding() {
                 style={{ width: `${((currentStep + 1) / activeTour.steps.length) * 100}%` }}
               />
             </div>
-            <div className="p-6 pt-7">
+            <div className="overflow-y-auto p-6 pt-7">
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">
                   Tutorial da tela {currentStep + 1} de {activeTour.steps.length}
@@ -450,14 +452,14 @@ function getPopoverPlacement(spotlight: TargetRect | null): PopoverPlacement {
       side: "center",
       style: {
         left: "50%",
+        maxHeight: `calc(100vh - ${viewportPadding * 2}px)`,
         top: "50%",
         transform: "translate(-50%, -50%)",
       },
     };
   }
 
-  const width = Math.min(window.innerWidth - 32, popoverMaxWidth);
-  const height = Math.min(window.innerHeight - 32, popoverEstimatedHeight);
+  const width = Math.min(window.innerWidth - viewportPadding * 2, popoverMaxWidth);
   const spaces = {
     top: spotlight.top,
     right: window.innerWidth - spotlight.left - spotlight.width,
@@ -465,10 +467,10 @@ function getPopoverPlacement(spotlight: TargetRect | null): PopoverPlacement {
     left: spotlight.left,
   };
   const preferredSides = getPreferredSides(spotlight);
-  const side = preferredSides.find((item) => hasEnoughSpace(item, spaces, width, height))
+  const side = preferredSides.find((item) => hasEnoughSpace(item, spaces, width))
     ?? preferredSides.sort((a, b) => scoreSide(b, spaces) - scoreSide(a, spaces))[0];
-  const style = getSideStyle(side, spotlight, width, height);
-  const arrowStyle = getArrowStyle(side, spotlight, style, width, height);
+  const style = getSideStyle(side, spotlight, width);
+  const arrowStyle = getArrowStyle(side, spotlight, style, width);
 
   return { arrowStyle, side, style };
 }
@@ -484,8 +486,8 @@ function getPreferredSides(spotlight: TargetRect): PopoverSide[] {
   return [verticalPreference, horizontalPreference, secondaryVertical, secondaryHorizontal];
 }
 
-function hasEnoughSpace(side: PopoverSide, spaces: Record<Exclude<PopoverSide, "center">, number>, width: number, height: number) {
-  if (side === "top" || side === "bottom") return spaces[side] >= height + popoverMargin;
+function hasEnoughSpace(side: PopoverSide, spaces: Record<Exclude<PopoverSide, "center">, number>, width: number) {
+  if (side === "top" || side === "bottom") return getAvailableHeight(side, spaces) >= popoverMinHeight;
   if (side === "left" || side === "right") return spaces[side] >= width + popoverMargin;
   return false;
 }
@@ -495,41 +497,50 @@ function scoreSide(side: PopoverSide, spaces: Record<Exclude<PopoverSide, "cente
   return spaces[side];
 }
 
-function getSideStyle(side: PopoverSide, spotlight: TargetRect, width: number, height: number): Record<string, number | string> {
+function getSideStyle(side: PopoverSide, spotlight: TargetRect, width: number): Record<string, number | string> {
+  const maxHeight = getPopoverHeightForSide(side, spotlight);
+
   if (side === "top") {
     return {
-      left: clamp(spotlight.left + spotlight.width / 2 - width / 2, 16, window.innerWidth - width - 16),
-      top: Math.max(16, spotlight.top - height - popoverMargin),
+      left: clamp(spotlight.left + spotlight.width / 2 - width / 2, viewportPadding, window.innerWidth - width - viewportPadding),
+      maxHeight,
+      top: Math.max(viewportPadding, spotlight.top - maxHeight - popoverMargin),
       width,
     };
   }
 
   if (side === "bottom") {
+    const top = Math.min(window.innerHeight - maxHeight - viewportPadding, spotlight.top + spotlight.height + popoverMargin);
+
     return {
-      left: clamp(spotlight.left + spotlight.width / 2 - width / 2, 16, window.innerWidth - width - 16),
-      top: Math.min(window.innerHeight - height - 16, spotlight.top + spotlight.height + popoverMargin),
+      left: clamp(spotlight.left + spotlight.width / 2 - width / 2, viewportPadding, window.innerWidth - width - viewportPadding),
+      maxHeight,
+      top: Math.max(viewportPadding, top),
       width,
     };
   }
 
   if (side === "left") {
     return {
-      left: Math.max(16, spotlight.left - width - popoverMargin),
-      top: clamp(spotlight.top + spotlight.height / 2 - height / 2, 16, window.innerHeight - height - 16),
+      left: Math.max(viewportPadding, spotlight.left - width - popoverMargin),
+      maxHeight,
+      top: clamp(spotlight.top + spotlight.height / 2 - maxHeight / 2, viewportPadding, window.innerHeight - maxHeight - viewportPadding),
       width,
     };
   }
 
   return {
-    left: Math.min(window.innerWidth - width - 16, spotlight.left + spotlight.width + popoverMargin),
-    top: clamp(spotlight.top + spotlight.height / 2 - height / 2, 16, window.innerHeight - height - 16),
+    left: Math.min(window.innerWidth - width - viewportPadding, spotlight.left + spotlight.width + popoverMargin),
+    maxHeight,
+    top: clamp(spotlight.top + spotlight.height / 2 - maxHeight / 2, viewportPadding, window.innerHeight - maxHeight - viewportPadding),
     width,
   };
 }
 
-function getArrowStyle(side: PopoverSide, spotlight: TargetRect, style: Record<string, number | string>, width: number, height: number): Record<string, number | string> {
+function getArrowStyle(side: PopoverSide, spotlight: TargetRect, style: Record<string, number | string>, width: number): Record<string, number | string> {
   const left = Number(style.left);
   const top = Number(style.top);
+  const height = Number(style.maxHeight);
 
   if (side === "top") {
     return {
@@ -565,6 +576,22 @@ function getArrowStyle(side: PopoverSide, spotlight: TargetRect, style: Record<s
 function clamp(value: number, min: number, max: number) {
   if (max < min) return min;
   return Math.min(Math.max(value, min), max);
+}
+
+function getAvailableHeight(side: Extract<PopoverSide, "top" | "bottom">, spaces: Record<Exclude<PopoverSide, "center">, number>) {
+  return Math.max(0, spaces[side] - popoverMargin - viewportPadding);
+}
+
+function getPopoverHeightForSide(side: PopoverSide, spotlight: TargetRect) {
+  if (side === "top") {
+    return clamp(spotlight.top - popoverMargin - viewportPadding, 0, popoverEstimatedHeight);
+  }
+
+  if (side === "bottom") {
+    return clamp(window.innerHeight - (spotlight.top + spotlight.height) - popoverMargin - viewportPadding, 0, popoverEstimatedHeight);
+  }
+
+  return Math.min(window.innerHeight - viewportPadding * 2, popoverEstimatedHeight);
 }
 
 function getCursorStyle(spotlight: TargetRect | null) {

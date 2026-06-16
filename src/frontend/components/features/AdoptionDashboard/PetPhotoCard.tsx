@@ -107,11 +107,19 @@ export function PetPhotoCard({ action, onActionComplete, pet }: PetPhotoCardProp
         style={{ transform: `translate3d(${dragX}px, 0, 0) rotate(${dragX / 24}deg)`, opacity: isExiting ? 0 : 1 }}
       >
         <div
-          className="animate-photo-change absolute inset-0 bg-cover bg-center bg-black"
-          style={{ backgroundImage: `url("${photos[activePhoto]}")` }}
+          className="absolute inset-0 bg-black"
           role="img"
           aria-label={`${pet.name} aguardando adoção, foto ${activePhoto + 1} de ${photos.length}`}
-        />
+        >
+          <img
+            alt={`${pet.name} aguardando adocao`}
+            className="animate-photo-change h-full w-full object-cover object-center"
+            decoding="async"
+            fetchPriority={activePhoto === 0 ? "high" : "auto"}
+            loading={activePhoto === 0 ? "eager" : "lazy"}
+            src={photos[activePhoto]}
+          />
+        </div>
         <div className="absolute inset-x-0 top-0 flex gap-3 p-2" aria-hidden="true">
           {photos.map((photo, index) => (
             <span className={`h-1 flex-1 rounded ${index === activePhoto ? "bg-white" : "bg-slate-600/80"}`} key={`${photo}-${index}`} />

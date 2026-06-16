@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
+
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
 import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
+
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { useDiscoverAccess } from "../Auth/DiscoverGate";
@@ -55,11 +57,10 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
   const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
-  const [ongSettings, setOngSettings] = useState<OngSettings | null>(null);
+  const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
-
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
+  const [, setOngSettings] = useState<OngSettings | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -173,8 +174,7 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
   }
 
   async function openContactDialogForInterest(animal: AnimalListItem, interest: InteresseRegistro) {
-    const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
-    if (settings && !ongSettings) setOngSettings(settings);
+    const settings = await carregarOngSettings().catch(() => null) as OngSettings | null;
 
     const interestLink = toAbsoluteInterestLink(interest.detail_url);
     const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
@@ -192,9 +192,9 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
   }
 
   async function handleAdopt() {
-    if (!featuredPet || isRegisteringInterest) return;
+    if (!featuredPet || pendingAdoptionId) return;
 
-    setIsRegisteringInterest(true);
+    setPendingAdoptionId(featuredPet.id);
     setLastActionMessageId(featuredPet.id);
     setActionMessage("Registrando interesse...");
 
@@ -205,10 +205,9 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
       requestCardAction("right");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
-      // Se falhou, limpamos o ID para permitir nova tentativa (via swipe ou botão)
       setLastActionMessageId(null);
     } finally {
-      setIsRegisteringInterest(false);
+      setPendingAdoptionId(null);
     }
   }
 
@@ -216,21 +215,23 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
     const [current, ...remaining] = pets;
     if (!current) return;
 
-    // Se for swipe para a direita e ainda não processamos este pet (não foi via botão)
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {
+        setPendingAdoptionId(current.id);
         const interest = await registrarInteresse(current.id);
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
         setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+      } finally {
+        setPendingAdoptionId(null);
       }
     } else if (direction === "left") {
-      setActionMessage(""); // Limpa mensagens anteriores no swipe para esquerda
+      setActionMessage("");
     }
 
-    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
+    setHistory((prev) => [current, ...prev].slice(0, 10));
     setPets(remaining);
     setCardAction(null);
     if (remaining.length === 0 && !hasMoreAnimals) {
@@ -249,7 +250,7 @@ export function AdoptionDashboard({ initialPage, status = "ready" }: AdoptionDas
 
   const actions = (
     <MatchActions
-      disabled={isRegisteringInterest}
+      disabled={Boolean(pendingAdoptionId)}
       onAdopt={handleAdopt}
       onReject={() => requestCardAction("left")}
       onUndo={history.length > 0 ? handleUndo : undefined}

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthenticatedUserId, getSupabaseBackendConfig, normalizeAnimal, normalizeCalendarEvent, normalizeTutor } from "./apiSupport";
+import { getAuthenticatedUserId, getRouteParam, getSupabaseBackendConfig, normalizeAnimal, normalizeCalendarEvent, normalizeTutor } from "./apiSupport";
 
 export class InterestsController {
   listMine = async (req: Request, res: Response) => {
@@ -125,8 +125,13 @@ export class InterestsController {
     try {
       const context = await requireInterestDetailContext(req, res);
       if (!context) return;
+      const interestId = getRouteParam(req.params.uuid_registro);
+      if (!interestId) {
+        res.status(400).json({ message: "Identificador do interesse invalido." });
+        return;
+      }
 
-      const interestResponse = await fetch(`${context.supabaseUrl}/rest/v1/tutor_interessados?select=uuid_registro,tutor_id,animal_id,data_registro&uuid_registro=eq.${encodeURIComponent(req.params.uuid_registro)}&limit=1`, {
+      const interestResponse = await fetch(`${context.supabaseUrl}/rest/v1/tutor_interessados?select=uuid_registro,tutor_id,animal_id,data_registro&uuid_registro=eq.${encodeURIComponent(interestId)}&limit=1`, {
         headers: {
           apikey: context.serviceRoleKey,
           authorization: `Bearer ${context.serviceRoleKey}`,

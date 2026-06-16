@@ -23,7 +23,7 @@ async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem
   return { ...animal, photoUrl, photoUrls: [photoUrl] };
 }
 
-function getPrimaryPhotoUrl(animal: AnimalListItem) {
+export function getPrimaryPhotoUrl(animal: AnimalListItem) {
   return animal.photoUrl || animal.photoUrls?.[0] || "";
 }
 

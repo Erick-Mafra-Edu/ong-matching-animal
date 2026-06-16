@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { syncAuthSessionCookies } from "@/lib/auth/session";
 import { hasCompletedOnboarding, saveOnboardingAnswersFromMetadata } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -32,6 +33,13 @@ export function LoginForm() {
       if (authError || !data.user) {
         setError("Não foi possível entrar. Confira seu e-mail e senha.");
         return;
+      }
+
+      if (data.session) {
+        await syncAuthSessionCookies({
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+        });
       }
 
       const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);

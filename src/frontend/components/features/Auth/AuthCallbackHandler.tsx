@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { syncAuthSessionCookies } from "@/lib/auth/session";
 import { hasCompletedOnboarding, saveOnboardingAnswersFromMetadata } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -31,12 +32,16 @@ export function AuthCallbackHandler() {
         refresh_token: refreshToken,
       });
 
-      if (error || !data.user) {
+      if (error || !data.user || !data.session) {
         router.replace("/login");
         return;
       }
 
       try {
+        await syncAuthSessionCookies({
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+        });
         const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);
         router.replace(completed ? "/discover" : "/onboarding");
       } catch {

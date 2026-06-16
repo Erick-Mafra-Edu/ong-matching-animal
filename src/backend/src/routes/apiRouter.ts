@@ -22,6 +22,7 @@ export function createApiRouter() {
   router.get("/onboarding-questions", system.listOnboardingQuestions);
 
   router.get("/admin/me", admin.getMe);
+  router.get("/admin/bootstrap", admin.getBootstrap);
   router.get("/admin/:resource", admin.listResource);
   router.post("/admin/admin-users", admin.createAdminUser);
   router.post("/admin/:resource", admin.createResource);
