@@ -574,6 +574,68 @@ describe("API Endpoints", () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
+    it("should allow tutor custom fields linked to text onboarding question ids", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "home_type" }, { id: "routine" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "custom-field-123",
+            entity_type: "tutor",
+            field_key: "teste",
+            label: "teste",
+            field_type: "text",
+            options: null,
+            source_question_id: "home_type",
+            is_active: true,
+            sort_order: 0,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/custom-fields")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          entity_type: "tutor",
+          field_key: "teste",
+          label: "teste",
+          source_question_id: "home_type",
+          field_type: "text",
+          options: null,
+          sort_order: 0,
+          is_active: true,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("source_question_id", "home_type");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/onboarding_questions?select=id&is_active=eq.true",
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        "https://example.supabase.co/rest/v1/custom_fields",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"source_question_id\":\"home_type\""),
+        }),
+      );
+    });
+
     it("should allow creating an onboarding question with null options", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
