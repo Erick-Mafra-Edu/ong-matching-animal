@@ -809,12 +809,20 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         : selectedId
           ? await dataProvider.update(activeResource, { id: selectedId, data: payload, previousData: selectedRow ?? undefined })
           : null;
+      const createdResourceId = response?.data?.id ? String(response.data.id) : selectedId ?? undefined;
+      const keepAnimalFormOpen = mode === "create" && activeResource === "animals" && Boolean(createdResourceId);
 
-      await loadResource(activeResource, response?.data?.id ? String(response.data.id) : selectedId ?? undefined);
+      await loadResource(activeResource, createdResourceId);
       if (activeResource === "custom-fields") await loadCustomFields();
       if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
-      setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
-      setIsMobileFormOpen(false);
+      setMessage(
+        keepAnimalFormOpen
+          ? "Registro criado. Agora voce ja pode enviar as fotos deste animal."
+          : mode === "create"
+            ? "Registro criado."
+            : "Alteracoes salvas.",
+      );
+      if (!keepAnimalFormOpen) setIsMobileFormOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
     } finally {
