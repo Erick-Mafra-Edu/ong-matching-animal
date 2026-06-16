@@ -580,7 +580,7 @@ async function fetchActiveOnboardingQuestionIds(supabaseUrl: string, serviceRole
 async function fetchTutorCustomFieldKeys(supabaseUrl: string, serviceRoleKey: string) {
   const [questions, customFieldsResponse] = await Promise.all([
     fetchActiveOnboardingQuestionIds(supabaseUrl, serviceRoleKey),
-    fetch(`${supabaseUrl}/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true&source_question_id=not.is.null`, {
+    fetch(`${supabaseUrl}/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true`, {
       headers: {
         apikey: serviceRoleKey,
         authorization: `Bearer ${serviceRoleKey}`,
@@ -591,7 +591,7 @@ async function fetchTutorCustomFieldKeys(supabaseUrl: string, serviceRoleKey: st
   const allowedKeys = new Set<string>(["onboarding_complete", ...questions]);
 
   for (const field of customFields) {
-    if (field.field_key && field.source_question_id && questions.has(field.source_question_id)) {
+    if (field.field_key && (!field.source_question_id || questions.has(field.source_question_id))) {
       allowedKeys.add(field.field_key);
     }
   }

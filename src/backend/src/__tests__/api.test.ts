@@ -272,6 +272,58 @@ describe("API Endpoints", () => {
       expect(response.status).toBe(502);
       expect(response.body.message).toContain("cache de matching");
     });
+
+    it("should accept active tutor custom fields without onboarding linkage", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "preferences" }, { id: "notes" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            { field_key: "preferencias", source_question_id: null },
+            { field_key: "observacoes", source_question_id: null },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => 3,
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/tutors")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          auth_user_id: "user-123",
+          name: "Tutor Teste",
+          custom_fields: {
+            onboarding_complete: true,
+            preferences: ["companhia"],
+            notes: "Tenho um gato em casa",
+            preferencias: ["companhia"],
+            observacoes: "Tenho um gato em casa",
+          },
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty("id", "tutor-123");
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true",
+        expect.any(Object),
+      );
+    });
   });
 
   describe("GET /api/tutors/me/discover-access", () => {
