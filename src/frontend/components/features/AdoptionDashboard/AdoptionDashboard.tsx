@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
+
+import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
 import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
-import type { InteresseRegistro } from "@/lib/interessados";
+
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
+import { useDiscoverAccess } from "../Auth/DiscoverGate";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
 import { MobileNavigation } from "./MobileNavigation";
@@ -15,7 +18,9 @@ import { PetPhotoCard } from "./PetPhotoCard";
 import { ProfileSummary } from "./ProfileSummary";
 
 interface AdoptionDashboardProps {
-  initialPage: AnimalsPageResponse;
+  initialPage?: AnimalsPageResponse;
+  status?: DashboardStatus;
+  tutorId?: string | null;
 }
 
 export type SwipeDirection = "left" | "right";
@@ -34,30 +39,84 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-async function registrarInteresse(animalId: string) {
-  const mod = await import("@/lib/interessados");
-  return mod.registrarInteresse(animalId);
-}
-
-export function AdoptionDashboard({ initialPage }: AdoptionDashboardProps) {
+export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tutorIdProp = null }: AdoptionDashboardProps) {
+  const discoverAccess = useDiscoverAccess();
+  const tutorId = tutorIdProp ?? discoverAccess.tutorId;
+  const initialItems = initialPage?.items ?? [];
+  const initialPagination = initialPage?.pagination ?? {
+    limit: 0,
+    offset: 0,
+    nextOffset: 0,
+    hasMore: true,
+  };
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
-  const [pets, setPets] = useState<AnimalListItem[]>(initialPage.items);
+  const [pets, setPets] = useState<AnimalListItem[]>(initialItems);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(initialPage.items.length ? "ready" : "empty");
-  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPage.pagination.nextOffset);
-  const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPage.pagination.hasMore);
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
+    status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
+  );
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);
+  const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
+  const [, setOngSettings] = useState<OngSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    carregarOngSettings()
+      .then((settings) => {
+        if (isMounted) setOngSettings(settings);
+      })
+      .catch(() => {
+        if (isMounted) setOngSettings(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (status !== "ready") {
+      setLoadStatus(status);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadStatus(initialItems.length ? "ready" : "loading");
+    setPets(initialItems);
+    setHistory([]);
+    setNextAnimalsOffset(initialPagination.nextOffset);
+    setHasMoreAnimals(initialPagination.hasMore);
+
+    fetchAnimalsPage(0, tutorId)
+      .then((page) => {
+        if (!isMounted) return;
+        setPets(page.items);
+        setNextAnimalsOffset(page.pagination.nextOffset);
+        setHasMoreAnimals(page.pagination.hasMore);
+        setLoadStatus(page.items.length ? "ready" : "empty");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setLoadStatus("error");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialItems, initialPagination.hasMore, initialPagination.nextOffset, status, tutorId]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
 
     setIsLoadingMoreAnimals(true);
     try {
-      const page = await fetchAnimalsPage(nextAnimalsOffset);
+      const page = await fetchAnimalsPage(nextAnimalsOffset, tutorId);
       setPets((currentPets) => {
         const existingIds = new Set(currentPets.map((pet) => pet.id));
         const newItems = page.items.filter((pet) => !existingIds.has(pet.id));
@@ -70,7 +129,7 @@ export function AdoptionDashboard({ initialPage }: AdoptionDashboardProps) {
     } finally {
       setIsLoadingMoreAnimals(false);
     }
-  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length]);
+  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length, tutorId]);
 
   useEffect(() => {
     if (loadStatus !== "ready" || pets.length > 1) return;
@@ -158,7 +217,6 @@ export function AdoptionDashboard({ initialPage }: AdoptionDashboardProps) {
     const [current, ...remaining] = pets;
     if (!current) return;
 
-    // Se for swipe para a direita e ainda não processamos este pet (não foi via botão)
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {

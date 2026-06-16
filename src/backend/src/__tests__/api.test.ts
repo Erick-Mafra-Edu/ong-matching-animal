@@ -186,6 +186,10 @@ describe("API Endpoints", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => 12,
         }) as jest.Mock;
 
       const response = await request(app)
@@ -219,6 +223,54 @@ describe("API Endpoints", () => {
           }),
         }),
       );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        5,
+        "https://example.supabase.co/rest/v1/rpc/refresh_tutor_animal_matches",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            target_tutor_id: "tutor-123",
+          }),
+        }),
+      );
+    });
+
+    it("should return 502 when onboarding save succeeds but cache refresh fails", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "q1" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ field_key: "home_type", source_question_id: "q1" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ message: "rpc failure" }),
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/tutors")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          auth_user_id: "user-123",
+          name: "Tutor Teste",
+          custom_fields: { onboarding_complete: true, home_type: "apartamento" },
+        });
+
+      expect(response.status).toBe(502);
+      expect(response.body.message).toContain("cache de matching");
     });
   });
 
@@ -997,6 +1049,109 @@ describe("API Endpoints", () => {
         expect.any(Object),
       );
     });
+
+    it("should list paginated cached matches for the authenticated tutor", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              compatibility_score: 98,
+              animal: {
+                id: "animal-123",
+                owner_id: "owner-123",
+                name: "Yolo",
+                species: "Cachorro",
+                custom_fields: { age: 2, traits: ["Calmo"] },
+                animal_photos: [{
+                  id: "photo-123",
+                  animal_id: "animal-123",
+                  public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+                  is_primary: true,
+                  created_at: "2026-01-01T00:00:00.000Z",
+                }],
+              },
+            },
+          ],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/animals?limit=2&offset=0&tutor_id=tutor-123")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0]).toMatchObject({
+        id: "animal-123",
+        name: "Yolo",
+        photoUrl: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+      });
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        1,
+        "https://example.supabase.co/auth/v1/user",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer access-token",
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        "https://example.supabase.co/rest/v1/tutors?select=id&auth_user_id=eq.user-123&id=eq.tutor-123&limit=1",
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("/rest/v1/tutor_animal_matches?select=compatibility_score,animal:animals("),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("tutor_id=eq.tutor-123"),
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining("limit=3&offset=0"),
+        expect.any(Object),
+      );
+    });
+
+    it("should reject cached match listing for a different tutor", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/animals?limit=2&offset=0&tutor_id=tutor-999")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toContain("outro tutor");
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("POST /api/animals", () => {
@@ -1247,7 +1402,7 @@ describe("API Endpoints", () => {
       expect(response.body.matches[0]).toHaveProperty("animal_id", "animal123");
       expect(response.body.matches[0]).toHaveProperty("compatibility_score", 50);
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://example.supabase.co/rest/v1/rpc/calculate_match_score",
+        "https://example.supabase.co/rest/v1/rpc/match_animals_for_tutor",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({

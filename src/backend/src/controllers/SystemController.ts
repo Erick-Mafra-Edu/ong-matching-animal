@@ -96,7 +96,7 @@ export class SystemController {
         fetch(`${supabaseUrl}/rest/v1/tutors?select=id,auth_user_id,name,location,custom_fields,created_at&id=eq.${encodeURIComponent(tutor_id)}&limit=1`, {
           headers: { apikey: serviceRoleKey, authorization: `Bearer ${serviceRoleKey}` },
         }),
-        fetch(`${supabaseUrl}/rest/v1/rpc/calculate_match_score`, {
+        fetch(`${supabaseUrl}/rest/v1/rpc/match_animals_for_tutor`, {
           method: "POST",
           headers: {
             apikey: serviceRoleKey,
@@ -132,7 +132,7 @@ export class SystemController {
         return;
       }
       if (!matchesResponse.ok) {
-        res.status(matchesResponse.status).json({ message: "Nao foi possivel calcular os matches via RPC.", details: matchesBody });
+        res.status(matchesResponse.status).json({ message: "Nao foi possivel carregar os matches em cache via RPC.", details: matchesBody });
         return;
       }
       if (!animalsCountResponse.ok) {
@@ -162,7 +162,7 @@ export class SystemController {
       res.json(response);
     } catch (error) {
       res.status(500).json({
-        message: "Nao foi possivel calcular os matches.",
+        message: "Nao foi possivel carregar os matches.",
         details: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }

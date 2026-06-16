@@ -47,9 +47,11 @@ async function fetchDiscoverAccessServer(accessToken: string): Promise<DiscoverA
   return response.json() as Promise<DiscoverAccessResponse>;
 }
 
-async function fetchInitialAnimals(): Promise<AnimalsPageResponse> {
+async function fetchInitialAnimals(tutorId: string | null, accessToken: string): Promise<AnimalsPageResponse> {
   const origin = await getRequestOrigin();
   return fetchAnimalsPage(0, {
+    tutorId,
+    accessToken,
     baseUrl: origin,
     init: {
       cache: "no-store",
@@ -75,11 +77,11 @@ export default async function DiscoverPage() {
     redirect("/onboarding");
   }
 
-  const initialPage = await fetchInitialAnimals();
+  const initialPage = await fetchInitialAnimals(access.tutor_id, accessToken);
 
   return (
     <>
-      <AdoptionDashboard initialPage={initialPage} />
+      <AdoptionDashboard initialPage={initialPage} tutorId={access.tutor_id} />
       <ScreenOnboardingRuntime />
     </>
   );
