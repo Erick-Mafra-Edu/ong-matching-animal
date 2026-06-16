@@ -144,6 +144,7 @@ type RuleSimulationResult = {
 
 const fieldClass =
   "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
+const adminOutlineButtonClass = "border-white/15 text-slate-100 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 const animalPhotoMaxSizeBytes = 800 * 1024;
 const animalPhotoMaxWidth = 1080;
 const animalPhotoMaxHeight = 1920;
@@ -879,7 +880,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
           <div className="flex flex-wrap gap-3">
             <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <DialogTrigger asChild>
-                <Button className="lg:hidden" type="button" variant="outline">
+                <Button className={`lg:hidden ${adminOutlineButtonClass}`} type="button" variant="outline">
                   <Menu className="h-4 w-4" />
                   Menu
                 </Button>
@@ -1591,7 +1592,7 @@ function RecordForm({
         <DialogFooter className="mt-4 gap-2 sm:justify-center">
           <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
           <DialogClose asChild>
-            <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+            <Button className={`flex-1 ${adminOutlineButtonClass}`} type="button" variant="outline">Cancelar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -1686,7 +1687,14 @@ function RecordForm({
               {isModal && (
                 <>
                   {deleteAction}
-                  <Button aria-label="Fechar registro" className="h-11 w-11 shrink-0 px-0" onClick={onClose} title="Fechar registro" type="button" variant="outline">
+                  <Button
+                    aria-label="Fechar registro"
+                    className={`h-11 w-11 shrink-0 px-0 ${adminOutlineButtonClass}`}
+                    onClick={onClose}
+                    title="Fechar registro"
+                    type="button"
+                    variant="outline"
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 </>
@@ -2812,7 +2820,7 @@ function KeyValueEditor({
         ))}
       </div>
       <Button
-        className="h-10 px-5 text-[10px] tracking-widest"
+        className={`h-10 px-5 text-[10px] tracking-widest ${adminOutlineButtonClass}`}
         disabled={disabled}
         onClick={() => onChange([...rows, { key: "", value: "" }])}
         type="button"
@@ -3360,7 +3368,7 @@ function ServiceConfigsPanel({ onRefresh, rows }: { onRefresh: () => Promise<voi
                   <>
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1 h-10 text-[10px]"
+                        className={`flex-1 h-10 text-[10px] ${adminOutlineButtonClass}`}
                         onClick={() => setIsConfiguring(service.id)}
                         variant="outline"
                       >
@@ -3368,7 +3376,7 @@ function ServiceConfigsPanel({ onRefresh, rows }: { onRefresh: () => Promise<voi
                         Configurar
                       </Button>
                       <Button
-                        className="h-10 px-4"
+                        className={`h-10 px-4 ${adminOutlineButtonClass}`}
                         disabled={isSaving}
                         onClick={() => handleToggleStatus(config)}
                         variant="outline"
@@ -3490,10 +3498,10 @@ function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void
                 <p>Calendar ID: {current?.calendar_id ? String(current.calendar_id) : "primary"}</p>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button className="flex-1" disabled={isWorking === provider} onClick={() => connect(provider)} variant="outline">
+                <Button className={`flex-1 ${adminOutlineButtonClass}`} disabled={isWorking === provider} onClick={() => connect(provider)} variant="outline">
                   {isConnected ? "Reconectar" : "Conectar"}
                 </Button>
-                <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => refresh(provider)} variant="outline">
+                <Button className={`flex-1 ${adminOutlineButtonClass}`} disabled={!isConnected || isWorking === provider} onClick={() => refresh(provider)} variant="outline">
                   Renovar
                 </Button>
                 <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => disconnect(provider)} variant="danger">
@@ -3605,7 +3613,7 @@ function ServiceConfigModal({
 
         <DialogFooter className="mt-8 gap-3 sm:justify-between border-t border-white/5 pt-6">
           <DialogClose asChild>
-            <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+            <Button className={`flex-1 ${adminOutlineButtonClass}`} type="button" variant="outline">Cancelar</Button>
           </DialogClose>
           <Button className="flex-1 shadow-lg shadow-cyan-400/10" disabled={isSaving} type="submit">
             {isSaving ? "Salvando..." : "Salvar Configuração"}

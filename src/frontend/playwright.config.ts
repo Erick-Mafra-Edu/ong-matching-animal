@@ -12,7 +12,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev",
+    command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
     port,
     reuseExistingServer: !process.env.CI,
     cwd: __dirname,
