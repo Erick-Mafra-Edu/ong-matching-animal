@@ -127,7 +127,7 @@ test("permite cadastrar campo customizado sem options e envia null para o endpoi
   await page.getByRole("button", { name: "Criar Registro" }).click();
 
   await expect(page.getByText("Registro criado.")).toBeVisible();
-  await expect(page.getByText("Pelagem")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pelagem para animal pelagem" })).toBeVisible();
   expect(state.lastCustomFieldPayload).toMatchObject({
     entity_type: "animal",
     field_key: "pelagem",
@@ -144,7 +144,7 @@ test("gera o id da pergunta de onboarding e envia payload valido para criacao", 
   await page.goto("/admin");
   await page.getByRole("button", { name: "Onboarding" }).click();
   await page.getByRole("button", { name: "Adicionar Novo" }).click();
-  await page.getByLabel("Pergunta").fill("Qual nome voce imagina para o pet?");
+  await page.getByRole("textbox", { name: "Pergunta*" }).fill("Qual nome voce imagina para o pet?");
 
   await expect(page.getByLabel("Identificador")).toHaveValue("qual_nome_voce_imagina_para_o_pet");
   await page.getByRole("button", { name: "Criar Registro" }).click();
