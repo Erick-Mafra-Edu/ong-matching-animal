@@ -19,6 +19,7 @@
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "npm test --prefix src/backend -- --runInBand",
     "test:frontend": "npm run build --prefix src/frontend",
+    "test:e2e": "npm run test:e2e --prefix src/frontend",
     "verify": "npm run test && npm run build"
   },
   "keywords": [
@@ -33,7 +34,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "concurrently": "^9.2.0"
+    "concurrently": "^10.0.3"
   },
   "dependencies": {
     "next": "^16.2.9"

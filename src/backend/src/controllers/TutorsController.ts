@@ -1,5 +1,12 @@
 import { Request, Response } from "express";
-import { getAuthenticatedUserId, getSupabaseBackendConfig, pickFields, requireAuthenticated, validateTutorCustomFields } from "./apiSupport";
+import {
+  getAuthenticatedUserId,
+  getAuthenticatedUserIdFromTokenPayload,
+  getSupabaseBackendConfig,
+  getSupabasePublicConfig,
+  pickFields,
+  validateTutorCustomFields,
+} from "./apiSupport";
 
 export class TutorsController {
   create = async (req: Request, res: Response) => {
@@ -56,7 +63,30 @@ export class TutorsController {
         return;
       }
 
-      res.status(201).json(Array.isArray(body) ? body[0] : body);
+      const savedTutor = Array.isArray(body) ? body[0] : body;
+
+      if (custom_fields.onboarding_complete === true && savedTutor?.id) {
+        const refreshResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/refresh_tutor_animal_matches`, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ target_tutor_id: savedTutor.id }),
+        });
+
+        if (!refreshResponse.ok) {
+          const refreshBody = await refreshResponse.json().catch(() => null);
+          res.status(502).json({
+            message: "Tutor salvo, mas nao foi possivel atualizar o cache de matching.",
+            details: refreshBody,
+          });
+          return;
+        }
+      }
+
+      res.status(201).json(savedTutor);
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -105,15 +135,32 @@ export class TutorsController {
 
   getDiscoverAccess = async (req: Request, res: Response) => {
     try {
-      const context = await requireAuthenticated(req, res);
-      if (!context) return;
+      const authorization = req.header("authorization");
+      const userId = getAuthenticatedUserIdFromTokenPayload(authorization);
+      const { supabaseUrl, publishableKey } = getSupabasePublicConfig();
 
-      const response = await fetch(`${context.supabaseUrl}/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.${encodeURIComponent(context.userId)}&limit=1`, {
+      if (!supabaseUrl || !publishableKey) {
+        res.status(500).json({ message: "Variaveis publicas do Supabase nao configuradas" });
+        return;
+      }
+
+      if (!authorization || !userId) {
+        res.status(401).json({ message: "Sessao invalida ou ausente." });
+        return;
+      }
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.${encodeURIComponent(userId)}&limit=1`, {
         headers: {
-          apikey: context.serviceRoleKey,
-          authorization: `Bearer ${context.serviceRoleKey}`,
+          apikey: publishableKey,
+          authorization,
         },
       });
+
+      if (response.status === 401 || response.status === 403) {
+        res.status(401).json({ message: "Sessao invalida ou ausente." });
+        return;
+      }
+
       const body = await response.json();
 
       if (!response.ok) {

@@ -54,7 +54,17 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   skipProxyUrlNormalize: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+    formats: ['image/avif', 'image/webp'],
+  },
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },

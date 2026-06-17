@@ -1,6 +1,10 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { backendApiUrl } from "@/lib/backend";
 
+type E2EWindow = Window & {
+  __E2E_ACCESS_TOKEN__?: unknown;
+};
+
 export type AdminResource =
   | "admin-users"
   | "tutors"
@@ -26,6 +30,14 @@ export interface NewAdminUserInput {
   password: string;
   full_name?: string;
   is_active: boolean;
+}
+
+export interface AdminBootstrapPayload {
+  admin: Record<string, unknown>;
+  custom_fields: Record<string, unknown>[];
+  onboarding_questions: Record<string, unknown>[];
+  resource: AdminResource;
+  rows: Record<string, unknown>[];
 }
 
 export const adminResources: AdminResourceConfig[] = [
@@ -177,6 +189,13 @@ export const adminResources: AdminResourceConfig[] = [
 ];
 
 async function getAccessToken() {
+  if (typeof window !== "undefined") {
+    const e2eAccessToken = (window as E2EWindow).__E2E_ACCESS_TOKEN__;
+    if (typeof e2eAccessToken === "string" && e2eAccessToken.trim()) {
+      return e2eAccessToken;
+    }
+  }
+
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
   if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
   return data.session.access_token;
@@ -204,6 +223,10 @@ async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function getAdminMe() {
   return adminFetch<Record<string, unknown>>("/api/admin/me");
+}
+
+export function getAdminBootstrap(resource: AdminResource) {
+  return adminFetch<AdminBootstrapPayload>(`/api/admin/bootstrap?resource=${encodeURIComponent(resource)}`);
 }
 
 export function listAdminResource(resource: AdminResource, q?: string) {

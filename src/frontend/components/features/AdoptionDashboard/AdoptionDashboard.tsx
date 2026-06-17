@@ -5,12 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
-import { backendApiUrl } from "@/lib/backend";
-import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
+
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
-import { fetchDiscoverAccess } from "@/lib/onboarding";
+import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
+
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
+import { useDiscoverAccess } from "../Auth/DiscoverGate";
+import { fetchDiscoverAccess } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
@@ -19,7 +21,9 @@ import { PetPhotoCard } from "./PetPhotoCard";
 import { ProfileSummary } from "./ProfileSummary";
 
 interface AdoptionDashboardProps {
+  initialPage?: AnimalsPageResponse;
   status?: DashboardStatus;
+  tutorId?: string | null;
 }
 
 export type SwipeDirection = "left" | "right";
@@ -38,99 +42,31 @@ interface ContactDialogState {
   whatsappUrl: string;
 }
 
-interface AnimalsPageResponse {
-  items: AnimalListItem[];
-  pagination: {
-    limit: number;
-    offset: number;
-    nextOffset: number | null;
-    hasMore: boolean;
+export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tutorIdProp = null }: AdoptionDashboardProps) {
+  const discoverAccess = useDiscoverAccess();
+  const tutorId = tutorIdProp ?? discoverAccess.tutorId;
+  const initialItems = initialPage?.items ?? [];
+  const initialPagination = initialPage?.pagination ?? {
+    limit: 0,
+    offset: 0,
+    nextOffset: 0,
+    hasMore: true,
   };
-}
-
-const DISCOVER_ANIMALS_PAGE_SIZE = 2;
-const IMAGE_PRELOAD_WINDOW = 2;
-
-async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
-  if (animal.photoUrl || animal.photoUrls?.length) return animal;
-
-  const photoUrl = await fetchAnimalFallbackPhoto();
-  return { ...animal, photoUrl, photoUrls: [photoUrl] };
-}
-
-function getPrimaryPhotoUrl(animal: AnimalListItem) {
-  return animal.photoUrl || animal.photoUrls?.[0] || "";
-}
-
-function preloadImage(url: string) {
-  if (typeof window === "undefined" || !url) return Promise.resolve();
-
-  return new Promise<void>((resolve) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve();
-    image.onerror = () => resolve();
-    image.src = url;
-  });
-}
-
-async function preloadPrimaryAnimalPhotos(animals: AnimalListItem[]) {
-  await Promise.all(animals.slice(0, IMAGE_PRELOAD_WINDOW).map((animal) => preloadImage(getPrimaryPhotoUrl(animal))));
-}
-
-async function fetchAnimalsPage(offset: number): Promise<AnimalsPageResponse> {
-  const params = new URLSearchParams({
-    limit: String(DISCOVER_ANIMALS_PAGE_SIZE),
-    offset: String(offset),
-  });
-  const response = await fetch(backendApiUrl(`/api/animals?${params.toString()}`));
-
-  if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
-
-  const body = await response.json() as AnimalsPageResponse | AnimalListItem[];
-  if (Array.isArray(body)) {
-    const items = await Promise.all(body.map(withFallbackPhoto));
-    await preloadPrimaryAnimalPhotos(items);
-    return {
-      items,
-      pagination: {
-        limit: items.length,
-        offset,
-        nextOffset: null,
-        hasMore: false,
-      },
-    };
-  }
-
-  const pageItems = Array.isArray(body.items) ? body.items : [];
-  const items = await Promise.all(pageItems.map(withFallbackPhoto));
-  await preloadPrimaryAnimalPhotos(items);
-  return {
-    items,
-    pagination: body.pagination ?? {
-      limit: items.length,
-      offset,
-      nextOffset: null,
-      hasMore: false,
-    },
-  };
-}
-
-export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) {
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
-  const [pets, setPets] = useState<AnimalListItem[]>([]);
+  const [pets, setPets] = useState<AnimalListItem[]>(initialItems);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(status === "ready" ? "loading" : status);
-  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(0);
-  const [hasMoreAnimals, setHasMoreAnimals] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
+    status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
+  );
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);      
+  const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const [isRegisteringInterest, setIsRegisteringInterest] = useState(false);
-  const [ongSettings, setOngSettings] = useState<OngSettings | null>(null);
+  const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
   const [onboardingOutdated, setOnboardingOutdated] = useState(false);
-
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
+  const [, setOngSettings] = useState<OngSettings | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -178,13 +114,13 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     }
 
     let isMounted = true;
-    setLoadStatus("loading");
-    setPets([]);
+    setLoadStatus(initialItems.length ? "ready" : "loading");
+    setPets(initialItems);
     setHistory([]);
-    setNextAnimalsOffset(0);
-    setHasMoreAnimals(true);
+    setNextAnimalsOffset(initialPagination.nextOffset);
+    setHasMoreAnimals(initialPagination.hasMore);
 
-    fetchAnimalsPage(0)
+    fetchAnimalsPage(0, tutorId)
       .then((page) => {
         if (!isMounted) return;
         setPets(page.items);
@@ -200,14 +136,14 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     return () => {
       isMounted = false;
     };
-  }, [status]);
+  }, [initialItems, initialPagination.hasMore, initialPagination.nextOffset, status, tutorId]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;
 
     setIsLoadingMoreAnimals(true);
     try {
-      const page = await fetchAnimalsPage(nextAnimalsOffset);
+      const page = await fetchAnimalsPage(nextAnimalsOffset, tutorId);
       setPets((currentPets) => {
         const existingIds = new Set(currentPets.map((pet) => pet.id));
         const newItems = page.items.filter((pet) => !existingIds.has(pet.id));
@@ -220,12 +156,12 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     } finally {
       setIsLoadingMoreAnimals(false);
     }
-  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length]);
+  }, [hasMoreAnimals, isLoadingMoreAnimals, nextAnimalsOffset, pets.length, tutorId]);
 
   useEffect(() => {
-    if (status !== "ready" || loadStatus !== "ready" || pets.length > 1) return;
+    if (loadStatus !== "ready" || pets.length > 1) return;
     void loadNextAnimalsPage();
-  }, [loadNextAnimalsPage, loadStatus, pets.length, status]);
+  }, [loadNextAnimalsPage, loadStatus, pets.length]);
 
   useEffect(() => {
     void preloadPrimaryAnimalPhotos(pets.slice(0, IMAGE_PRELOAD_WINDOW));
@@ -267,11 +203,10 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }
 
   async function openContactDialogForInterest(animal: AnimalListItem, interest: InteresseRegistro) {
-    const settings = ongSettings ?? await carregarOngSettings().catch(() => null);
-    if (settings && !ongSettings) setOngSettings(settings);
+    const settings = await carregarOngSettings().catch(() => null) as OngSettings | null;
 
     const interestLink = toAbsoluteInterestLink(interest.detail_url);
-    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
+    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);       
     const email = settings?.contact_email?.trim() ?? "";
     const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
 
@@ -286,9 +221,9 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
   }
 
   async function handleAdopt() {
-    if (!featuredPet || isRegisteringInterest) return;
+    if (!featuredPet || pendingAdoptionId) return;
 
-    setIsRegisteringInterest(true);
+    setPendingAdoptionId(featuredPet.id);
     setLastActionMessageId(featuredPet.id);
     setActionMessage("Registrando interesse...");
 
@@ -298,11 +233,10 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
-      // Se falhou, limpamos o ID para permitir nova tentativa (via swipe ou botão)
+      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");     
       setLastActionMessageId(null);
     } finally {
-      setIsRegisteringInterest(false);
+      setPendingAdoptionId(null);
     }
   }
 
@@ -310,21 +244,23 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
     const [current, ...remaining] = pets;
     if (!current) return;
 
-    // Se for swipe para a direita e ainda não processamos este pet (não foi via botão)
     if (direction === "right" && lastActionMessageId !== current.id) {
       setActionMessage("Registrando interesse...");
       try {
+        setPendingAdoptionId(current.id);
         const interest = await registrarInteresse(current.id);
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
-        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");   
+      } finally {
+        setPendingAdoptionId(null);
       }
     } else if (direction === "left") {
-      setActionMessage(""); // Limpa mensagens anteriores no swipe para esquerda
+      setActionMessage("");
     }
 
-    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
+    setHistory((prev) => [current, ...prev].slice(0, 10));
     setPets(remaining);
     setCardAction(null);
     if (remaining.length === 0 && !hasMoreAnimals) {
@@ -343,7 +279,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
   const actions = (
     <MatchActions
-      disabled={isRegisteringInterest}
+      disabled={Boolean(pendingAdoptionId)}
       onAdopt={handleAdopt}
       onReject={() => requestCardAction("left")}
       onUndo={history.length > 0 ? handleUndo : undefined}
@@ -365,7 +301,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           </nav>
         </div>
       </header>
-      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">
+      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
         <div>
           <PetPhotoCard
             action={cardAction}
@@ -375,7 +311,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
           <div className="md:hidden">
             <div className="animate-actions-enter bg-black px-5 py-3">
               {actions}
-              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}
+              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}      
             </div>
             <MobileNavigation items={mobileNavigationItems} />
           </div>
@@ -435,7 +371,7 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
           />
         </label>
 
-        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">
+        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">    
           <span className="font-semibold text-cyan-100">Link do interesse:</span> {dialog.interestLink}
         </div>
 

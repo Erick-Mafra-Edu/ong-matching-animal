@@ -1,4 +1,4 @@
-import { X, RotateCcw } from "lucide-react";
+import { RotateCcw, ShieldCheck, X } from "lucide-react";
 
 interface IconProps {
   className?: string;
@@ -30,8 +30,6 @@ export function ChevronIcon({ className = "" }: IconProps) {
 
 export function VerifiedIcon({ className = "" }: IconProps) {
   return (
-    <span className={`inline-grid place-items-center rounded-full bg-cyan-500 text-[9px] font-black text-white ${className}`} aria-label="Perfil verificado">
-      ✓
-    </span>
+    <ShieldCheck className={className} aria-label="Perfil verificado" />
   );
 }

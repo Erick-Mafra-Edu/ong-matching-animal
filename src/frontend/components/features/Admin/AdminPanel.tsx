@@ -20,6 +20,9 @@ import {
   AlertTriangle,
   ChevronDown,
   Star,
+  Plus,
+  Save,
+  X,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -41,7 +44,7 @@ import {
   createAdminUser,
   deleteAdminResource,
   disconnectCalendarOAuthConnection,
-  getAdminMe,
+  getAdminBootstrap,
   getCalendarOAuthAuthorizationUrl,
   listAdminResource,
   refreshCalendarOAuthConnection,
@@ -141,6 +144,7 @@ type RuleSimulationResult = {
 
 const fieldClass =
   "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
+const adminOutlineButtonClass = "border-white/15 text-slate-100 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 const animalPhotoMaxSizeBytes = 800 * 1024;
 const animalPhotoMaxWidth = 1080;
 const animalPhotoMaxHeight = 1920;
@@ -456,6 +460,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     secondaryFields: ["type", "sort_order"],
     searchFields: ["id", "label", "description", "placeholder"],
     createDefaults: {
+      id: "",
       label: "",
       description: "",
       placeholder: "",
@@ -466,6 +471,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       sort_order: 0,
     },
     fields: [
+      { name: "id", label: "Identificador", type: "text", createOnly: true, required: true, helper: "Use apenas letras minusculas, numeros e underscore. Ex.: preferred_energy." },
       { name: "label", label: "Pergunta", type: "text", required: true },
       { name: "description", label: "Descricao", type: "textarea" },
       { name: "placeholder", label: "Texto de apoio", type: "text" },
@@ -642,6 +648,8 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const [isResourceLoading, setIsResourceLoading] = useState(false);
   const [customFields, setCustomFields] = useState<CustomFieldRecord[]>([]);
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestionRecord[]>([]);
+  const [isBootstrapped, setIsBootstrapped] = useState(false);
+  const [bootstrappedResource, setBootstrappedResource] = useState<AdminResource | null>(null);
 
   const activeConfig = resourceUiConfigs[activeResource];
   const selectedRow = useMemo(
@@ -663,6 +671,24 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setOnboardingQuestions(data.map(toRaRecord) as OnboardingQuestionRecord[]);
   }, []);
 
+  const hydrateResourceState = useCallback((resource: AdminResource, data: AdminRecord[], nextSelectedId?: string) => {
+    setRows(data);
+
+    const resolvedId = nextSelectedId && data.some((row) => String(row.id) === String(nextSelectedId))
+      ? nextSelectedId
+      : data[0]?.id
+        ? String(data[0].id)
+        : null;
+
+    setSelectedId(resolvedId);
+    setMode(resolvedId ? "edit" : "create");
+    setFormState(
+      resolvedId
+        ? recordToFormState(data.find((row) => String(row.id) === resolvedId) ?? null, resourceUiConfigs[resource])
+        : createInitialState(resourceUiConfigs[resource]),
+    );
+  }, []);
+
   const loadResource = useCallback(async (resource: AdminResource, nextSelectedId?: string) => {
     setMessage("");
     setIsResourceLoading(true);
@@ -674,29 +700,25 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         filter: {},
       });
       const data = response.data as AdminRecord[];
-      setRows(data);
-
-      const resolvedId = nextSelectedId && data.some((row) => String(row.id) === String(nextSelectedId))
-        ? nextSelectedId
-        : data[0]?.id
-          ? String(data[0].id)
-          : null;
-
-      setSelectedId(resolvedId);
-      setMode(resolvedId ? "edit" : "create");
-      setFormState(resolvedId ? recordToFormState(data.find((row) => String(row.id) === resolvedId) ?? null, activeConfig) : createInitialState(activeConfig));
+      hydrateResourceState(resource, data, nextSelectedId);
     } finally {
       setIsResourceLoading(false);
     }
-  }, [activeConfig, dataProvider]);
+  }, [dataProvider, hydrateResourceState]);
 
   useEffect(() => {
     let mounted = true;
 
-    getAdminMe()
-      .then(() => Promise.all([loadCustomFields(), loadOnboardingQuestions(), loadResource(activeResource)]))
-      .then(() => {
-        if (mounted) setStatus("ready");
+    setStatus("loading");
+    getAdminBootstrap("admin-users")
+      .then((payload) => {
+        if (!mounted) return;
+        setCustomFields(payload.custom_fields.map(toRaRecord) as CustomFieldRecord[]);
+        setOnboardingQuestions(payload.onboarding_questions.map(toRaRecord) as OnboardingQuestionRecord[]);
+        hydrateResourceState("admin-users", payload.rows.map(toRaRecord) as AdminRecord[]);
+        setBootstrappedResource("admin-users");
+        setIsBootstrapped(true);
+        setStatus("ready");
       })
       .catch((error) => {
         if (!mounted) return;
@@ -714,7 +736,37 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     return () => {
       mounted = false;
     };
-  }, [activeResource, loadCustomFields, loadOnboardingQuestions, loadResource, router]);
+  }, [hydrateResourceState, router]);
+
+  useEffect(() => {
+    if (!isBootstrapped) return;
+    if (bootstrappedResource === activeResource) {
+      setBootstrappedResource(null);
+      return;
+    }
+
+    let mounted = true;
+    loadResource(activeResource)
+      .catch((error) => {
+        if (!mounted) return;
+        const errorMessage = error instanceof Error ? error.message : "";
+
+        if (errorMessage.includes("Sessao ausente")) {
+          router.push("/login?redirect=/admin");
+          return;
+        }
+
+        setStatus(errorMessage.includes("administrativo") ? "denied" : "error");
+        setMessage(errorMessage || "Nao foi possivel carregar o painel.");
+      })
+      .then(() => {
+        if (mounted) setStatus("ready");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activeResource, bootstrappedResource, isBootstrapped, loadResource, router]);
 
   function changeResource(resource: AdminResource) {
     setIsResourceLoading(true);
@@ -728,12 +780,17 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setIsMobileFormOpen(false);
   }
 
+  function shouldOpenMobileForm() {
+    if (typeof window === "undefined") return false;
+    return !window.matchMedia("(min-width: 1024px)").matches;
+  }
+
   function startCreate() {
     setMode("create");
     setSelectedId(null);
     setMessage("");
     setFormState(createInitialState(activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   function selectRow(row: AdminRecord) {
@@ -741,7 +798,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setSelectedId(String(row.id));
     setMessage("");
     setFormState(recordToFormState(row, activeConfig));
-    setIsMobileFormOpen(true);
+    setIsMobileFormOpen(shouldOpenMobileForm());
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -756,12 +813,20 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         : selectedId
           ? await dataProvider.update(activeResource, { id: selectedId, data: payload, previousData: selectedRow ?? undefined })
           : null;
+      const createdResourceId = response?.data?.id ? String(response.data.id) : selectedId ?? undefined;
+      const keepAnimalFormOpen = mode === "create" && activeResource === "animals" && Boolean(createdResourceId);
 
-      await loadResource(activeResource, response?.data?.id ? String(response.data.id) : selectedId ?? undefined);
+      await loadResource(activeResource, createdResourceId);
       if (activeResource === "custom-fields") await loadCustomFields();
       if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
-      setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
-      setIsMobileFormOpen(false);
+      setMessage(
+        keepAnimalFormOpen
+          ? "Registro criado. Agora voce ja pode enviar as fotos deste animal."
+          : mode === "create"
+            ? "Registro criado."
+            : "Alteracoes salvas.",
+      );
+      if (!keepAnimalFormOpen) setIsMobileFormOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
     } finally {
@@ -815,7 +880,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
           <div className="flex flex-wrap gap-3">
             <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <DialogTrigger asChild>
-                <Button className="lg:hidden" type="button" variant="outline">
+                <Button className={`lg:hidden ${adminOutlineButtonClass}`} type="button" variant="outline">
                   <Menu className="h-4 w-4" />
                   Menu
                 </Button>
@@ -1497,22 +1562,66 @@ function RecordForm({
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
   const formDisabled = disabled || config.readonly === true;
   const isModal = variant === "modal";
+  const canDelete = mode === "edit" && !config.readonly;
+
+  const deleteAction = canDelete ? (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          aria-label="Excluir registro"
+          className={isModal ? "h-11 w-11 shrink-0 px-0" : "h-9 px-4 text-[10px]"}
+          disabled={formDisabled}
+          title="Excluir registro"
+          type="button"
+          variant={isModal ? "danger-outline" : "danger"}
+        >
+          <Trash2 className="h-4 w-4" />
+          {!isModal && "Excluir"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
+          <DialogDescription className="text-center">
+            Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4 gap-2 sm:justify-center">
+          <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
+          <DialogClose asChild>
+            <Button className={`flex-1 ${adminOutlineButtonClass}`} type="button" variant="outline">Cancelar</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null;
 
   function handleFieldChange(field: FieldConfig, value: unknown) {
-    if (config.id !== "custom-fields") {
+    if (config.id !== "custom-fields" && config.id !== "onboarding-questions") {
       onChange({ ...formState, [field.name]: value });
       return;
     }
 
-    if (field.name === "field_key") {
-      onChange({ ...formState, field_key: sanitizeCustomFieldKey(String(value ?? "")) });
+    if (config.id === "custom-fields" && field.name === "field_key") {
+      onChange({ ...formState, field_key: sanitizeAdminIdentifier(String(value ?? "")) });
+      return;
+    }
+
+    if (config.id === "onboarding-questions" && field.name === "id") {
+      onChange({ ...formState, id: sanitizeAdminIdentifier(String(value ?? "")) });
       return;
     }
 
     if (field.name === "label") {
       const nextState: FormState = { ...formState, label: value };
-      if (!String(formState.field_key ?? "").trim()) {
-        nextState.field_key = sanitizeCustomFieldKey(String(value ?? ""));
+      if (config.id === "custom-fields" && !String(formState.field_key ?? "").trim()) {
+        nextState.field_key = sanitizeAdminIdentifier(String(value ?? ""));
+      }
+      if (config.id === "onboarding-questions" && !String(formState.id ?? "").trim()) {
+        nextState.id = sanitizeAdminIdentifier(String(value ?? ""));
       }
       onChange(nextState);
       return;
@@ -1537,33 +1646,7 @@ function RecordForm({
                 Ver Detalhes
               </Link>
             )}
-            {mode === "edit" && !config.readonly && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="h-9 px-4 text-[10px]" disabled={formDisabled} type="button" variant="danger">
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
-                      <AlertTriangle className="h-6 w-6" />
-                    </div>
-                    <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
-                    <DialogDescription className="text-center">
-                      Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter className="mt-4 gap-2 sm:justify-center">
-                    <Button className="flex-1" onClick={onDelete} type="button" variant="danger">Sim, excluir</Button>
-                    <DialogClose asChild>
-                      <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+            {deleteAction}
           </div>
         </div>
 
@@ -1602,11 +1685,22 @@ function RecordForm({
           {!config.readonly && (
             <div className={`sticky bottom-0 z-20 flex gap-3 border-t border-white/10 bg-[#16161a]/90 p-4 backdrop-blur-md ${isModal ? "justify-between" : "justify-end"}`}>
               {isModal && (
-                <Button className="flex-1" onClick={onClose} type="button" variant="outline">
-                  Fechar registro
-                </Button>
+                <>
+                  {deleteAction}
+                  <Button
+                    aria-label="Fechar registro"
+                    className={`h-11 w-11 shrink-0 px-0 ${adminOutlineButtonClass}`}
+                    onClick={onClose}
+                    title="Fechar registro"
+                    type="button"
+                    variant="outline"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
               )}
-              <Button className="min-w-[160px] shadow-xl shadow-cyan-400/10" disabled={formDisabled} type="submit">
+              <Button aria-label={mode === "create" ? "Criar registro" : "Salvar alterações"} className={`${isModal ? "flex-1" : "min-w-[160px]"} shadow-xl shadow-cyan-400/10`} disabled={formDisabled} title={mode === "create" ? "Criar registro" : "Salvar alterações"} type="submit">
+                {mode === "create" ? <Plus className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                 {mode === "create" ? "Criar Registro" : "Salvar Alterações"}
               </Button>
             </div>
@@ -2726,7 +2820,7 @@ function KeyValueEditor({
         ))}
       </div>
       <Button
-        className="h-10 px-5 text-[10px] tracking-widest"
+        className={`h-10 px-5 text-[10px] tracking-widest ${adminOutlineButtonClass}`}
         disabled={disabled}
         onClick={() => onChange([...rows, { key: "", value: "" }])}
         type="button"
@@ -3274,7 +3368,7 @@ function ServiceConfigsPanel({ onRefresh, rows }: { onRefresh: () => Promise<voi
                   <>
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1 h-10 text-[10px]"
+                        className={`flex-1 h-10 text-[10px] ${adminOutlineButtonClass}`}
                         onClick={() => setIsConfiguring(service.id)}
                         variant="outline"
                       >
@@ -3282,7 +3376,7 @@ function ServiceConfigsPanel({ onRefresh, rows }: { onRefresh: () => Promise<voi
                         Configurar
                       </Button>
                       <Button
-                        className="h-10 px-4"
+                        className={`h-10 px-4 ${adminOutlineButtonClass}`}
                         disabled={isSaving}
                         onClick={() => handleToggleStatus(config)}
                         variant="outline"
@@ -3404,10 +3498,10 @@ function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void
                 <p>Calendar ID: {current?.calendar_id ? String(current.calendar_id) : "primary"}</p>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button className="flex-1" disabled={isWorking === provider} onClick={() => connect(provider)} variant="outline">
+                <Button className={`flex-1 ${adminOutlineButtonClass}`} disabled={isWorking === provider} onClick={() => connect(provider)} variant="outline">
                   {isConnected ? "Reconectar" : "Conectar"}
                 </Button>
-                <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => refresh(provider)} variant="outline">
+                <Button className={`flex-1 ${adminOutlineButtonClass}`} disabled={!isConnected || isWorking === provider} onClick={() => refresh(provider)} variant="outline">
                   Renovar
                 </Button>
                 <Button className="flex-1" disabled={!isConnected || isWorking === provider} onClick={() => disconnect(provider)} variant="danger">
@@ -3519,7 +3613,7 @@ function ServiceConfigModal({
 
         <DialogFooter className="mt-8 gap-3 sm:justify-between border-t border-white/5 pt-6">
           <DialogClose asChild>
-            <Button className="flex-1" type="button" variant="outline">Cancelar</Button>
+            <Button className={`flex-1 ${adminOutlineButtonClass}`} type="button" variant="outline">Cancelar</Button>
           </DialogClose>
           <Button className="flex-1 shadow-lg shadow-cyan-400/10" disabled={isSaving} type="submit">
             {isSaving ? "Salvando..." : "Salvar Configuração"}
@@ -3538,7 +3632,7 @@ function humanizeFieldKey(value: string) {
     .join(" ");
 }
 
-function sanitizeCustomFieldKey(value: string) {
+function sanitizeAdminIdentifier(value: string) {
   const sanitized = value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
