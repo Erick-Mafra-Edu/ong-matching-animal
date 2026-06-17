@@ -1,3 +1,5 @@
+import { X, RotateCcw } from "lucide-react";
+
 interface IconProps {
   className?: string;
 }
@@ -11,11 +13,11 @@ export function PawIcon({ className = "" }: IconProps) {
 }
 
 export function CrossIcon({ className = "" }: IconProps) {
-  return <span className={className} aria-hidden="true">×</span>;
+  return <X className={className} aria-hidden="true" />;
 }
 
 export function UndoIcon({ className = "" }: IconProps) {
-  return <span className={className} aria-hidden="true">↶</span>;
+  return <RotateCcw className={className} aria-hidden="true" />;
 }
 
 export function ChevronIcon({ className = "" }: IconProps) {
