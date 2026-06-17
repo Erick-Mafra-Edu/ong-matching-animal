@@ -8,11 +8,11 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS onboarding_questions (
-  id TEXT PRIMARY KEY,
-  label TEXT NOT NULL,
+  id VARCHAR(64) PRIMARY KEY,
+  label VARCHAR(180) NOT NULL,
   description TEXT,
-  placeholder TEXT,
-  type TEXT NOT NULL CHECK (type IN ('text', 'select', 'radio', 'boolean', 'multiselect')),
+  placeholder VARCHAR(255),
+  type VARCHAR(32) NOT NULL CHECK (type IN ('text', 'select', 'radio', 'boolean', 'multiselect')),
   options JSONB,
   required BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true,

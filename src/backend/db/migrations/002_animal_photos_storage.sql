@@ -14,10 +14,10 @@ ON CONFLICT (id) DO UPDATE SET
 CREATE TABLE IF NOT EXISTS animal_photos (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
-  bucket_id TEXT NOT NULL DEFAULT 'animal-photos',
-  storage_path TEXT NOT NULL UNIQUE,
-  public_url TEXT NOT NULL,
-  content_type TEXT NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif')),
+  bucket_id VARCHAR(63) NOT NULL DEFAULT 'animal-photos',
+  storage_path VARCHAR(1024) NOT NULL UNIQUE,
+  public_url VARCHAR(2048) NOT NULL,
+  content_type VARCHAR(32) NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif')),
   size_bytes INT NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 5242880),
   is_primary BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()

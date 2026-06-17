@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     auth_user_id uuid REFERENCES auth.users(id),
-    action TEXT NOT NULL,
-    resource TEXT NOT NULL,
-    resource_id TEXT,
+    action VARCHAR(32) NOT NULL,
+    resource VARCHAR(80) NOT NULL,
+    resource_id VARCHAR(128),
     details JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

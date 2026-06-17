@@ -2,7 +2,7 @@ ALTER TABLE calendar_events
   ADD COLUMN IF NOT EXISTS interest_id UUID REFERENCES tutor_interessados(uuid_registro) ON DELETE SET NULL;
 
 ALTER TABLE calendar_events
-  ADD COLUMN IF NOT EXISTS external_event_url TEXT;
+  ADD COLUMN IF NOT EXISTS external_event_url VARCHAR(2048);
 
 CREATE INDEX IF NOT EXISTS calendar_events_interest_id_idx
   ON calendar_events (interest_id);

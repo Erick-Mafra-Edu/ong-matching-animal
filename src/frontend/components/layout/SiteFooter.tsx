@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Globe, Mail, MapPin, Phone } from "lucide-react";
 import { carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 
-const githubUrl = "https://github.com/Erick-Mafra-Edu/ong-matching-animal";
+const githubUrl = process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/Erick-Mafra-Edu/ong-matching-animal";
 
 export function SiteFooter() {
   const [settings, setSettings] = useState<OngSettings | null>(null);

@@ -1,5 +1,5 @@
 ALTER TABLE custom_fields
-  ADD COLUMN IF NOT EXISTS source_question_id TEXT REFERENCES onboarding_questions(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS source_question_id VARCHAR(64) REFERENCES onboarding_questions(id) ON DELETE SET NULL;
 
 UPDATE custom_fields
 SET source_question_id = CASE field_key
