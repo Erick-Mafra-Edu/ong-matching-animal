@@ -10,6 +10,7 @@ CREATE TABLE tutors (
   name TEXT NOT NULL,
   location geography(POINT),
   custom_fields JSONB DEFAULT '{}'::jsonb,
+  onboarding_completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -487,8 +488,12 @@ CREATE TABLE onboarding_questions (
   required BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true,
   sort_order INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX onboarding_questions_active_updated_at_idx
+  ON onboarding_questions (is_active, updated_at DESC);
 
 INSERT INTO onboarding_questions (id, label, description, placeholder, type, options, required, sort_order) VALUES
   ('home_type', 'Como é a sua moradia?', 'Isso ajuda a recomendar animais compatíveis com o espaço disponível.', NULL, 'radio', '[{"label":"Apartamento","value":"apartamento"},{"label":"Casa sem quintal","value":"casa_sem_quintal"},{"label":"Casa com quintal","value":"casa_com_quintal"}]'::jsonb, true, 10),

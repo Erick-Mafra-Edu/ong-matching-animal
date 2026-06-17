@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import {
+  getBearerToken,
   getAuthenticatedUserId,
   getAuthenticatedUserIdFromTokenPayload,
   getSupabaseBackendConfig,
   getSupabasePublicConfig,
   pickFields,
+  readJsonResponse,
+  requireAuthenticated,
   validateTutorCustomFields,
 } from "./apiSupport";
 
@@ -54,7 +57,12 @@ export class TutorsController {
           "content-type": "application/json",
           prefer: "resolution=merge-duplicates,return=representation",
         },
-        body: JSON.stringify({ auth_user_id, name, custom_fields }),
+        body: JSON.stringify({
+          auth_user_id,
+          name,
+          custom_fields,
+          ...(custom_fields.onboarding_complete === true ? { onboarding_completed_at: new Date().toISOString() } : {}),
+        }),
       });
       const body = await response.json();
 
@@ -95,6 +103,150 @@ export class TutorsController {
     }
   };
 
+  getMe = async (req: Request, res: Response) => {
+    try {
+      const context = await requireAuthenticated(req, res);
+      if (!context) return;
+
+      const accessToken = getBearerToken(req.header("authorization"));
+      if (!accessToken) {
+        res.status(401).json({ message: "Sessao invalida ou ausente." });
+        return;
+      }
+      const [authUserResponse, tutorResponse, questionsResponse] = await Promise.all([
+        fetch(`${context.supabaseUrl}/auth/v1/user`, {
+          headers: {
+            apikey: context.serviceRoleKey,
+            authorization: `Bearer ${accessToken}`,
+          },
+        }),
+        fetch(`${context.supabaseUrl}/rest/v1/tutors?select=id,auth_user_id,name,custom_fields,onboarding_completed_at,created_at&auth_user_id=eq.${encodeURIComponent(context.userId)}&limit=1`, {
+          headers: {
+            apikey: context.serviceRoleKey,
+            authorization: `Bearer ${context.serviceRoleKey}`,
+          },
+        }),
+        fetch(`${context.supabaseUrl}/rest/v1/onboarding_questions?select=updated_at&is_active=eq.true&order=updated_at.desc&limit=1`, {
+          headers: {
+            apikey: context.serviceRoleKey,
+            authorization: `Bearer ${context.serviceRoleKey}`,
+          },
+        }),
+      ]);
+
+      const authUser = await readJsonResponse(authUserResponse) as { email?: string; user_metadata?: Record<string, unknown> } | null;
+      const tutorBody = await tutorResponse.json();
+      const questionsBody = await questionsResponse.json();
+
+      if (!authUserResponse.ok) {
+        res.status(authUserResponse.status).json({ message: "Nao foi possivel carregar o usuario autenticado.", details: authUser });
+        return;
+      }
+
+      if (!tutorResponse.ok) {
+        res.status(tutorResponse.status).json({ message: "Nao foi possivel carregar o perfil.", details: tutorBody });
+        return;
+      }
+
+      if (!questionsResponse.ok) {
+        res.status(questionsResponse.status).json({ message: "Nao foi possivel carregar o status do questionario.", details: questionsBody });
+        return;
+      }
+
+      const tutor = Array.isArray(tutorBody) ? tutorBody[0] : null;
+      const latestQuestion = Array.isArray(questionsBody) ? questionsBody[0] : null;
+      const onboardingCompletedAt = typeof tutor?.onboarding_completed_at === "string" ? tutor.onboarding_completed_at : null;
+      const questionnaireUpdatedAt = typeof latestQuestion?.updated_at === "string" ? latestQuestion.updated_at : null;
+
+      res.json({
+        id: tutor?.id ?? null,
+        auth_user_id: context.userId,
+        email: authUser?.email ?? null,
+        name: tutor?.name ?? authUser?.user_metadata?.full_name ?? authUser?.email?.split("@")[0] ?? "",
+        onboarding_completed_at: onboardingCompletedAt,
+        questionnaire_updated_at: questionnaireUpdatedAt,
+        onboarding_outdated: isOnboardingOutdated(onboardingCompletedAt, questionnaireUpdatedAt),
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel carregar o perfil.",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  updateMe = async (req: Request, res: Response) => {
+    try {
+      const context = await requireAuthenticated(req, res);
+      if (!context) return;
+
+      const name = String(req.body?.name ?? "").trim();
+      if (name.length < 2 || name.length > 120) {
+        res.status(400).json({ message: "Informe um nome entre 2 e 120 caracteres." });
+        return;
+      }
+
+      const accessToken = getBearerToken(req.header("authorization"));
+      if (!accessToken) {
+        res.status(401).json({ message: "Sessao invalida ou ausente." });
+        return;
+      }
+
+      const authUserResponse = await fetch(`${context.supabaseUrl}/auth/v1/user`, {
+        headers: {
+          apikey: context.serviceRoleKey,
+          authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const authUser = await readJsonResponse(authUserResponse) as { user_metadata?: Record<string, unknown> } | null;
+
+      if (!authUserResponse.ok) {
+        res.status(authUserResponse.status).json({ message: "Nao foi possivel validar o usuario autenticado.", details: authUser });
+        return;
+      }
+
+      const tutorResponse = await fetch(`${context.supabaseUrl}/rest/v1/tutors?on_conflict=auth_user_id`, {
+        method: "POST",
+        headers: {
+          apikey: context.serviceRoleKey,
+          authorization: `Bearer ${context.serviceRoleKey}`,
+          "content-type": "application/json",
+          prefer: "resolution=merge-duplicates,return=representation",
+        },
+        body: JSON.stringify({ auth_user_id: context.userId, name }),
+      });
+      const tutorBody = await tutorResponse.json();
+
+      if (!tutorResponse.ok) {
+        res.status(tutorResponse.status).json({ message: "Nao foi possivel atualizar o perfil.", details: tutorBody });
+        return;
+      }
+
+      const authResponse = await fetch(`${context.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(context.userId)}`, {
+        method: "PUT",
+        headers: {
+          apikey: context.serviceRoleKey,
+          authorization: `Bearer ${context.serviceRoleKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ user_metadata: { ...(authUser?.user_metadata ?? {}), full_name: name } }),
+      });
+      const authBody = await readJsonResponse(authResponse);
+
+      if (!authResponse.ok) {
+        res.status(authResponse.status).json({ message: "Perfil atualizado, mas nao foi possivel sincronizar o nome no Auth.", details: authBody });
+        return;
+      }
+
+      res.json(Array.isArray(tutorBody) ? tutorBody[0] : tutorBody);
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel atualizar o perfil.",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
   getOnboardingStatus = async (req: Request, res: Response) => {
     const { supabaseUrl, serviceRoleKey } = getSupabaseBackendConfig();
     if (!supabaseUrl || !serviceRoleKey) {
@@ -109,22 +261,44 @@ export class TutorsController {
         return;
       }
 
-      const response = await fetch(`${supabaseUrl}/rest/v1/tutors?select=custom_fields&auth_user_id=eq.${encodeURIComponent(authenticatedUserId)}&limit=1`, {
-        headers: {
-          apikey: serviceRoleKey,
-          authorization: `Bearer ${serviceRoleKey}`,
-        },
-      });
-      const body = await response.json();
+      const [profileResponse, questionsResponse] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/tutors?select=custom_fields,onboarding_completed_at&auth_user_id=eq.${encodeURIComponent(authenticatedUserId)}&limit=1`, {
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }),
+        fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=updated_at&is_active=eq.true&order=updated_at.desc&limit=1`, {
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }),
+      ]);
+      const body = await profileResponse.json();
+      const questionsBody = await questionsResponse.json();
 
-      if (!response.ok) {
-        res.status(response.status).json({ message: "Nao foi possivel carregar o status de onboarding", details: body });
+      if (!profileResponse.ok) {
+        res.status(profileResponse.status).json({ message: "Nao foi possivel carregar o status de onboarding", details: body });
+        return;
+      }
+
+      if (!questionsResponse.ok) {
+        res.status(questionsResponse.status).json({ message: "Nao foi possivel carregar o status do questionario", details: questionsBody });
         return;
       }
 
       const profile = Array.isArray(body) ? body[0] : null;
+      const latestQuestion = Array.isArray(questionsBody) ? questionsBody[0] : null;
       const customFields = profile?.custom_fields && typeof profile.custom_fields === "object" ? profile.custom_fields : {};
-      res.json({ onboarding_complete: customFields.onboarding_complete === true });
+      const onboardingCompletedAt = typeof profile?.onboarding_completed_at === "string" ? profile.onboarding_completed_at : null;
+      const questionnaireUpdatedAt = typeof latestQuestion?.updated_at === "string" ? latestQuestion.updated_at : null;
+      res.json({
+        onboarding_complete: customFields.onboarding_complete === true,
+        onboarding_completed_at: onboardingCompletedAt,
+        questionnaire_updated_at: questionnaireUpdatedAt,
+        onboarding_outdated: isOnboardingOutdated(onboardingCompletedAt, questionnaireUpdatedAt),
+      });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
@@ -138,9 +312,10 @@ export class TutorsController {
       const authorization = req.header("authorization");
       const userId = getAuthenticatedUserIdFromTokenPayload(authorization);
       const { supabaseUrl, publishableKey } = getSupabasePublicConfig();
+      const { serviceRoleKey } = getSupabaseBackendConfig();
 
-      if (!supabaseUrl || !publishableKey) {
-        res.status(500).json({ message: "Variaveis publicas do Supabase nao configuradas" });
+      if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
+        res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
         return;
       }
 
@@ -149,30 +324,51 @@ export class TutorsController {
         return;
       }
 
-      const response = await fetch(`${supabaseUrl}/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.${encodeURIComponent(userId)}&limit=1`, {
-        headers: {
-          apikey: publishableKey,
-          authorization,
-        },
-      });
+      const [profileResponse, questionsResponse] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/tutors?select=id,custom_fields,onboarding_completed_at&auth_user_id=eq.${encodeURIComponent(userId)}&limit=1`, {
+          headers: {
+            apikey: publishableKey,
+            authorization,
+          },
+        }),
+        fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=updated_at&is_active=eq.true&order=updated_at.desc&limit=1`, {
+          headers: {
+            apikey: serviceRoleKey,
+            authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }),
+      ]);
 
-      if (response.status === 401 || response.status === 403) {
+      if (profileResponse.status === 401 || profileResponse.status === 403) {
         res.status(401).json({ message: "Sessao invalida ou ausente." });
         return;
       }
 
-      const body = await response.json();
+      const body = await profileResponse.json();
+      const questionsBody = await questionsResponse.json();
 
-      if (!response.ok) {
-        res.status(response.status).json({ message: "Nao foi possivel carregar o acesso ao discover", details: body });
+      if (!profileResponse.ok) {
+        res.status(profileResponse.status).json({ message: "Nao foi possivel carregar o acesso ao discover", details: body });
+        return;
+      }
+
+      if (!questionsResponse.ok) {
+        res.status(questionsResponse.status).json({ message: "Nao foi possivel carregar o status do questionario", details: questionsBody });
         return;
       }
 
       const profile = Array.isArray(body) ? body[0] : null;
+      const latestQuestion = Array.isArray(questionsBody) ? questionsBody[0] : null;
       const customFields = profile?.custom_fields && typeof profile.custom_fields === "object" ? profile.custom_fields : {};
+      const onboardingCompletedAt = typeof profile?.onboarding_completed_at === "string" ? profile.onboarding_completed_at : null;
+      const questionnaireUpdatedAt = typeof latestQuestion?.updated_at === "string" ? latestQuestion.updated_at : null;
+
       res.json({
         authenticated: true,
         onboarding_complete: customFields.onboarding_complete === true,
+        onboarding_completed_at: onboardingCompletedAt,
+        questionnaire_updated_at: questionnaireUpdatedAt,
+        onboarding_outdated: isOnboardingOutdated(onboardingCompletedAt, questionnaireUpdatedAt),
         tutor_id: profile?.id ?? null,
       });
     } catch (error) {
@@ -186,4 +382,9 @@ export class TutorsController {
   getById = (_req: Request, res: Response) => {
     res.json({ message: "Implementar carregamento de tutor do Supabase" });
   };
+}
+
+function isOnboardingOutdated(completedAt: string | null, questionnaireUpdatedAt: string | null) {
+  if (!completedAt || !questionnaireUpdatedAt) return false;
+  return new Date(questionnaireUpdatedAt).getTime() > new Date(completedAt).getTime();
 }

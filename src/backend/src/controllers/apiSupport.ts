@@ -21,7 +21,7 @@ export const adminTables = {
   },
   tutors: {
     table: "tutors",
-    select: "id,auth_user_id,name,location,custom_fields,created_at",
+    select: "id,auth_user_id,name,location,custom_fields,onboarding_completed_at,created_at",
     order: "created_at.desc",
     createFields: ["auth_user_id", "name", "location", "custom_fields"],
     updateFields: ["name", "location", "custom_fields"],
@@ -64,10 +64,10 @@ export const adminTables = {
   },
   "onboarding-questions": {
     table: "onboarding_questions",
-    select: "id,label,description,placeholder,type,options,required,is_active,sort_order,created_at",
+    select: "id,label,description,placeholder,type,options,required,is_active,sort_order,created_at,updated_at",
     order: "sort_order.asc",
     createFields: ["id", "label", "description", "placeholder", "type", "options", "required", "is_active", "sort_order"],
-    updateFields: ["label", "description", "placeholder", "type", "options", "required", "is_active", "sort_order"],
+    updateFields: ["label", "description", "placeholder", "type", "options", "required", "is_active", "sort_order", "updated_at"],
   },
   "matching-rules": {
     table: "matching_rules",
@@ -203,6 +203,10 @@ export async function requireAuthenticated(req: Request, res: Response) {
   }
 
   return { supabaseUrl, serviceRoleKey, userId };
+}
+
+export function getBearerToken(authorization?: string) {
+  return authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
 }
 
 export function getAdminTable(resource: string) {

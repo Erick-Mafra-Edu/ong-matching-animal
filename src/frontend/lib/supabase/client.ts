@@ -17,6 +17,7 @@ export interface Database {
           is_active: boolean;
           sort_order: number;
           created_at: string;
+          updated_at: string;
         };
         Insert: never;
         Update: never;
@@ -29,6 +30,7 @@ export interface Database {
           name: string;
           location: unknown | null;
           custom_fields: Json;
+          onboarding_completed_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -37,6 +39,7 @@ export interface Database {
           name: string;
           location?: unknown | null;
           custom_fields?: Json;
+          onboarding_completed_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -44,6 +47,7 @@ export interface Database {
           name?: string;
           location?: unknown | null;
           custom_fields?: Json;
+          onboarding_completed_at?: string | null;
         };
         Relationships: [];
       };

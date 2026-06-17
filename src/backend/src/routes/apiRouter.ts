@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/AdminController";
 import { AnimalsController } from "../controllers/AnimalsController";
+import { AuthController } from "../controllers/AuthController";
 import { CalendarOAuthController } from "../controllers/CalendarOAuthController";
 import { CalendarEventsController } from "../controllers/CalendarEventsController";
 import { InterestsController } from "../controllers/InterestsController";
@@ -11,6 +12,7 @@ export function createApiRouter() {
   const router = Router();
   const admin = new AdminController();
   const animals = new AnimalsController();
+  const auth = new AuthController();
   const calendarOAuth = new CalendarOAuthController();
   const calendarEvents = new CalendarEventsController();
   const interests = new InterestsController();
@@ -20,6 +22,9 @@ export function createApiRouter() {
   router.get("/health", system.getHealth);
   router.get("/ong-settings", system.getOngSettings);
   router.get("/onboarding-questions", system.listOnboardingQuestions);
+
+  router.post("/auth/password-recovery", auth.requestPasswordRecovery);
+  router.post("/auth/change-password", auth.changePassword);
 
   router.get("/admin/me", admin.getMe);
   router.get("/admin/bootstrap", admin.getBootstrap);
@@ -47,6 +52,8 @@ export function createApiRouter() {
   router.get("/interessados/:uuid_registro", interests.getDetail);
 
   router.post("/tutors", tutors.create);
+  router.get("/tutors/me", tutors.getMe);
+  router.patch("/tutors/me", tutors.updateMe);
   router.get("/tutors/me/discover-access", tutors.getDiscoverAccess);
   router.get("/tutors/me/onboarding-status", tutors.getOnboardingStatus);
   router.get("/tutors/:id", tutors.getById);

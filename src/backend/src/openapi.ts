@@ -111,9 +111,25 @@ export const apiDoc = {
       properties: {
         authenticated: { type: "boolean" },
         onboarding_complete: { type: "boolean" },
+        onboarding_completed_at: { type: "string", format: "date-time" },
+        questionnaire_updated_at: { type: "string", format: "date-time" },
+        onboarding_outdated: { type: "boolean" },
         tutor_id: { type: "string" },
       },
       required: ["authenticated", "onboarding_complete"],
+    },
+    AccountProfile: {
+      type: "object",
+      properties: {
+        id: { type: "string", format: "uuid" },
+        auth_user_id: { type: "string", format: "uuid" },
+        email: { type: "string" },
+        name: { type: "string" },
+        onboarding_completed_at: { type: "string", format: "date-time" },
+        questionnaire_updated_at: { type: "string", format: "date-time" },
+        onboarding_outdated: { type: "boolean" },
+      },
+      required: ["auth_user_id", "name", "onboarding_outdated"],
     },
     AnimalPhoto: {
       type: "object",
@@ -287,6 +303,43 @@ export const apiDoc = {
         },
       },
     },
+    "/tutors/me": {
+      get: {
+        tags: ["Tutors"],
+        operationId: "getTutorMe",
+        summary: "Retorna o perfil de conta do tutor autenticado.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: "Perfil autenticado.", schema: { $ref: "#/definitions/AccountProfile" } },
+          401: { description: "Sessao ausente ou invalida.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          500: { description: "Erro de configuracao ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
+        },
+      },
+      patch: {
+        tags: ["Tutors"],
+        operationId: "updateTutorMe",
+        summary: "Atualiza dados editaveis da conta do tutor autenticado.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "body",
+            name: "body",
+            required: true,
+            schema: {
+              type: "object",
+              properties: { name: { type: "string", minLength: 2, maxLength: 120 } },
+              required: ["name"],
+            },
+          },
+        ],
+        responses: {
+          200: { description: "Perfil atualizado.", schema: { $ref: "#/definitions/Tutor" } },
+          400: { description: "Payload invalido.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          401: { description: "Sessao ausente ou invalida.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          500: { description: "Erro de configuracao ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
+        },
+      },
+    },
     "/tutors/me/discover-access": {
       get: {
         tags: ["Tutors"],
@@ -297,6 +350,59 @@ export const apiDoc = {
           200: { description: "Status de acesso ao Discover.", schema: { $ref: "#/definitions/DiscoverAccess" } },
           401: { description: "Sessão ausente ou inválida.", schema: { $ref: "#/definitions/ErrorResponse" } },
           500: { description: "Erro de configuração ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
+        },
+      },
+    },
+    "/auth/password-recovery": {
+      post: {
+        tags: ["Tutors"],
+        operationId: "requestPasswordRecovery",
+        summary: "Solicita recuperacao de senha sem expor existencia de conta.",
+        parameters: [
+          {
+            in: "body",
+            name: "body",
+            required: true,
+            schema: {
+              type: "object",
+              properties: { email: { type: "string", format: "email" } },
+              required: ["email"],
+            },
+          },
+        ],
+        responses: {
+          200: { description: "Solicitacao aceita." },
+          400: { description: "Email invalido.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          500: { description: "Erro de configuracao.", schema: { $ref: "#/definitions/ErrorResponse" } },
+        },
+      },
+    },
+    "/auth/change-password": {
+      post: {
+        tags: ["Tutors"],
+        operationId: "changePassword",
+        summary: "Altera senha do usuario autenticado apos validar a senha atual.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "body",
+            name: "body",
+            required: true,
+            schema: {
+              type: "object",
+              properties: {
+                current_password: { type: "string" },
+                new_password: { type: "string", minLength: 8 },
+              },
+              required: ["current_password", "new_password"],
+            },
+          },
+        ],
+        responses: {
+          200: { description: "Senha alterada." },
+          400: { description: "Senha atual invalida ou payload invalido.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          401: { description: "Sessao ausente ou invalida.", schema: { $ref: "#/definitions/ErrorResponse" } },
+          500: { description: "Erro de configuracao ou Supabase.", schema: { $ref: "#/definitions/ErrorResponse" } },
         },
       },
     },
@@ -440,8 +546,12 @@ export const openApiOperations = {
   getOngSettings: operationPassThrough,
   listOnboardingQuestions: operationPassThrough,
   upsertTutor: operationPassThrough,
+  getTutorMe: operationPassThrough,
+  updateTutorMe: operationPassThrough,
   getDiscoverAccess: operationPassThrough,
   getTutorById: operationPassThrough,
+  requestPasswordRecovery: operationPassThrough,
+  changePassword: operationPassThrough,
   listAnimals: operationPassThrough,
   createAnimal: operationPassThrough,
   listAnimalPhotos: operationPassThrough,

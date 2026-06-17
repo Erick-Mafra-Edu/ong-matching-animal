@@ -221,6 +221,7 @@ describe("API Endpoints", () => {
             authorization: "Bearer service-key",
             prefer: "resolution=merge-duplicates,return=representation",
           }),
+          body: expect.stringContaining("\"onboarding_completed_at\""),
         }),
       );
       expect(global.fetch).toHaveBeenNthCalledWith(
@@ -326,9 +327,124 @@ describe("API Endpoints", () => {
     });
   });
 
+  describe("Account auth endpoints", () => {
+    it("should request password recovery without exposing account existence", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/auth/password-recovery")
+        .send({ email: "tutor@example.com" });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toContain("Se o e-mail existir");
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://example.supabase.co/auth/v1/recover",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ email: "tutor@example.com" }),
+        }),
+      );
+    });
+
+    it("should change password only after validating the current password", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123", email: "tutor@example.com" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ access_token: "verified" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: async () => JSON.stringify({ id: "user-123" }),
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/auth/change-password")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          current_password: "current-password",
+          new_password: "new-password",
+        });
+
+      expect(response.status).toBe(200);
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        3,
+        "https://example.supabase.co/auth/v1/token?grant_type=password",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ email: "tutor@example.com", password: "current-password" }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        "https://example.supabase.co/auth/v1/admin/users/user-123",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ password: "new-password" }),
+        }),
+      );
+    });
+  });
+
+  describe("GET /api/tutors/me", () => {
+    it("should return profile and questionnaire freshness status", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: async () => JSON.stringify({ email: "tutor@example.com", user_metadata: { full_name: "Tutor Auth" } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "tutor-123",
+            name: "Tutor Teste",
+            onboarding_completed_at: "2026-06-10T12:00:00.000Z",
+          }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ updated_at: "2026-06-11T12:00:00.000Z" }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/tutors/me")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        id: "tutor-123",
+        auth_user_id: "user-123",
+        email: "tutor@example.com",
+        name: "Tutor Teste",
+        onboarding_outdated: true,
+      });
+    });
+  });
+
   describe("GET /api/tutors/me/discover-access", () => {
     it("should return only the data needed to load discover", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
       const accessToken = "header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature";
       global.fetch = jest.fn()
@@ -336,11 +452,16 @@ describe("API Endpoints", () => {
           ok: true,
           json: async () => [{
             id: "tutor-123",
+            onboarding_completed_at: "2026-06-12T12:00:00.000Z",
             custom_fields: {
               onboarding_complete: true,
               preferred_energy: "alto",
             },
           }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ updated_at: "2026-06-11T12:00:00.000Z" }],
         }) as jest.Mock;
 
       const response = await request(app)
@@ -351,10 +472,13 @@ describe("API Endpoints", () => {
       expect(response.body).toEqual({
         authenticated: true,
         onboarding_complete: true,
+        onboarding_completed_at: "2026-06-12T12:00:00.000Z",
+        questionnaire_updated_at: "2026-06-11T12:00:00.000Z",
+        onboarding_outdated: false,
         tutor_id: "tutor-123",
       });
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://example.supabase.co/rest/v1/tutors?select=id,custom_fields&auth_user_id=eq.user-123&limit=1",
+        "https://example.supabase.co/rest/v1/tutors?select=id,custom_fields,onboarding_completed_at&auth_user_id=eq.user-123&limit=1",
         expect.objectContaining({
           headers: expect.objectContaining({
             apikey: "publishable-key",
@@ -1714,34 +1838,31 @@ describe("API Endpoints", () => {
       global.fetch = jest.fn()
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
+          text: async () => JSON.stringify([{
             id: "tutor123",
             name: "Tutor Teste",
             custom_fields: { pref_energia: "alto" },
-          }],
+          }]),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
-            id: "animal123",
-            owner_id: "owner123",
-            name: "Rex",
-            species: "Cachorro",
-            custom_fields: { nivel_energia: "alto" },
-          }],
+          text: async () => JSON.stringify([{
+            animal_id: "animal123",
+            animal_name: "Rex",
+            compatibility_score: 50,
+            matched_rules: ["rule123"],
+            details: [{
+              rule_id: "rule123",
+              rule_name: "Energia",
+              matched: true,
+              weight: 50,
+              is_dealbreaker: false,
+            }],
+          }]),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [{
-            id: "rule123",
-            rule_name: "Energia",
-            tutor_field: "pref_energia",
-            animal_field: "nivel_energia",
-            comparison_operator: "=",
-            weight: 50,
-            is_dealbreaker: false,
-            is_active: true,
-          }],
+          text: async () => "1",
         }) as jest.Mock;
       const testData = { tutor_id: "test123", data: "test" };
       const response = await request(app)
