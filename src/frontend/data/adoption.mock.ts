@@ -25,7 +25,7 @@ export const featuredPet: PetProfile = {
 export const navigationItems: NavigationItem[] = [
   { id: "discover", label: "Descobrir", icon: "discover", href: "/discover", active: true },
   { id: "interests", label: "Interesses", icon: "interests", href: "/interesses" },
-  { id: "messages", label: "Mensagens", icon: "messages", notification: true },
-  { id: "profile", label: "Perfil", icon: "profile" },
+  { id: "messages", label: "Mensagens", icon: "messages" },
+  { id: "profile", label: "Perfil", icon: "profile", href: "/perfil" },
   { id: "admin", label: "Administração", icon: "admin", href: "/admin" },
 ];

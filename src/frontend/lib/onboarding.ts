@@ -149,6 +149,9 @@ export async function fetchDiscoverAccess(supabase: SupabaseClient<Database>) {
   return response.json() as Promise<{
     authenticated: boolean;
     onboarding_complete: boolean;
+    onboarding_completed_at: string | null;
+    questionnaire_updated_at: string | null;
+    onboarding_outdated: boolean;
     tutor_id: string | null;
   }>;
 }

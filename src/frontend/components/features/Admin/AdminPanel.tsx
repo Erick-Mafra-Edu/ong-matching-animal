@@ -2473,7 +2473,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
                   title="Excluir foto"
                   type="button"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
 
@@ -2814,7 +2814,7 @@ function KeyValueEditor({
               title="Remover campo"
               type="button"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         ))}

@@ -320,6 +320,7 @@ export class AdminController {
       }
       if (resource === "admin-users") payload.updated_at = new Date().toISOString();
       if (resource === "ong-settings") payload.updated_at = new Date().toISOString();
+      if (resource === "onboarding-questions") payload.updated_at = new Date().toISOString();
 
       if (!resourceId) {
         res.status(400).json({ message: "Identificador do recurso invalido." });

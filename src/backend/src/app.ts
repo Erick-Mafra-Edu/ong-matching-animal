@@ -79,6 +79,8 @@ export function createApp() {
   }));
 
   app.use("/api/admin/admin-users", strictLimiter);
+  app.use("/api/auth/password-recovery", strictLimiter);
+  app.use("/api/auth/change-password", strictLimiter);
 
   app.get("/api/openapi.json", (_req, res) => {
     res.json(apiDoc);

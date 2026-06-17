@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 
@@ -11,6 +12,8 @@ import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, typ
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
 import { useDiscoverAccess } from "../Auth/DiscoverGate";
+import { fetchDiscoverAccess } from "@/lib/onboarding";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { DashboardState } from "./DashboardState";
 import { MatchActions } from "./MatchActions";
 import { MobileNavigation } from "./MobileNavigation";
@@ -55,12 +58,13 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
   const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
     status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
   );
-  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);
+  const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);      
   const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
+  const [onboardingOutdated, setOnboardingOutdated] = useState(false);
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
   const [, setOngSettings] = useState<OngSettings | null>(null);
 
@@ -79,6 +83,29 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchDiscoverAccess(getSupabaseBrowserClient())
+      .then((access) => {
+        if (isMounted) setOnboardingOutdated(access.onboarding_outdated === true);
+      })
+      .catch(() => {
+        if (isMounted) setOnboardingOutdated(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const mobileNavigationItems = useMemo(
+    () => navigationItems.map((item) => (
+      item.id === "profile" ? { ...item, notification: onboardingOutdated } : item
+    )),
+    [onboardingOutdated],
+  );
 
   useEffect(() => {
     if (status !== "ready") {
@@ -179,7 +206,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     const settings = await carregarOngSettings().catch(() => null) as OngSettings | null;
 
     const interestLink = toAbsoluteInterestLink(interest.detail_url);
-    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);
+    const message = buildAdoptionMessage(settings?.adoption_message_template, animal.name, interestLink);       
     const email = settings?.contact_email?.trim() ?? "";
     const whatsappPhone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
 
@@ -206,7 +233,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");     
       setLastActionMessageId(null);
     } finally {
       setPendingAdoptionId(null);
@@ -225,7 +252,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
-        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");   
       } finally {
         setPendingAdoptionId(null);
       }
@@ -274,7 +301,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
           </nav>
         </div>
       </header>
-      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">
+      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
         <div>
           <PetPhotoCard
             action={cardAction}
@@ -284,9 +311,9 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
           <div className="md:hidden">
             <div className="animate-actions-enter bg-black px-5 py-3">
               {actions}
-              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}
+              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}      
             </div>
-            <MobileNavigation items={navigationItems} />
+            <MobileNavigation items={mobileNavigationItems} />
           </div>
         </div>
         <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
@@ -330,8 +357,8 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
             <h2 className="text-lg font-black" id="adoption-contact-title">Contato com a ONG</h2>
             <p className="mt-1 text-sm leading-6 text-slate-400">{dialog.animalName} foi salvo nos seus interesses.</p>
           </div>
-          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-xl text-slate-300 transition hover:border-cyan-200 hover:text-cyan-100" onClick={onClose} type="button" aria-label="Fechar">
-            ×
+          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-slate-300 transition hover:border-cyan-200 hover:text-cyan-100" onClick={onClose} type="button" aria-label="Fechar">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -344,7 +371,7 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
           />
         </label>
 
-        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">
+        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">    
           <span className="font-semibold text-cyan-100">Link do interesse:</span> {dialog.interestLink}
         </div>
 
