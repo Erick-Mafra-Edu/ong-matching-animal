@@ -4,7 +4,7 @@ DO $$
 BEGIN
   PERFORM pgmq.create('calendar_sync');
 EXCEPTION
-  WHEN duplicate_table OR duplicate_object THEN
+  WHEN OTHERS THEN
     NULL;
 END;
 $$;
@@ -13,7 +13,7 @@ DO $$
 BEGIN
   PERFORM pgmq.create('calendar_sync_failed');
 EXCEPTION
-  WHEN duplicate_table OR duplicate_object THEN
+  WHEN OTHERS THEN
     NULL;
 END;
 $$;

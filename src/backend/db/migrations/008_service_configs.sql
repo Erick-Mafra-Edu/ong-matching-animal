@@ -1,8 +1,8 @@
 -- Configuration for external services
 CREATE TABLE service_configs (
-  id TEXT PRIMARY KEY,
-  service_type TEXT NOT NULL CHECK (service_type IN ('calendar')),
-  provider TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+  id VARCHAR(80) PRIMARY KEY,
+  service_type VARCHAR(32) NOT NULL CHECK (service_type IN ('calendar')),
+  provider VARCHAR(32) NOT NULL CHECK (provider IN ('google', 'microsoft')),
   config JSONB NOT NULL DEFAULT '{}'::jsonb,
   is_active BOOLEAN DEFAULT true,
   updated_at TIMESTAMPTZ DEFAULT NOW()

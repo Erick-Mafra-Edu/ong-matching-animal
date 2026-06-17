@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS admin_users (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   auth_user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
+  email VARCHAR(254) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),

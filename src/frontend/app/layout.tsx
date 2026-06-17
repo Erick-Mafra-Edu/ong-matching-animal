@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="pt-BR" style={{ backgroundColor: "var(--color-bg)" }}>
       <body className="min-h-screen bg-surface-bg text-surface-text" style={{ backgroundColor: "var(--color-bg)" }}>
-        {children}
+        <div className="flex min-h-screen flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );

@@ -94,6 +94,35 @@ export class InterestsController {
         return;
       }
 
+      const existingInterestResponse = await fetch(
+        `${context.supabaseUrl}/rest/v1/tutor_interessados?select=uuid_registro,tutor_id,animal_id,data_registro&tutor_id=eq.${encodeURIComponent(tutor.id)}&animal_id=eq.${encodeURIComponent(animal_id)}&limit=1`,
+        {
+          headers: {
+            apikey: context.serviceRoleKey,
+            authorization: `Bearer ${context.serviceRoleKey}`,
+          },
+        },
+      );
+      const existingInterestBody = await existingInterestResponse.json();
+
+      if (!existingInterestResponse.ok) {
+        res.status(existingInterestResponse.status).json({
+          message: "Nao foi possivel verificar interesses existentes.",
+          details: existingInterestBody,
+        });
+        return;
+      }
+
+      const existingInterest = Array.isArray(existingInterestBody) ? existingInterestBody[0] : null;
+      if (existingInterest?.uuid_registro) {
+        res.status(200).json({
+          ...existingInterest,
+          detail_url: `/interessados/${existingInterest.uuid_registro}`,
+          already_exists: true,
+        });
+        return;
+      }
+
       const insertResponse = await fetch(`${context.supabaseUrl}/rest/v1/tutor_interessados`, {
         method: "POST",
         headers: {
@@ -112,7 +141,7 @@ export class InterestsController {
       }
 
       const interest = Array.isArray(insertBody) ? insertBody[0] : insertBody;
-      res.status(201).json({ ...interest, detail_url: `/interessados/${interest.uuid_registro}` });
+      res.status(201).json({ ...interest, detail_url: `/interessados/${interest.uuid_registro}`, already_exists: false });
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel registrar o interesse.",

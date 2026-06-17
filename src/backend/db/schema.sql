@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE TABLE tutors (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   auth_user_id UUID UNIQUE REFERENCES auth.users(id),
-  name TEXT NOT NULL,
+  name VARCHAR(120) NOT NULL,
   location geography(POINT),
   custom_fields JSONB DEFAULT '{}'::jsonb,
   onboarding_completed_at TIMESTAMPTZ,
@@ -18,7 +18,7 @@ CREATE TABLE tutors (
 CREATE TABLE admin_users (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   auth_user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
+  email VARCHAR(254) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -48,8 +48,8 @@ GRANT EXECUTE ON FUNCTION is_admin(UUID) TO authenticated;
 CREATE TABLE animals (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   owner_id UUID REFERENCES tutors(id),
-  name TEXT NOT NULL,
-  species TEXT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  species VARCHAR(64) NOT NULL,
   location geography(POINT),
   custom_fields JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -78,10 +78,10 @@ ON CONFLICT (id) DO UPDATE SET
 CREATE TABLE animal_photos (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
-  bucket_id TEXT NOT NULL DEFAULT 'animal-photos',
-  storage_path TEXT NOT NULL UNIQUE,
-  public_url TEXT NOT NULL,
-  content_type TEXT NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif')),
+  bucket_id VARCHAR(63) NOT NULL DEFAULT 'animal-photos',
+  storage_path VARCHAR(1024) NOT NULL UNIQUE,
+  public_url VARCHAR(2048) NOT NULL,
+  content_type VARCHAR(32) NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif')),
   size_bytes INT NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 5242880),
   is_primary BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -99,7 +99,8 @@ CREATE TABLE tutor_interessados (
   tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,
   animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
   data_registro TIMESTAMPTZ DEFAULT NOW(),
-  uuid_registro UUID DEFAULT uuid_generate_v4() PRIMARY KEY
+  uuid_registro UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  CONSTRAINT tutor_interessados_tutor_animal_key UNIQUE (tutor_id, animal_id)
 );
 
 CREATE INDEX tutor_interessados_tutor_id_idx
@@ -114,15 +115,15 @@ CREATE TABLE calendar_events (
   tutor_id UUID REFERENCES tutors(id) ON DELETE SET NULL,
   animal_id UUID REFERENCES animals(id) ON DELETE SET NULL,
   interest_id UUID REFERENCES tutor_interessados(uuid_registro) ON DELETE SET NULL,
-  title TEXT NOT NULL,
+  title VARCHAR(160) NOT NULL,
   description TEXT,
-  location TEXT,
+  location VARCHAR(255),
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL,
-  status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
-  provider TEXT CHECK (provider IN ('google', 'microsoft')),
-  external_event_id TEXT,
-  external_event_url TEXT,
+  status VARCHAR(24) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
+  provider VARCHAR(32) CHECK (provider IN ('google', 'microsoft')),
+  external_event_id VARCHAR(255),
+  external_event_url VARCHAR(2048),
   metadata JSONB DEFAULT '{}'::jsonb,
   created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -145,16 +146,16 @@ CREATE UNIQUE INDEX calendar_events_provider_external_idx
 
 -- Public/contact settings for the ONG profile used by adoption flows
 CREATE TABLE ong_settings (
-  id TEXT PRIMARY KEY DEFAULT 'default' CHECK (id = 'default'),
-  ong_name TEXT NOT NULL DEFAULT 'ONG Matching Animal',
-  contact_email TEXT,
-  contact_phone TEXT,
-  whatsapp_phone TEXT,
-  website_url TEXT,
-  address_line TEXT,
-  city TEXT,
-  state TEXT,
-  postal_code TEXT,
+  id VARCHAR(32) PRIMARY KEY DEFAULT 'default' CHECK (id = 'default'),
+  ong_name VARCHAR(160) NOT NULL DEFAULT 'ONG Matching Animal',
+  contact_email VARCHAR(254),
+  contact_phone VARCHAR(32),
+  whatsapp_phone VARCHAR(32),
+  website_url VARCHAR(2048),
+  address_line VARCHAR(255),
+  city VARCHAR(120),
+  state VARCHAR(64),
+  postal_code VARCHAR(20),
   social_links JSONB NOT NULL DEFAULT '{}'::jsonb,
   business_hours JSONB NOT NULL DEFAULT '{}'::jsonb,
   adoption_message_template TEXT DEFAULT 'Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.' || E'\n\n' || 'Observacoes:',
@@ -174,12 +175,12 @@ ON CONFLICT (id) DO NOTHING;
 -- Custom fields catalog used by admin forms and matching rules
 CREATE TABLE custom_fields (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  entity_type TEXT NOT NULL CHECK (entity_type IN ('tutor', 'animal')),
-  field_key TEXT NOT NULL CHECK (field_key ~ '^[a-z][a-z0-9_]*$'),
-  label TEXT NOT NULL,
-  field_type TEXT NOT NULL DEFAULT 'text' CHECK (field_type IN ('text', 'number', 'boolean', 'select', 'multiselect')),
+  entity_type VARCHAR(16) NOT NULL CHECK (entity_type IN ('tutor', 'animal')),
+  field_key VARCHAR(64) NOT NULL CHECK (field_key ~ '^[a-z][a-z0-9_]*$'),
+  label VARCHAR(120) NOT NULL,
+  field_type VARCHAR(32) NOT NULL DEFAULT 'text' CHECK (field_type IN ('text', 'number', 'boolean', 'select', 'multiselect')),
   options JSONB,
-  source_question_id TEXT,
+  source_question_id VARCHAR(64),
   is_active BOOLEAN DEFAULT true,
   sort_order INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -207,10 +208,10 @@ INSERT INTO custom_fields (entity_type, field_key, label, field_type, options, s
 -- Matching rules
 CREATE TABLE matching_rules (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  rule_name TEXT NOT NULL,
-  tutor_field TEXT NOT NULL,
-  animal_field TEXT NOT NULL,
-  comparison_operator TEXT DEFAULT '=',
+  rule_name VARCHAR(120) NOT NULL,
+  tutor_field VARCHAR(64) NOT NULL,
+  animal_field VARCHAR(64) NOT NULL,
+  comparison_operator VARCHAR(16) DEFAULT '=',
   weight INT DEFAULT 10,
   is_dealbreaker BOOLEAN NOT NULL DEFAULT false,
   is_active BOOLEAN DEFAULT true,
@@ -479,11 +480,11 @@ $$;
 
 -- Dynamic onboarding questions configured by the ONG
 CREATE TABLE onboarding_questions (
-  id TEXT PRIMARY KEY,
-  label TEXT NOT NULL,
+  id VARCHAR(64) PRIMARY KEY,
+  label VARCHAR(180) NOT NULL,
   description TEXT,
-  placeholder TEXT,
-  type TEXT NOT NULL CHECK (type IN ('text', 'select', 'radio', 'boolean', 'multiselect')),
+  placeholder VARCHAR(255),
+  type VARCHAR(32) NOT NULL CHECK (type IN ('text', 'select', 'radio', 'boolean', 'multiselect')),
   options JSONB,
   required BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true,
