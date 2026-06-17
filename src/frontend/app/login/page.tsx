@@ -5,9 +5,9 @@ import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/Screen
 import { LoginForm } from "@/components/features/Auth/LoginForm";
 
 interface LoginPageProps {
-  searchParams: {
+  searchParams: Promise<{
     auth_error?: string;
-  };
+  }>;
 }
 
 const authErrorMessages: Record<string, string> = {
@@ -15,8 +15,9 @@ const authErrorMessages: Record<string, string> = {
   otp_expired: "Este link de acesso é inválido ou expirou. Solicite um novo link para continuar.",
 };
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
-  const authErrorMessage = searchParams.auth_error ? authErrorMessages[searchParams.auth_error] ?? authErrorMessages.access_denied : "";
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const authErrorMessage = resolvedSearchParams.auth_error ? authErrorMessages[resolvedSearchParams.auth_error] ?? authErrorMessages.access_denied : "";
 
   return (
     <main className="grid min-h-screen bg-[#0e0e12] text-white lg:grid-cols-[1fr_560px]">
