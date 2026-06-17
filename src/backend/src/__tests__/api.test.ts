@@ -1104,6 +1104,10 @@ describe("API Endpoints", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
           json: async () => [{
             uuid_registro: "interest-uuid-123",
             tutor_id: "tutor-123",
@@ -1120,14 +1124,58 @@ describe("API Endpoints", () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty("uuid_registro", "interest-uuid-123");
       expect(response.body).toHaveProperty("detail_url", "/interessados/interest-uuid-123");
+      expect(response.body).toHaveProperty("already_exists", false);
       expect(global.fetch).toHaveBeenNthCalledWith(
         3,
+        "https://example.supabase.co/rest/v1/tutor_interessados?select=uuid_registro,tutor_id,animal_id,data_registro&tutor_id=eq.tutor-123&animal_id=eq.animal-123&limit=1",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            apikey: "service-key",
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
         "https://example.supabase.co/rest/v1/tutor_interessados",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ tutor_id: "tutor-123", animal_id: "animal-123" }),
         }),
       );
+    });
+
+    it("should reuse an existing interest record for the same tutor and animal", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123", auth_user_id: "user-123", name: "Tutor Teste" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            uuid_registro: "interest-uuid-123",
+            tutor_id: "tutor-123",
+            animal_id: "animal-123",
+            data_registro: "2026-06-05T12:00:00.000Z",
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/interessados")
+        .set("Authorization", "Bearer access-token")
+        .send({ animal_id: "animal-123" });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("uuid_registro", "interest-uuid-123");
+      expect(response.body).toHaveProperty("detail_url", "/interessados/interest-uuid-123");
+      expect(response.body).toHaveProperty("already_exists", true);
+      expect(global.fetch).toHaveBeenCalledTimes(3);
     });
 
     it("should deny interest detail access to another tutor", async () => {

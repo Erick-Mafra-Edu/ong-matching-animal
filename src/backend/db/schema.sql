@@ -99,7 +99,8 @@ CREATE TABLE tutor_interessados (
   tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,
   animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
   data_registro TIMESTAMPTZ DEFAULT NOW(),
-  uuid_registro UUID DEFAULT uuid_generate_v4() PRIMARY KEY
+  uuid_registro UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  CONSTRAINT tutor_interessados_tutor_animal_key UNIQUE (tutor_id, animal_id)
 );
 
 CREATE INDEX tutor_interessados_tutor_id_idx
