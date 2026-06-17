@@ -1,359 +1,239 @@
 # ONG Matching Animal
 
-Sistema de matchmaking dinâmico para adoção de animais com arquitetura separada frontend/backend.
+Sistema de matchmaking para adocao de animais com arquitetura separada entre frontend, backend e banco Supabase/Postgres.
 
-## 🎯 Objetivo
+## Objetivo
 
-Conectar tutores em busca de animais com os pets disponíveis para adoção, usando regras de matching flexíveis e armazenamento dinâmico de atributos (JSONB + PostGIS).
+Conectar tutores a animais disponiveis para adocao usando:
+- atributos dinamicos com JSONB
+- consultas geograficas com PostGIS
+- regras configuraveis de compatibilidade
+- backend como intermediario confiavel para operacoes sensiveis
 
-## 📁 Estrutura do Projeto
+## Status Atual
 
-```
+Ja implementado no projeto:
+- autenticacao de tutor com Supabase Auth e fluxos de recuperacao/troca de senha
+- onboarding dinamico com perguntas configuraveis e controle de conclusao
+- perfil de conta do tutor e endpoints `me`
+- listagem e cadastro de animais, incluindo upload/listagem de fotos
+- fluxo de interesse em adocao com prevencao de duplicidade entre o mesmo tutor e o mesmo animal
+- agenda de interesses com eventos de calendario
+- painel administrativo para recursos principais
+- configuracoes publicas da ONG, usadas tambem no footer do frontend
+- cache de matching no banco com suporte a `pg_cron`
+- RLS e uso do backend para operacoes administrativas e integracoes
+
+## Estrutura do Projeto
+
+```text
 ong-matching-animal/
 ├── src/
-│   ├── shared/                 # Código compartilhado entre backend e frontend
-│   │   ├── types/
-│   │   │   └── index.ts        # Tipos centralizados (TutorProfile, AnimalProfile, etc)
-│   │   └── README.md
-│   │
-│   ├── backend/                # Express.js + Node.js (TypeScript)
-│   │   ├── src/
-│   │   │   ├── index.ts        # Entrada da aplicação
-│   │   │   ├── lib/
-│   │   │   │   └── matching.ts # Algoritmo de matchmaking
-│   │   │   ├── db/
-│   │   │   │   └── seed.ts     # Script para popular dados de teste
-│   │   │   └── types/          # (descontinuado - usar src/shared/types)
-│   │   ├── dist/               # Build compilado
-│   │   ├── tsconfig.json
+│   ├── shared/                    # Tipos e contratos compartilhados
+│   ├── backend/
+│   │   ├── src/                   # API Express em TypeScript
+│   │   ├── db/
+│   │   │   ├── schema.sql         # Schema base
+│   │   │   ├── all_migrations.sql # Bootstrap completo do banco
+│   │   │   ├── migrations/        # Migrations incrementais
+│   │   │   └── scripts/           # Scripts utilitarios SQL/Node
 │   │   └── package.json
-│   │
-│   ├── frontend/               # Next.js (TypeScript)
-│   │   ├── app/
-│   │   │   ├── layout.tsx
-│   │   │   ├── page.tsx
-│   │   │   └── globals.css
-│   │   ├── types/
-│   │   │   └── shared.ts       # Re-export de src/shared/types
-│   │   ├── .next/              # Build do Next.js
-│   │   ├── tsconfig.json
-│   │   └── package.json
-│   │
-├── .env.example                # Template de variáveis de ambiente
-├── package.json                # Workspaces npm do monorepo
-├── tsconfig.json               # Configuração TypeScript da raiz
+│   └── frontend/
+│       ├── app/                   # App Router do Next.js
+│       ├── components/
+│       └── package.json
+├── .env.example
+├── package.json
 └── README.md
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Pré-requisitos
+### Pre-requisitos
 
 - Node.js 18+
-- npm ou yarn
-- Conta Supabase
+- npm
+- projeto Supabase
 
-### 1. Configurar Variáveis de Ambiente
+### 1. Configurar variaveis de ambiente
 
 ```bash
-# Na raiz do projeto
 cp .env.example .env.local
 ```
 
-Edite `.env.local` com suas credenciais:
+Preencha ao menos:
 
 ```env
-SUPABASE_URL=https://sua-project.supabase.co
+SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key
 ```
 
-### 2. Criar Banco de Dados no Supabase
+### 2. Criar o banco no Supabase
 
-Acesse o SQL Editor do Supabase e execute o conteúdo de `src/backend/db/schema.sql`:
+No SQL Editor, execute o bootstrap consolidado:
 
 ```sql
--- Copy & paste from src/backend/db/schema.sql
+-- src/backend/db/all_migrations.sql
 ```
 
-### 3. Instalar Dependências
+Arquivos uteis adicionais:
+- `src/backend/db/scripts/first_admin_user.sql`: exemplo para inserir o primeiro admin
+- `src/backend/db/scripts/drop_system_tables.sql`: limpeza das tabelas da aplicacao
+
+### 3. Instalar dependencias
 
 ```bash
 npm install
 ```
 
-### 4. Popular Dados de Teste
+### 4. Popular dados de teste
 
 ```bash
 cd src/backend
-
-# Em desenvolvimento (com ts-node)
 npm run seed
-
-# Após compilar para produção
-npm run seed:prod
 ```
 
-Isso irá gerar automaticamente:
-- 10 tutores com dados fake
-- 20 animais com diversas espécies
-- 3 regras de matching pré-configuradas
+O seed atual cria dados falsos para:
+- configuracoes da ONG
+- perguntas de onboarding
+- campos customizados e regras de matching
+- tutores e animais
+- fotos, interesses e eventos de calendario
+- configuracao inicial de servico de calendario
 
-### 5. Rodar Localmente
+### 5. Rodar localmente
 
 ```bash
-# Na raiz do projeto
 npm run dev
 ```
 
-Ou execute cada aplicação separadamente:
+Servicos locais:
+- frontend: `http://localhost:3000`
+- backend: `http://localhost:3001`
 
-**Terminal 1 - Backend (com TypeScript):**
-```bash
-cd src/backend
-npm run dev
-# Servidor na porta 3001 com ts-node
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd src/frontend
-npm run dev
-# App na porta 3000 (Next.js redireciona /api para o backend)
-```
-
-### 6. Build para Produção
+### 6. Testar e buildar
 
 ```bash
-# Na raiz do projeto
-npm run build
-```
-
-### 7. Executar Testes
-
-```bash
-# Testes do backend e validação de build do frontend
 npm test
-
-# Testes e builds de todo o monorepo
+npm run build
 npm run verify
 ```
 
-## 📊 Modelo de Dados
+## Endpoints Principais
 
-### Tutores
+### Sistema
 
-```json
-{
-  "id": "UUID",
-  "name": "João Silva",
-  "location": "POINT(longitude latitude)",
-  "custom_fields": {
-    "tamanho_casa": "pequeno|medio|grande",
-    "tem_quintal": true|false,
-    "tem_criancas": true|false,
-    "renda_mensal": "ate_1000|1000_3000|3000_6000|6000_acima",
-    "disponibilidade_tempo": "meio_periodo|integral"
-  }
-}
-```
+- `GET /api/health`
+- `GET /api/ong-settings`
+- `GET /api/onboarding-questions`
+- `POST /api/match`
+
+### Autenticacao
+
+- `POST /api/auth/password-recovery`
+- `POST /api/auth/change-password`
+
+### Tutor
+
+- `POST /api/tutors`
+- `GET /api/tutors/me`
+- `PATCH /api/tutors/me`
+- `GET /api/tutors/me/discover-access`
+- `GET /api/tutors/me/onboarding-status`
+- `GET /api/tutors/:id`
 
 ### Animais
 
-```json
-{
-  "id": "UUID",
-  "owner_id": "UUID (tutor que cadastrou)",
-  "name": "Rex",
-  "species": "Cachorro|Gato|Coelho|Passaro",
-  "location": "POINT(longitude latitude)",
-  "custom_fields": {
-    "raca": "Labrador",
-    "idade_meses": 24,
-    "peso_kg": 30,
-    "tamanho": "pequeno|medio|grande",
-    "nivel_energia": "baixo|medio|alto",
-    "aceita_criancas": true|false,
-    "aceita_outros_animais": true|false,
-    "castrado": true|false,
-    "vacinado": true|false,
-    "requer_espaco": "apartamento|casa_pequena|casa_grande"
-  }
-}
-```
+- `GET /api/animals`
+- `POST /api/animals`
+- `GET /api/animals/:id/photos`
+- `POST /api/animals/:id/photos`
+- `POST /api/animals/:id/photos/signed-url`
 
-### Regras de Matching
+### Interesses e agenda
 
-```json
-{
-  "id": "UUID",
-  "rule_name": "Tamanho da casa vs espaço do animal",
-  "tutor_field": "tamanho_casa",
-  "animal_field": "requer_espaco",
-  "comparison_operator": "=|>=|<=|contains",
-  "weight": 30,
-  "is_active": true
-}
-```
+- `GET /api/interessados`
+- `POST /api/interessados`
+- `GET /api/interessados/:uuid_registro`
+- `GET /api/calendar-events`
+- `POST /api/calendar-events`
+- `PUT /api/calendar-events/:id`
+- `DELETE /api/calendar-events/:id`
 
-## ⚙️ Arquitetura
+### Admin e integracoes
 
-### Backend (Express + TypeScript)
+- `GET /api/admin/me`
+- `GET /api/admin/bootstrap`
+- `GET /api/admin/:resource`
+- `POST /api/admin/admin-users`
+- `POST /api/admin/:resource`
+- `PUT /api/admin/:resource/:id`
+- `DELETE /api/admin/:resource/:id`
+- `GET /api/oauth/:provider/start`
+- `GET /api/oauth/:provider/callback`
+- `POST /api/oauth/:provider/refresh`
+- `POST /api/oauth/:provider/disconnect`
+- `GET /api/oauth/:provider/status`
 
-O backend é escrito em **TypeScript** e preparado para rodar na Vercel como Serverless Functions:
+## Banco e Matching
 
-```typescript
-// src/backend/src/index.ts
-// ⚠️ Exporta a app para Vercel
-export default app;
+Decisoes relevantes que ja estao no codigo:
+- JSONB para campos dinamicos de tutor e animal
+- PostGIS para localizacao
+- funcoes SQL/RPC para calculo e refresh de matches
+- cache de matching em `tutor_animal_matches`
+- refresh consolidado com suporte a `pg_cron`
+- RLS habilitada nas tabelas principais
+- constraint de unicidade em `tutor_interessados (tutor_id, animal_id)` para impedir interesse duplicado
 
-// Mas também pode rodar localmente
-if (process.env.NODE_ENV !== "production" && require.main === module) {
-  app.listen(3001);
-}
-```
+## Scripts Uteis
 
-**Endpoints principais:**
-- `GET /api/health` - Health check
-- `POST /api/tutors` - Criar tutor
-- `GET /api/animals` - Listar animais
-- `POST /api/match` - Calcular matches
-
-### Frontend (Next.js + TypeScript)
-
-App moderno com SSR, otimizado para SEO e performance. Usa tipos compartilhados de `src/shared/types`.
-
-## 📈 PageSpeed Insights
-
-Scores mais recentes da home (`/`) com base no relatório público do PageSpeed Insights:
-
-- Mobile: `98` Performance, `100` Accessibility, `100` Best Practices, `100` SEO
-- Desktop: `100` Performance, `100` Accessibility, `100` Best Practices, `100` SEO
-
-Referências:
-
-- Link do relatório mobile: `https://pagespeed.web.dev/analysis/https-ong-matching-animalfrontend-vercel-app/t81so00amb?form_factor=mobile`
-- Captura mobile: [insightsMobile.png](docs/reports_lighthouse/insightsMobile.png)
-- Captura desktop: [insightsDesktop.png](docs/reports_lighthouse/insightsDesktop.png)
-- Export Lighthouse local da home: [ong-matching-animalfrontend.vercel.app-20260614T194526.json](docs/reports_lighthouse/ong-matching-animalfrontend.vercel.app-20260614T194526.json)
-
-### Tipos Compartilhados
-
-Os tipos estão centralizados em `src/shared/types/index.ts` para evitar duplicação:
-
-```typescript
-// Backend
-import type { TutorProfile, AnimalProfile } from "@ong-matching-animal/shared/types";
-
-// Frontend
-import type { TutorProfile, AnimalProfile } from "@/types/shared";
-```
-
-**Tipos disponíveis:**
-- `Location` - Coordenadas geográficas
-- `TutorProfile` - Perfil do tutor/adotante
-- `AnimalProfile` - Perfil do animal
-- `MatchingRule` - Regra de compatibilidade
-- `MatchResult` - Resultado de um match
-- `MatchResponse` - Resposta da API
-- `ComparatorFunction` - Função de comparação
-
-Veja [src/shared/README.md](src/shared/README.md) para mais detalhes.
-
-## 🗄️ Decisões Arquiteturais
-
-### 1. JSONB para Atributos Dinâmicos
-
-**Por que?** Schema-less permite que ONGs/Instrutores adicionem novos campos sem ALTER TABLE.
-
-**Tradeoff:** Sem tipagem rígida, requer validação extra no backend.
-
-### 2. PostGIS para Distância
-
-**Por que?** Cálculos geoespaciais nativos no Postgres são muito mais rápidos.
-
-**Índices:** GiST automático em `location`.
-
-### 3. RPC para Match Score
-
-**Por que?** Não baixar 10.000 animais para memória. Postgres calcula e retorna Top N.
-
-**Implementado:** RPC `calculate_match_score(target_tutor_id, result_limit)` no Postgres, consumida pelo endpoint `/api/match`.
-
-### 4. Separação Frontend/Backend no Vercel
-
-**Por que?** Isolamento de responsabilidades, escalabilidade independente.
-
-**Deploy:** Crie dois projetos na mesma organização Vercel, conectados ao mesmo repositório:
-
-| Projeto | Root Directory | Framework |
-| --- | --- | --- |
-| Backend | `src/backend` | Express (`src/backend/vercel.json`) |
-| Frontend | `src/frontend` | Next.js (`src/frontend/vercel.json`) |
-
-A Vercel detecta os frameworks e executa os builds separadamente. Não use `builds` no
-`vercel.json` da raiz: essa configuração é legada. Configure no frontend a URL do
-backend para chamadas feitas em produção.
-
-O procedimento completo de configuração, validação e deploy está em
-[docs/VERCEL_MONOREPO.md](docs/VERCEL_MONOREPO.md).
-
-## 🧪 Scripts Úteis
+### Raiz
 
 | Comando | Finalidade |
 | --- | --- |
-| `npm run dev` | Inicia backend e frontend localmente |
-| `npm run dev:backend` | Inicia apenas o Express em `http://localhost:3001` |
-| `npm run dev:frontend` | Inicia apenas o Next.js em `http://localhost:3000` |
-| `npm run vercel:dev:backend` | Inicia o backend usando o runtime local da Vercel |
-| `npm run vercel:dev:frontend` | Inicia o frontend usando o runtime local da Vercel |
-| `npm run test:backend` | Executa a suíte Jest do backend |
-| `npm run test:frontend` | Valida o frontend com build Next.js |
-| `npm test` | Executa as validações de backend e frontend |
-| `npm run verify` | Executa testes e builds completos |
+| `npm run dev` | Inicia backend e frontend |
+| `npm run dev:backend` | Inicia apenas o backend |
+| `npm run dev:frontend` | Inicia apenas o frontend |
+| `npm run build` | Build backend + frontend |
+| `npm test` | Testes backend + build frontend |
+| `npm run verify` | Testes e builds completos |
 
-## 🛠️ Scripts Úteis
+### Backend
 
-### Backend (TypeScript)
+| Comando | Finalidade |
+| --- | --- |
+| `npm run dev --prefix src/backend` | Backend local com ts-node |
+| `npm run build --prefix src/backend` | Compila o backend |
+| `npm run seed --prefix src/backend` | Popula o banco com dados fake |
+| `npm start --prefix src/backend` | Executa build compilado |
 
-```bash
-cd src/backend
+### Frontend
 
-# Desenvolvimento
-npm run dev              # Rodar com ts-node (reload automático)
-npm run build           # Compilar TypeScript → JavaScript
-npm run seed            # Popular DB com dados fake (usa ts-node)
-npm run seed:prod       # Popular DB após compilação (usa node)
-npm start               # Rodar versão compilada (produção)
-```
+| Comando | Finalidade |
+| --- | --- |
+| `npm run dev --prefix src/frontend` | Next.js em desenvolvimento |
+| `npm run build --prefix src/frontend` | Build do frontend |
+| `npm run test:e2e --prefix src/frontend` | Testes E2E com Playwright |
 
-### Frontend (Next.js + TypeScript)
+## Proximas Etapas
 
-```bash
-cd src/frontend
+Itens ainda razoaveis para evolucao:
+- ampliar cobertura E2E do frontend
+- endurecer observabilidade e monitoramento em producao
+- concluir refinamentos da integracao de calendario e sincronizacao externa
+- documentar melhor fluxo operacional de deploy e administracao
 
-npm run dev             # Dev server com hot reload
-npm run build           # Build otimizado
-npm start               # Produção (requer build prévio)
-npm run lint            # ESLint
-```
+## Documentacao Adicional
 
-## 📝 Próximas Etapas
-
-- [x] Implementar RPC de Match Score no Postgres
-- [ ] Criar endpoints REST para CRUD de Tutores/Animais
-- [ ] Dashboard administrativo para configurar Regras
-- [ ] Autenticação com Supabase Auth
-- [ ] Geolocalização do cliente
-- [ ] Notificações de novos matches
-- [ ] Testes automatizados
-
-## 📚 Documentação Adicional
-
+- [src/shared/README.md](src/shared/README.md)
+- [docs/VERCEL_MONOREPO.md](docs/VERCEL_MONOREPO.md)
 - [Supabase](https://supabase.com/docs)
-- [Express.js](https://expressjs.com/)
 - [Next.js](https://nextjs.org/docs)
-- [Faker.js](https://fakerjs.dev/)
+- [Express.js](https://expressjs.com/)
 
-## 📄 Licença
+## Licenca
 
-GPL-3.0
+MIT
