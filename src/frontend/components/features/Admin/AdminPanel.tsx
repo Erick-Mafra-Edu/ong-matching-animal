@@ -555,6 +555,17 @@ const resourceIconMap: Record<AdminResource, any> = {
   "matching-rules": Zap,
 };
 
+const resourceHelpDocs: Partial<Record<AdminResource, { href: string; label: string }>> = {
+  "onboarding-questions": {
+    href: "/docs/user/ADMIN_ONBOARDING_QUESTIONS_GUIDE",
+    label: "Ajuda do onboarding",
+  },
+  "matching-rules": {
+    href: "/docs/user/ADMIN_MATCHING_RULES_GUIDE",
+    label: "Ajuda das regras",
+  },
+};
+
 const adminDataProvider = {
   getList: async (resource: string) => {
     const data = await listAdminResource(resource as AdminResource);
@@ -1155,6 +1166,7 @@ function AdminShell({ children, theme = "dark" }: { children: ReactNode; theme?:
 
 function ResourceHeader({ config, count, isLoading, onCreate }: { config: ResourceUiConfig; count: number; isLoading: boolean; onCreate: () => void }) {
   const Icon = resourceIconMap[config.id as AdminResource] || Settings;
+  const helpDoc = resourceHelpDocs[config.id];
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -1172,11 +1184,24 @@ function ResourceHeader({ config, count, isLoading, onCreate }: { config: Resour
           <p className="mt-1 text-xs font-medium text-slate-500 truncate">{config.description}</p>
         </div>
       </div>
-      {!config.readonly && (
-        <Button className="shrink-0 h-11 px-6 shadow-lg shadow-cyan-400/5" disabled={isLoading} onClick={onCreate} type="button">
-          Adicionar Novo
-        </Button>
-      )}
+      <div className="flex flex-wrap gap-3">
+        {helpDoc && (
+          <Link
+            className={adminNavLinkClass}
+            href={helpDoc.href}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <HelpCircle className="h-4 w-4" />
+            {helpDoc.label}
+          </Link>
+        )}
+        {!config.readonly && (
+          <Button className="shrink-0 h-11 px-6 shadow-lg shadow-cyan-400/5" disabled={isLoading} onClick={onCreate} type="button">
+            Adicionar Novo
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
