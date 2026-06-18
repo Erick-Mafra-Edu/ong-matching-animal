@@ -65,6 +65,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
   const [pendingAdoptionId, setPendingAdoptionId] = useState<string | null>(null);
   const [contactDialog, setContactDialog] = useState<ContactDialogState | null>(null);
   const [onboardingOutdated, setOnboardingOutdated] = useState(false);
+  const [userIsAdmin, setUserIsAdmin] = useState(false);
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
   const [, setOngSettings] = useState<OngSettings | null>(null);
 
@@ -89,10 +90,16 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
 
     fetchDiscoverAccess(getSupabaseBrowserClient())
       .then((access) => {
-        if (isMounted) setOnboardingOutdated(access.onboarding_outdated === true);
+        if (isMounted) {
+          setOnboardingOutdated(access.onboarding_outdated === true);
+          setUserIsAdmin(access.is_admin === true);
+        }
       })
       .catch(() => {
-        if (isMounted) setOnboardingOutdated(false);
+        if (isMounted) {
+          setOnboardingOutdated(false);
+          setUserIsAdmin(false);
+        }
       });
 
     return () => {
@@ -295,9 +302,11 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
             <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/interesses">
               Meus interesses
             </Link>
-            <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/admin">
-              Painel administrativo
-            </Link>
+            {userIsAdmin && (
+              <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/admin">
+                Painel administrativo
+              </Link>
+            )}
           </nav>
         </div>
       </header>

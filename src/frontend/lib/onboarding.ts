@@ -153,6 +153,7 @@ export async function fetchDiscoverAccess(supabase: SupabaseClient<Database>) {
     questionnaire_updated_at: string | null;
     onboarding_outdated: boolean;
     tutor_id: string | null;
+    is_admin: boolean;
   }>;
 }
 

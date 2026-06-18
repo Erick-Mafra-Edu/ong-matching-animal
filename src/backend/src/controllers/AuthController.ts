@@ -23,6 +23,8 @@ export class AuthController {
     }
 
     try {
+      const redirectTo = process.env.NEXT_PUBLIC_FRONTEND_URL;
+      
       await fetch(`${supabaseUrl}/auth/v1/recover`, {
         method: "POST",
         headers: {
@@ -30,7 +32,10 @@ export class AuthController {
           authorization: `Bearer ${serviceRoleKey}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ 
+          email,
+          ...(redirectTo ? { redirectTo } : {})
+        }),
       });
 
       res.json({ message: "Se o e-mail existir, enviaremos instrucoes para redefinir a senha." });

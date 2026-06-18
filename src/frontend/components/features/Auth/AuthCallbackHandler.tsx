@@ -14,6 +14,7 @@ export function AuthCallbackHandler() {
       const params = new URLSearchParams(window.location.hash.slice(1));
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
+      const type = params.get("type");
       const authError = params.get("error");
       const authErrorCode = params.get("error_code");
 
@@ -42,6 +43,12 @@ export function AuthCallbackHandler() {
           accessToken: data.session.access_token,
           refreshToken: data.session.refresh_token,
         });
+
+        if (type === "recovery") {
+          router.replace("/redefinir-senha");
+          return;
+        }
+
         const completed = await hasCompletedOnboarding(supabase, data.user.id) || await saveOnboardingAnswersFromMetadata(supabase, data.user);
         router.replace(completed ? "/discover" : "/onboarding");
       } catch {

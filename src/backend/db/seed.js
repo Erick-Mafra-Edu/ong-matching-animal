@@ -93,7 +93,7 @@ function generateAnimals(count = 20) {
   });
 }
 
-// Regras de matching
+// Regras de matching (Sem UUIDs manuais)
 function generateMatchingRules() {
   return [
     {
@@ -274,33 +274,55 @@ async function seed() {
     if (animalError) throw animalError;
     console.log(`✅ ${insertedAnimals.length} animais inseridos\n`);
 
-    // 4. Inserir campos customizados
+    // 4. Processar campos customizados (Checa existência antes para respeitar o UUID automático)
     console.log("📋 Gerando campos customizados...");
-    const { data: insertedCustomFields, error: customFieldError } = await supabase
-      .from("custom_fields")
-      .insert(generateCustomFields())
-      .select();
+    const customFields = generateCustomFields();
+    let customFieldsCount = 0;
 
-    if (customFieldError) throw customFieldError;
-    console.log(`✅ ${insertedCustomFields.length} campos customizados inseridos\n`);
+    for (const field of customFields) {
+      const { data: existingField } = await supabase
+        .from("custom_fields")
+        .select("id")
+        .eq("entity_type", field.entity_type)
+        .eq("field_key", field.field_key)
+        .maybeSingle();
 
-    // 5. Inserir regras de matching
+      if (existingField) {
+        await supabase.from("custom_fields").update(field).eq("id", existingField.id);
+      } else {
+        await supabase.from("custom_fields").insert(field);
+      }
+      customFieldsCount++;
+    }
+    console.log(`✅ ${customFieldsCount} campos customizados processados\n`);
+
+    // 5. Processar regras de matching (Checa existência antes para respeitar o UUID automático)
     console.log("⚙️  Gerando regras de matching...");
     const rules = generateMatchingRules();
-    const { data: insertedRules, error: ruleError } = await supabase
-      .from("matching_rules")
-      .insert(rules)
-      .select();
+    let rulesCount = 0;
 
-    if (ruleError) throw ruleError;
-    console.log(`✅ ${insertedRules.length} regras de matching inseridas\n`);
+    for (const rule of rules) {
+      const { data: existingRule } = await supabase
+        .from("matching_rules")
+        .select("id")
+        .eq("rule_name", rule.rule_name)
+        .maybeSingle();
+
+      if (existingRule) {
+        await supabase.from("matching_rules").update(rule).eq("id", existingRule.id);
+      } else {
+        await supabase.from("matching_rules").insert(rule);
+      }
+      rulesCount++;
+    }
+    console.log(`✅ ${rulesCount} regras de matching processadas\n`);
 
     console.log("🎉 Seed completo com sucesso!");
     console.log("\n📊 Resumo:");
     console.log(`   - Tutores: ${insertedTutors.length}`);
     console.log(`   - Animais: ${insertedAnimals.length}`);
-    console.log(`   - Campos customizados: ${insertedCustomFields.length}`);
-    console.log(`   - Regras: ${insertedRules.length}`);
+    console.log(`   - Campos customizados: ${customFieldsCount}`);
+    console.log(`   - Regras: ${rulesCount}`);
   } catch (error) {
     console.error("❌ Erro durante o seed:", error.message);
     process.exit(1);

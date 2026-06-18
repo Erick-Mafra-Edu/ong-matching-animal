@@ -447,22 +447,18 @@ describe("API Endpoints", () => {
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
       const accessToken = "header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature";
-      global.fetch = jest.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{
-            id: "tutor-123",
-            onboarding_completed_at: "2026-06-12T12:00:00.000Z",
-            custom_fields: {
-              onboarding_complete: true,
-              preferred_energy: "alto",
-            },
-          }],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ updated_at: "2026-06-11T12:00:00.000Z" }],
-        }) as jest.Mock;
+      
+      // Mock configurado para interceptar a nova rota RPC unificada
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tutor_id: "tutor-123",
+          onboarding_completed_at: "2026-06-12T12:00:00.000Z",
+          is_admin: false,
+          questionnaire_updated_at: "2026-06-11T12:00:00.000Z",
+        }),
+      }) as jest.Mock;
 
       const response = await request(app)
         .get("/api/tutors/me/discover-access")
@@ -477,12 +473,17 @@ describe("API Endpoints", () => {
         onboarding_outdated: false,
         tutor_id: "tutor-123",
       });
+
+      // Valida se a chamada ao fetch foi feita para o endpoint correto do RPC
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://example.supabase.co/rest/v1/tutors?select=id,custom_fields,onboarding_completed_at&auth_user_id=eq.user-123&limit=1",
+        "https://example.supabase.co/rest/v1/rpc/get_user_discover_access",
         expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ target_user_id: "user-123" }),
           headers: expect.objectContaining({
-            apikey: "publishable-key",
-            authorization: `Bearer ${accessToken}`,
+            apikey: "service-key",
+            authorization: "Bearer service-key",
+            "content-type": "application/json",
           }),
         }),
       );
@@ -502,6 +503,7 @@ describe("API Endpoints", () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
       const accessToken = "header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature";
+      
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: false,
         status: 401,
