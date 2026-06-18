@@ -89,3 +89,10 @@ export async function requestPasswordRecovery(email: string) {
     throw new Error(body?.message ?? "Nao foi possivel solicitar recuperacao de senha.");
   }
 }
+
+export async function resetAccountPassword(newPassword: string) {
+  const { error } = await getSupabaseBrowserClient().auth.updateUser({ password: newPassword });
+  if (error) {
+    throw new Error(error.message);
+  }
+}

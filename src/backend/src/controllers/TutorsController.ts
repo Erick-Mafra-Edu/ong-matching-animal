@@ -311,10 +311,10 @@ export class TutorsController {
     try {
       const authorization = req.header("authorization");
       const userId = getAuthenticatedUserIdFromTokenPayload(authorization);
-      const { supabaseUrl, publishableKey } = getSupabasePublicConfig();
+      const { supabaseUrl } = getSupabasePublicConfig();
       const { serviceRoleKey } = getSupabaseBackendConfig();
 
-      if (!supabaseUrl || !publishableKey || !serviceRoleKey) {
+      if (!supabaseUrl || !serviceRoleKey) {
         res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
         return;
       }
@@ -324,52 +324,51 @@ export class TutorsController {
         return;
       }
 
-      const [profileResponse, questionsResponse] = await Promise.all([
-        fetch(`${supabaseUrl}/rest/v1/tutors?select=id,custom_fields,onboarding_completed_at&auth_user_id=eq.${encodeURIComponent(userId)}&limit=1`, {
-          headers: {
-            apikey: publishableKey,
-            authorization,
-          },
-        }),
-        fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=updated_at&is_active=eq.true&order=updated_at.desc&limit=1`, {
-          headers: {
-            apikey: serviceRoleKey,
-            authorization: `Bearer ${serviceRoleKey}`,
-          },
-        }),
-      ]);
+      // Chamada à nova função RPC
+      const rpcResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/get_user_discover_access`, {
+        method: "POST",
+        headers: {
+          apikey: serviceRoleKey,
+          authorization: `Bearer ${serviceRoleKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ target_user_id: userId }),
+      });
 
-      if (profileResponse.status === 401 || profileResponse.status === 403) {
+      if (rpcResponse.status === 401 || rpcResponse.status === 403) {
         res.status(401).json({ message: "Sessao invalida ou ausente." });
         return;
       }
 
-      const body = await profileResponse.json();
-      const questionsBody = await questionsResponse.json();
+      const resultData = await rpcResponse.json();
 
-      if (!profileResponse.ok) {
-        res.status(profileResponse.status).json({ message: "Nao foi possivel carregar o acesso ao discover", details: body });
+      if (!rpcResponse.ok) {
+        res.status(rpcResponse.status).json({ 
+          message: "Nao foi possivel carregar o acesso ao discover via banco", 
+          details: resultData 
+        });
         return;
       }
 
-      if (!questionsResponse.ok) {
-        res.status(questionsResponse.status).json({ message: "Nao foi possivel carregar o status do questionario", details: questionsBody });
-        return;
-      }
+      // Tipando estritamente para prever que campos podem vir nulos ou indefinidos do mock/banco
+      const accessData = (resultData as {
+        tutor_id?: string | null;
+        onboarding_completed_at?: string | null;
+        is_admin?: boolean | null;
+        questionnaire_updated_at?: string | null;
+      }) ?? {};
 
-      const profile = Array.isArray(body) ? body[0] : null;
-      const latestQuestion = Array.isArray(questionsBody) ? questionsBody[0] : null;
-      const customFields = profile?.custom_fields && typeof profile.custom_fields === "object" ? profile.custom_fields : {};
-      const onboardingCompletedAt = typeof profile?.onboarding_completed_at === "string" ? profile.onboarding_completed_at : null;
-      const questionnaireUpdatedAt = typeof latestQuestion?.updated_at === "string" ? latestQuestion.updated_at : null;
+      const onboardingCompletedAt = accessData.onboarding_completed_at ?? null;
+      const questionnaireUpdatedAt = accessData.questionnaire_updated_at ?? null;
 
+      // Montando a resposta garantindo que NENHUMA chave fique como undefined
       res.json({
         authenticated: true,
-        onboarding_complete: customFields.onboarding_complete === true,
+        onboarding_complete: onboardingCompletedAt !== null,
         onboarding_completed_at: onboardingCompletedAt,
         questionnaire_updated_at: questionnaireUpdatedAt,
         onboarding_outdated: isOnboardingOutdated(onboardingCompletedAt, questionnaireUpdatedAt),
-        tutor_id: profile?.id ?? null,
+        tutor_id: accessData.tutor_id ?? null,
       });
     } catch (error) {
       res.status(500).json({
