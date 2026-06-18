@@ -568,3 +568,142 @@
     transition-duration: 1ms !important;
   }
 }
+
+.markdown-doc {
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.markdown-doc > :first-child {
+  margin-top: 0;
+}
+
+.markdown-doc > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-doc h1,
+.markdown-doc h2,
+.markdown-doc h3,
+.markdown-doc h4,
+.markdown-doc h5,
+.markdown-doc h6 {
+  color: var(--color-text);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 1.8rem 0 0.8rem;
+}
+
+.markdown-doc h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+}
+
+.markdown-doc h2 {
+  font-size: clamp(1.55rem, 3vw, 2.2rem);
+}
+
+.markdown-doc h3 {
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+}
+
+.markdown-doc p,
+.markdown-doc li,
+.markdown-doc blockquote {
+  color: var(--color-text-muted);
+}
+
+.markdown-doc p,
+.markdown-doc ul,
+.markdown-doc ol,
+.markdown-doc blockquote,
+.markdown-doc pre,
+.markdown-doc table {
+  margin: 1rem 0;
+}
+
+.markdown-doc ul,
+.markdown-doc ol {
+  padding-left: 1.4rem;
+}
+
+.markdown-doc li + li {
+  margin-top: 0.35rem;
+}
+
+.markdown-doc a {
+  color: var(--color-field-border-focus);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.markdown-doc strong {
+  color: var(--color-text);
+}
+
+.markdown-doc code {
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-card-muted);
+  color: var(--color-text);
+  font-size: 0.92em;
+  padding: 0.15rem 0.42rem;
+}
+
+.markdown-doc pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-card-muted);
+  padding: 1rem 1.1rem;
+}
+
+.markdown-doc pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-doc blockquote {
+  border-left: 4px solid var(--color-field-border-focus);
+  border-radius: 0 1rem 1rem 0;
+  background: var(--color-card-muted);
+  padding: 0.9rem 1rem;
+}
+
+.markdown-doc hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 2rem 0;
+}
+
+.markdown-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+}
+
+.markdown-doc th,
+.markdown-doc td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-doc th {
+  background: var(--color-card-muted);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.markdown-doc tr:last-child td {
+  border-bottom: 0;
+}
