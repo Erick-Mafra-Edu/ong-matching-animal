@@ -369,6 +369,7 @@ export class TutorsController {
         questionnaire_updated_at: questionnaireUpdatedAt,
         onboarding_outdated: isOnboardingOutdated(onboardingCompletedAt, questionnaireUpdatedAt),
         tutor_id: accessData.tutor_id ?? null,
+        is_admin: accessData.is_admin ?? false,
       });
     } catch (error) {
       res.status(500).json({
