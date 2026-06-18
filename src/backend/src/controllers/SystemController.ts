@@ -16,7 +16,7 @@ export class SystemController {
     }
 
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/ong_settings?select=id,ong_name,contact_email,contact_phone,whatsapp_phone,website_url,address_line,city,state,postal_code,social_links,business_hours,adoption_message_template,settings&is_active=eq.true&limit=1`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/ong_settings?select=id,ong_name,contact_email,contact_phone,whatsapp_phone,website_url,address_line,city,state,postal_code,social_links,business_hours,adoption_message_template,settings,extension_college&is_active=eq.true&limit=1`, {
         headers: {
           apikey: serviceRoleKey,
           authorization: `Bearer ${serviceRoleKey}`,

@@ -343,6 +343,7 @@ export class TutorsController {
       const resultData = await rpcResponse.json();
 
       if (!rpcResponse.ok) {
+        console.error("RPC Error (Status " + rpcResponse.status + "):", JSON.stringify(resultData));
         res.status(rpcResponse.status).json({ 
           message: "Nao foi possivel carregar o acesso ao discover via banco", 
           details: resultData 

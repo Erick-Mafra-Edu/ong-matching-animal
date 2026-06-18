@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION get_user_discover_access(target_user_id TEXT)
+CREATE OR REPLACE FUNCTION get_user_discover_access(target_user_id UUID)
 RETURNS JSON AS $$
 DECLARE
     t_id UUID;

@@ -1,15 +1,15 @@
 -- Public/contact settings for the ONG profile used by adoption flows.
 CREATE TABLE IF NOT EXISTS ong_settings (
-  id VARCHAR(32) PRIMARY KEY DEFAULT 'default' CHECK (id = 'default'),
-  ong_name VARCHAR(160) NOT NULL DEFAULT 'ONG Matching Animal',
-  contact_email VARCHAR(254),
-  contact_phone VARCHAR(32),
-  whatsapp_phone VARCHAR(32),
-  website_url VARCHAR(2048),
-  address_line VARCHAR(255),
-  city VARCHAR(120),
-  state VARCHAR(64),
-  postal_code VARCHAR(20),
+  id TEXT PRIMARY KEY DEFAULT 'default' CHECK (id = 'default'),
+  ong_name TEXT NOT NULL DEFAULT 'ONG Matching Animal',
+  contact_email TEXT,
+  contact_phone TEXT,
+  whatsapp_phone TEXT,
+  website_url TEXT,
+  address_line TEXT,
+  city TEXT,
+  state TEXT,
+  postal_code TEXT,
   social_links JSONB NOT NULL DEFAULT '{}'::jsonb,
   business_hours JSONB NOT NULL DEFAULT '{}'::jsonb,
   adoption_message_template TEXT DEFAULT 'Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.' || E'\n\n' || 'Observacoes:',
@@ -40,3 +40,5 @@ CREATE POLICY "Admins can manage ONG settings"
   TO authenticated
   USING (is_admin())
   WITH CHECK (is_admin());
+
+ALTER TABLE ong_settings ADD COLUMN IF NOT EXISTS extension_college CHAR(50);
