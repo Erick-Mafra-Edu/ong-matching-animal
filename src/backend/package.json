@@ -15,7 +15,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@faker-js/faker": "^10.4.0",
+    "@faker-js/faker": "^10.5.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@ong-matching-animal/shared": "file:../shared",
     "@supabase/supabase-js": "^2.108.2",
