@@ -46,13 +46,14 @@ export function SiteFooter() {
   const phone = settings?.whatsapp_phone?.trim() || settings?.contact_phone?.trim() || "";
   const phoneHref = phone ? `tel:${phone.replace(/\D/g, "") || phone}` : "";
   const ongName = settings?.ong_name?.trim() || "Nome da ONG";
-  const collegeName = getSettingString(settings?.settings, [
-    "faculty_name",
-    "college_name",
-    "extension_college",
-    "nome_faculdade",
-    "faculdade",
-  ]) || "Nome da Faculdade";
+  const collegeName = settings?.extension_college?.trim()
+    || getSettingString(settings?.settings, [
+      "faculty_name",
+      "college_name",
+      "extension_college",
+      "nome_faculdade",
+      "faculdade",
+    ]);
 
   return (
     <footer className="border-t border-white/10 bg-[#0b0f18] px-5 py-8 text-slate-300 sm:px-8">
@@ -97,7 +98,7 @@ export function SiteFooter() {
 
         <p className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-white/10 pt-5 text-sm leading-6 text-slate-400">
           <span>© 2026 {ongName}.</span>
-          <span>Projeto de Extensão {collegeName}.</span>
+          {collegeName && <span>Projeto de Extensão {collegeName}.</span>}
           <a className="inline-flex items-center gap-1.5 font-bold text-cyan-100 transition hover:text-cyan-200" href={githubUrl} rel="noreferrer" target="_blank">
             <GitHubIcon className="h-4 w-4" />
             Ver Créditos

@@ -12,6 +12,7 @@ export async function mockOngSettingsApi(page: Page) {
   await page.route("**/api/ong-settings", async (route) => json(route, {
     id: "default",
     ong_name: "MatchPet E2E",
+    extension_college: "Faculdade E2E",
     social_links: {},
     business_hours: {},
     settings: {},

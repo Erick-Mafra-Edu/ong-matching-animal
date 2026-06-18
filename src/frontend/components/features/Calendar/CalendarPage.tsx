@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { format, startOfWeek, addDays, isSameDay, isSameMonth, setHours, setMinutes, setSeconds } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, ChevronDown, List, CalendarDays, Search, Trash2, User, Dog } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, ChevronDown, List, CalendarDays, Search, Trash2, User, Dog } from "lucide-react";
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -63,6 +63,8 @@ const emptyFormState: FormState = {
 
 const fieldClass =
   "min-h-11 w-full rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition focus:border-cyan-200 disabled:opacity-40";
+const navigationLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export function CalendarPage({ 
   standalone = true,
@@ -336,7 +338,10 @@ export function CalendarPage({
         <div className="max-w-md space-y-4 text-center">
           <h1 className="text-2xl font-bold">Acesso negado</h1>
           <p className="text-slate-400">Você não tem permissão para acessar o calendário administrativo.</p>
-          <Link className="inline-block text-cyan-200 hover:underline" href="/discover">Voltar para a home</Link>
+          <Link className={navigationLinkClass} href="/discover">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para a home
+          </Link>
         </div>
       </main>
     );
@@ -351,7 +356,10 @@ export function CalendarPage({
       {standalone && (
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/admin">Voltar ao admin</Link>
+            <Link className={navigationLinkClass} href="/admin">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar ao admin
+            </Link>
             <h1 className="mt-3 text-3xl font-black tracking-tight">Calendário</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Agenda de visitas, conversas com tutores e retornos do processo de adoção.</p>
           </div>
