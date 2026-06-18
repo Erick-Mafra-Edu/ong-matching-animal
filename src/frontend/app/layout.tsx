@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { AuthCallbackHandler } from "@/components/features/Auth/AuthCallbackHandler";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,15 +16,17 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="pt-BR" style={{ backgroundColor: "var(--color-bg)" }}>
+    <html lang="pt-BR" style={{ backgroundColor: "var(--color-bg)" }} suppressHydrationWarning>
       <body className="min-h-screen bg-surface-bg text-surface-text" style={{ backgroundColor: "var(--color-bg)" }}>
-        <AuthCallbackHandler />
-        <div className="flex min-h-screen flex-col">
-          <div className="flex-1">
-            {children}
+        <ThemeProvider>
+          <AuthCallbackHandler />
+          <div className="flex min-h-screen flex-col">
+            <div className="flex-1">
+              {children}
+            </div>
+            <SiteFooter />
           </div>
-          <SiteFooter />
-        </div>
+        </ThemeProvider>
       </body>
     </html>
   );
