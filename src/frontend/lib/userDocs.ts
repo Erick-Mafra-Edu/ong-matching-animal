@@ -3,15 +3,28 @@ import path from "path";
 
 const userDocsDirectory = path.resolve(process.cwd(), "..", "..", "docs", "user");
 
+const userDocRelations: Record<string, string[]> = {
+  ADMIN_MATCHING_RULES_GUIDE: ["ADMIN_ONBOARDING_QUESTIONS_GUIDE"],
+  ADMIN_ONBOARDING_QUESTIONS_GUIDE: ["ADMIN_MATCHING_RULES_GUIDE"],
+};
+
+export interface UserDocHeading {
+  id: string;
+  level: 2 | 3;
+  title: string;
+}
+
 export interface UserDocSummary {
   slug: string;
   title: string;
   fileName: string;
   excerpt: string;
+  relatedSlugs: string[];
 }
 
 export interface UserDoc extends UserDocSummary {
   content: string;
+  headings: UserDocHeading[];
 }
 
 export async function listUserDocs(): Promise<UserDocSummary[]> {
@@ -42,6 +55,7 @@ export async function getUserDocBySlug(slug: string): Promise<UserDoc | null> {
     return {
       ...buildSummary(fileName, content),
       content,
+      headings: extractHeadings(content),
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -60,7 +74,28 @@ function buildSummary(fileName: string, content: string): UserDocSummary {
     title,
     fileName,
     excerpt,
+    relatedSlugs: userDocRelations[slug] ?? [],
   };
+}
+
+function extractHeadings(content: string): UserDocHeading[] {
+  const headings: UserDocHeading[] = [];
+  const lines = content.split(/\r?\n/);
+
+  for (const line of lines) {
+    const match = /^(##|###)\s+(.+?)\s*$/.exec(line.trim());
+    if (!match) continue;
+
+    const level = match[1] === "##" ? 2 : 3;
+    const title = match[2].trim();
+    headings.push({
+      id: slugifyHeading(title),
+      level,
+      title,
+    });
+  }
+
+  return headings;
 }
 
 function sanitizeSlug(value: string) {
@@ -75,4 +110,14 @@ function humanizeSlug(slug: string) {
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+export function slugifyHeading(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
