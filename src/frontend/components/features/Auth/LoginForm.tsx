@@ -83,7 +83,6 @@ export function LoginForm() {
       <label className="block space-y-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">E-mail</span>
         <input className="form-control" name="email" type="email" autoComplete="email" placeholder="voce@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        <input className="form-control" name="email" type="email" autoComplete="email" placeholder="você@email.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
       </label>
       <label className="block space-y-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Senha</span>

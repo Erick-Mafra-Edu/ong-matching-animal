@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { json, mockOngSettingsApi } from "./mocks";
 
 type AdminRecord = Record<string, unknown>;
 
@@ -34,15 +35,9 @@ function buildAdminMockState(): AdminMockState {
   };
 }
 
-function json(route: Route, body: unknown, status = 200) {
-  return route.fulfill({
-    status,
-    contentType: "application/json",
-    body: JSON.stringify(body),
-  });
-}
-
 async function mockAdminApi(page: Page, state: AdminMockState) {
+  await mockOngSettingsApi(page);
+
   await page.addInitScript((token) => {
     (window as Window & { __E2E_ACCESS_TOKEN__?: string }).__E2E_ACCESS_TOKEN__ = token;
   }, "e2e-admin-token");
