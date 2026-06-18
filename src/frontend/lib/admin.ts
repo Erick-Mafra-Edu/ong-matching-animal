@@ -5,6 +5,16 @@ type E2EWindow = Window & {
   __E2E_ACCESS_TOKEN__?: unknown;
 };
 
+export class AdminApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AdminApiError";
+    this.status = status;
+  }
+}
+
 export type AdminResource =
   | "admin-users"
   | "tutors"
@@ -215,7 +225,7 @@ async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const message = body && typeof body === "object" && "message" in body ? String(body.message) : "Falha administrativa.";
-    throw new Error(message);
+    throw new AdminApiError(message, response.status);
   }
 
   return body as T;
