@@ -79,7 +79,7 @@ export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> 
 
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? "Nao foi possivel carregar as perguntas.");
+    throw new Error(body?.message ?? "Não foi possível carregar as perguntas.");
   }
 
   const data = await response.json() as Array<{
@@ -106,11 +106,11 @@ export async function hasCompletedOnboarding(supabase: SupabaseClient<Database>,
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError || !sessionData.session?.access_token) {
-    throw sessionError ?? new Error("Sessao ausente para verificar onboarding.");
+    throw sessionError ?? new Error("Sessão ausente para verificar onboarding.");
   }
 
   if (sessionData.session.user.id !== userId) {
-    throw new Error("Nao e permitido verificar onboarding de outro usuario.");
+    throw new Error("Não é permitido verificar onboarding de outro usuário.");
   }
 
   const response = await fetch(backendApiUrl("/api/tutors/me/onboarding-status"), {
@@ -121,7 +121,7 @@ export async function hasCompletedOnboarding(supabase: SupabaseClient<Database>,
 
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? "Nao foi possivel verificar onboarding.");
+    throw new Error(body?.message ?? "Não foi possível verificar onboarding.");
   }
 
   const body = await response.json() as { onboarding_complete?: boolean };
@@ -134,7 +134,7 @@ export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError || !sessionData.session?.access_token) {
-    throw sessionError ?? new Error("Sessao ausente para salvar o tutor.");
+    throw sessionError ?? new Error("Sessão ausente para salvar o tutor.");
   }
 
   const response = await fetch(backendApiUrl("/api/tutors"), {
@@ -152,7 +152,7 @@ export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, 
 
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? "Nao foi possivel salvar o tutor.");
+    throw new Error(body?.message ?? "Não foi possível salvar o tutor.");
   }
 }
 

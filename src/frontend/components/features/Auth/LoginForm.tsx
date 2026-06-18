@@ -48,7 +48,7 @@ export function LoginForm() {
     <form className="space-y-5" onSubmit={handleSubmit}>
       <label className="block space-y-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">E-mail</span>
-        <input className="form-control" name="email" type="email" autoComplete="email" placeholder="voce@email.com" required />
+        <input className="form-control" name="email" type="email" autoComplete="email" placeholder="você@email.com" required />
       </label>
       <label className="block space-y-2">
         <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Senha</span>

@@ -33,7 +33,7 @@ export interface InteresseComAnimal extends InteresseRegistro {
 
 async function getAccessToken() {
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
-  if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
+  if (error || !data.session?.access_token) throw error ?? new Error("Sessão ausente.");
   return data.session.access_token;
 }
 
@@ -52,7 +52,7 @@ export async function registrarInteresse(animalId: string) {
   if (!response.ok) {
     const message = body && typeof body === "object" && "message" in body
       ? String(body.message)
-      : "Nao foi possivel registrar o interesse.";
+      : "Não foi possível registrar o interesse.";
     throw new Error(message);
   }
 
@@ -71,7 +71,7 @@ export async function carregarInteresse(uuidRegistro: string) {
   if (!response.ok) {
     const message = body && typeof body === "object" && "message" in body
       ? String(body.message)
-      : "Nao foi possivel carregar o registro de interesse.";
+      : "Não foi possível carregar o registro de interesse.";
     throw new Error(message);
   }
 
@@ -90,7 +90,7 @@ export async function listarMeusInteresses() {
   if (!response.ok) {
     const message = body && typeof body === "object" && "message" in body
       ? String(body.message)
-      : "Nao foi possivel carregar seus interesses.";
+      : "Não foi possível carregar seus interesses.";
     throw new Error(message);
   }
 

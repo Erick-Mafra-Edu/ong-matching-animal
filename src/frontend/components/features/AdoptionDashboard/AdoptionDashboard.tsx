@@ -81,7 +81,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
 
     fetch(backendApiUrl("/api/animals"))
       .then(async (response) => {
-        if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
+        if (!response.ok) throw new Error("Não foi possível carregar os animais.");
         return response.json() as Promise<AnimalListItem[]>;
       })
       .then((animals) => {
@@ -169,7 +169,7 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+      setActionMessage(error instanceof Error ? error.message : "Não foi possível registrar o interesse.");
       // Se falhou, limpamos o ID para permitir nova tentativa (via swipe ou botão)
       setLastActionMessageId(null);
     } finally {
@@ -189,13 +189,13 @@ export function AdoptionDashboard({ status = "ready" }: AdoptionDashboardProps) 
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
-        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");
+        setActionMessage(error instanceof Error ? error.message : "Não foi possível registrar o interesse.");
       }
     } else if (direction === "left") {
       setActionMessage(""); // Limpa mensagens anteriores no swipe para esquerda
     }
 
-    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantem os ultimos 10 no historico
+    setHistory((prev) => [current, ...prev].slice(0, 10)); // Mantém os últimos 10 no histórico
     setPets(remaining);
     setCardAction(null);
     if (remaining.length === 0) {

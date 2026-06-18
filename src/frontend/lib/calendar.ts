@@ -42,7 +42,7 @@ export interface CalendarEventInput {
 
 async function getAccessToken() {
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
-  if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
+  if (error || !data.session?.access_token) throw error ?? new Error("Sessão ausente.");
   return data.session.access_token;
 }
 
@@ -59,7 +59,7 @@ async function calendarFetch<T>(path: string, init: RequestInit = {}) {
   const body = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = body && typeof body === "object" && "message" in body ? String(body.message) : "Falha ao acessar o calendario.";
+    const message = body && typeof body === "object" && "message" in body ? String(body.message) : "Falha ao acessar o calendário.";
     throw new Error(message);
   }
 

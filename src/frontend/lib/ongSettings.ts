@@ -17,7 +17,7 @@ export interface OngSettings {
   settings: Record<string, unknown>;
 }
 
-export const defaultAdoptionMessageTemplate = "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:";
+export const defaultAdoptionMessageTemplate = "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse é {linkInteresse}.\n\nObservações:";
 
 export async function carregarOngSettings() {
   const response = await fetch(backendApiUrl("/api/ong-settings"), { cache: "no-store" });
@@ -26,7 +26,7 @@ export async function carregarOngSettings() {
   if (!response.ok) {
     const message = body && typeof body === "object" && "message" in body
       ? String(body.message)
-      : "Nao foi possivel carregar as configuracoes da ONG.";
+      : "Não foi possível carregar as configurações da ONG.";
     throw new Error(message);
   }
 

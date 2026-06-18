@@ -110,8 +110,8 @@ export function CalendarPage({
     try {
       setEvents(await listCalendarEvents());
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Nao foi possivel carregar o calendario.";
-      if (msg.includes("Sessao ausente")) {
+      const msg = error instanceof Error ? error.message : "Não foi possível carregar o calendário.";
+      if (msg.includes("Sessão ausente")) {
         router.push("/login?redirect=/calendario");
         return;
       }
@@ -130,7 +130,7 @@ export function CalendarPage({
       setAnimals(animalsData);
       setInterests(interestsData);
     } catch (error) {
-      console.error("Erro ao carregar dados de selecao:", error);
+      console.error("Erro ao carregar dados de seleção:", error);
     }
   }, []);
 
@@ -152,7 +152,7 @@ export function CalendarPage({
         if (!mounted) return;
         const errorMessage = error instanceof Error ? error.message : "";
 
-        if (errorMessage.includes("Sessao ausente")) {
+        if (errorMessage.includes("Sessão ausente")) {
           router.push("/login?redirect=/calendario");
           return;
         }
@@ -160,7 +160,7 @@ export function CalendarPage({
         if (errorMessage.includes("administrativo")) {
           setStatus("denied");
         } else {
-          setMessage(errorMessage || "Nao foi possivel carregar o calendario.");
+          setMessage(errorMessage || "Não foi possível carregar o calendário.");
           setStatus("ready");
         }
       });
@@ -202,11 +202,11 @@ export function CalendarPage({
         interest_id: draft.uuid_registro ?? "",
         external_event_url: interestUrl,
       });
-      setMessage("Formulario de entrevista preenchido. Revise os dados e clique em Criar para salvar o evento.");
+      setMessage("Formulário de entrevista preenchido. Revise os dados e clique em Criar para salvar o evento.");
       sessionStorage.removeItem("calendarInterviewDraft");
       router.replace("/calendario");
     } catch {
-      setMessage("Nao foi possivel abrir o rascunho da entrevista.");
+      setMessage("Não foi possível abrir o rascunho da entrevista.");
     } finally {
       setDraftApplied(true);
     }
@@ -307,7 +307,7 @@ export function CalendarPage({
       startCreate();
       setMessage(selectedEvent ? "Evento atualizado." : "Evento criado.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar o evento.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível salvar o evento.");
     } finally {
       setStatus("ready");
     }
@@ -324,7 +324,7 @@ export function CalendarPage({
       startCreate();
       setMessage("Evento removido.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel remover o evento.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível remover o evento.");
     } finally {
       setStatus("ready");
     }
@@ -335,7 +335,7 @@ export function CalendarPage({
       <main className="flex min-h-screen items-center justify-center bg-[#0e0e12] p-5 text-white">
         <div className="max-w-md space-y-4 text-center">
           <h1 className="text-2xl font-bold">Acesso negado</h1>
-          <p className="text-slate-400">Voce nao tem permissao para acessar o calendario administrativo.</p>
+          <p className="text-slate-400">Você não tem permissão para acessar o calendário administrativo.</p>
           <Link className="inline-block text-cyan-200 hover:underline" href="/discover">Voltar para a home</Link>
         </div>
       </main>
@@ -352,8 +352,8 @@ export function CalendarPage({
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/admin">Voltar ao admin</Link>
-            <h1 className="mt-3 text-3xl font-black tracking-tight">Calendario</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Agenda de visitas, conversas com tutores e retornos do processo de adocao.</p>
+            <h1 className="mt-3 text-3xl font-black tracking-tight">Calendário</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Agenda de visitas, conversas com tutores e retornos do processo de adoção.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {(["all", "scheduled", "completed", "cancelled"] as const).map((item) => (
@@ -528,11 +528,11 @@ export function CalendarPage({
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <Field label="Titulo" required>
+            <Field label="Título" required>
               <input className={fieldClass} disabled={isBusy} required value={formState.title} onChange={(event) => setFormState({ ...formState, title: event.target.value })} />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Inicio" required>
+              <Field label="Início" required>
                 <input className={fieldClass} disabled={isBusy} required type="datetime-local" value={formState.starts_at} onChange={(event) => setFormState({ ...formState, starts_at: event.target.value })} />
               </Field>
               <Field label="Fim" required>
@@ -543,7 +543,7 @@ export function CalendarPage({
               <div className="relative">
                 <select className={cn(fieldClass, "appearance-none")} disabled={isBusy} value={formState.status} onChange={(event) => setFormState({ ...formState, status: event.target.value as CalendarEventStatus })}>
                   <option value="scheduled">Agendado</option>
-                  <option value="completed">Concluido</option>
+                  <option value="completed">Concluído</option>
                   <option value="cancelled">Cancelado</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -552,7 +552,7 @@ export function CalendarPage({
             <Field label="Local">
               <input className={fieldClass} disabled={isBusy} value={formState.location} onChange={(event) => setFormState({ ...formState, location: event.target.value })} />
             </Field>
-            <Field label="Descricao">
+            <Field label="Descrição">
               <textarea className={`${fieldClass} min-h-24 resize-y py-3`} disabled={isBusy} value={formState.description} onChange={(event) => setFormState({ ...formState, description: event.target.value })} />
             </Field>
             
@@ -861,14 +861,14 @@ function formatTimeRange(event: CalendarEventRecord) {
 }
 
 function eventSubtitle(event: CalendarEventRecord) {
-  return [event.animal_name, event.tutor_name, event.location].filter(Boolean).join(" · ") || "Sem vinculo definido";
+  return [event.animal_name, event.tutor_name, event.location].filter(Boolean).join(" · ") || "Sem vínculo definido";
 }
 
 function statusLabel(status: "all" | CalendarEventStatus) {
   const labels = {
     all: "Todos",
     scheduled: "Agendado",
-    completed: "Concluido",
+    completed: "Concluído",
     cancelled: "Cancelado",
   };
 

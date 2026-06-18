@@ -141,8 +141,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
   },
   "service-configs": {
     id: "service-configs",
-    description: "Configure credenciais de servicos externos como Google e Microsoft.",
-    emptyTitle: "Nenhum servico configurado.",
+    description: "Configure credenciais de serviços externos como Google e Microsoft.",
+    emptyTitle: "Nenhum serviço configurado.",
     primaryField: "provider",
     secondaryFields: ["service_type", "is_active"],
     searchFields: ["id", "service_type", "provider"],
@@ -150,10 +150,10 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     fields: [
       {
         name: "service_type",
-        label: "Tipo de servico",
+        label: "Tipo de serviço",
         type: "select",
         required: true,
-        options: [{ label: "Calendario", value: "calendar" }],
+        options: [{ label: "Calendário", value: "calendar" }],
       },
       {
         name: "provider",
@@ -165,14 +165,14 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
           { label: "Microsoft", value: "microsoft" },
         ],
       },
-      { name: "config", label: "Configuracoes (JSON)", type: "keyValue", helper: "Credenciais e IDs necessarios para integracao." },
+      { name: "config", label: "Configurações (JSON)", type: "keyValue", helper: "Credenciais e IDs necessários para integração." },
       { name: "is_active", label: "Ativo", type: "boolean" },
     ],
   },
   "ong-settings": {
     id: "ong-settings",
     description: "Configure os dados de contato e a mensagem usada quando um tutor quer adotar.",
-    emptyTitle: "Nenhuma configuracao da ONG encontrada.",
+    emptyTitle: "Nenhuma configuração da ONG encontrada.",
     primaryField: "ong_name",
     secondaryFields: ["contact_email", "whatsapp_phone", "is_active"],
     searchFields: ["ong_name", "contact_email", "contact_phone", "whatsapp_phone"],
@@ -188,7 +188,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       postal_code: "",
       social_links: [],
       business_hours: [],
-      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:",
+      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse é {linkInteresse}.\n\nObservações:",
       settings: [],
       is_active: true,
     },
@@ -198,15 +198,15 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "contact_phone", label: "Telefone", type: "text" },
       { name: "whatsapp_phone", label: "WhatsApp", type: "text", helper: "Use DDI e DDD. Ex.: 5511999999999." },
       { name: "website_url", label: "Site", type: "text" },
-      { name: "address_line", label: "Endereco", type: "text" },
+      { name: "address_line", label: "Endereço", type: "text" },
       { name: "city", label: "Cidade", type: "text" },
       { name: "state", label: "Estado", type: "text" },
       { name: "postal_code", label: "CEP", type: "text" },
-      { name: "adoption_message_template", label: "Mensagem de adocao", type: "textarea", helper: "Use {nomeDoAnimal} e {linkInteresse} para preencher automaticamente." },
+      { name: "adoption_message_template", label: "Mensagem de adoção", type: "textarea", helper: "Use {nomeDoAnimal} e {linkInteresse} para preencher automaticamente." },
       { name: "social_links", label: "Redes sociais", type: "keyValue" },
-      { name: "business_hours", label: "Horario de atendimento", type: "keyValue" },
-      { name: "settings", label: "Configuracoes extras", type: "keyValue" },
-      { name: "is_active", label: "Configuracao ativa", type: "boolean" },
+      { name: "business_hours", label: "Horário de atendimento", type: "keyValue" },
+      { name: "settings", label: "Configurações extras", type: "keyValue" },
+      { name: "is_active", label: "Configuração ativa", type: "boolean" },
     ],
   },
   tutors: {
@@ -219,13 +219,13 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     createDefaults: { name: "", location: "", custom_fields: [] },
     fields: [
       { name: "name", label: "Nome", type: "text", required: true },
-      { name: "location", label: "Localizacao", type: "text" },
-      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "tutor", helper: "Use os campos cadastrados para preferencias, rotina e outros dados." },
+      { name: "location", label: "Localização", type: "text" },
+      { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "tutor", helper: "Use os campos cadastrados para preferências, rotina e outros dados." },
     ],
   },
   animals: {
     id: "animals",
-    description: "Animais disponiveis para adocao e atributos exibidos no matching.",
+    description: "Animais disponíveis para adoção e atributos exibidos no matching.",
     emptyTitle: "Nenhum animal cadastrado.",
     primaryField: "name",
     secondaryFields: ["species", "location"],
@@ -233,14 +233,14 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     createDefaults: { name: "", species: "", location: "", custom_fields: [] },
     fields: [
       { name: "name", label: "Nome", type: "text", required: true },
-      { name: "species", label: "Especie", type: "text", required: true },
-      { name: "location", label: "Localizacao", type: "text" },
+      { name: "species", label: "Espécie", type: "text", required: true },
+      { name: "location", label: "Localização", type: "text" },
       { name: "custom_fields", label: "Campos personalizados", type: "keyValue", customFieldsFor: "animal", helper: "Use os campos cadastrados para idade, porte, energia e outros atributos." },
     ],
   },
   "custom-fields": {
     id: "custom-fields",
-    description: "Catalogo de campos usados nos cadastros e nas regras de matching.",
+    description: "Catálogo de campos usados nos cadastros e nas regras de matching.",
     emptyTitle: "Nenhum campo customizado cadastrado.",
     primaryField: "label",
     secondaryFields: ["entity_type", "field_key", "field_type"],
@@ -261,20 +261,20 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         label: "Serve para",
         type: "select",
         required: true,
-        helper: "Define se este campo aparecera nos dados de tutores ou de animais.",
+        helper: "Define se este campo aparecerá nos dados de tutores ou de animais.",
         options: [
           { label: "Para tutor", value: "tutor" },
           { label: "Para animal", value: "animal" },
         ],
       },
-      { name: "field_key", label: "Chave do campo", type: "text", required: true, helper: "Use letras minusculas, numeros e underscore. Ex.: nivel_energia." },
+      { name: "field_key", label: "Chave do campo", type: "text", required: true, helper: "Use letras minúsculas, números e underscore. Ex.: nivel_energia." },
       { name: "label", label: "Descrição do campo", type: "text", required: true },
       {
         name: "source_question_id",
         label: "Pergunta que preenche",
         type: "select",
         dynamicOptionsSource: "onboardingQuestions",
-        helper: "Obrigatorio para campos de tutor. Em campos de animal, deixe vazio.",
+        helper: "Obrigatório para campos de tutor. Em campos de animal, deixe vazio.",
       },
       {
         name: "field_type",
@@ -283,13 +283,13 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         required: true,
         options: [
           { label: "Texto", value: "text" },
-          { label: "Numero", value: "number" },
-          { label: "Sim ou nao", value: "boolean" },
+          { label: "Número", value: "number" },
+          { label: "Sim ou não", value: "boolean" },
           { label: "Lista", value: "select" },
-          { label: "Lista multipla", value: "multiselect" },
+          { label: "Lista múltipla", value: "multiselect" },
         ],
       },
-      { name: "options", label: "Opcoes da lista", type: "options", helper: "Uma opcao por linha para campos do tipo lista." },
+      { name: "options", label: "Opções da lista", type: "options", helper: "Uma opção por linha para campos do tipo lista." },
       { name: "sort_order", label: "Ordem", type: "number" },
       { name: "is_active", label: "Campo ativo", type: "boolean" },
     ],
@@ -306,13 +306,13 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     fields: [
       { name: "tutor_name", label: "Tutor", type: "text" },
       { name: "animal_name", label: "Animal", type: "text" },
-      { name: "animal_species", label: "Especie", type: "text" },
+      { name: "animal_species", label: "Espécie", type: "text" },
       { name: "data_registro", label: "Data do registro", type: "text" },
     ],
   },
   "calendar-events": {
     id: "calendar-events",
-    description: "Agenda administrativa de visitas, conversas e retornos de adocao.",
+    description: "Agenda administrativa de visitas, conversas e retornos de adoção.",
     emptyTitle: "Nenhum evento cadastrado.",
     primaryField: "title",
     secondaryFields: ["starts_at", "status", "animal_name"],
@@ -329,8 +329,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       metadata: [],
     },
     fields: [
-      { name: "title", label: "Titulo", type: "text", required: true },
-      { name: "starts_at", label: "Inicio", type: "text", required: true, placeholder: "2026-06-10T14:00:00-03:00" },
+      { name: "title", label: "Título", type: "text", required: true },
+      { name: "starts_at", label: "Início", type: "text", required: true, placeholder: "2026-06-10T14:00:00-03:00" },
       { name: "ends_at", label: "Fim", type: "text", required: true, placeholder: "2026-06-10T15:00:00-03:00" },
       {
         name: "status",
@@ -338,15 +338,15 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         type: "select",
         options: [
           { label: "Agendado", value: "scheduled" },
-          { label: "Concluido", value: "completed" },
+          { label: "Concluído", value: "completed" },
           { label: "Cancelado", value: "cancelled" },
         ],
       },
       { name: "location", label: "Local", type: "text" },
-      { name: "description", label: "Descricao", type: "textarea" },
+      { name: "description", label: "Descrição", type: "textarea" },
       {
         name: "provider",
-        label: "Calendario externo",
+        label: "Calendário externo",
         type: "select",
         options: [
           { label: "Nenhum", value: "" },
@@ -360,8 +360,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
   },
   "calendar-oauth-connections": {
     id: "calendar-oauth-connections",
-    description: "Conexoes OAuth de calendario para Google e Microsoft.",
-    emptyTitle: "Nenhuma conexao OAuth configurada.",
+    description: "Conexões OAuth de calendário para Google e Microsoft.",
+    emptyTitle: "Nenhuma conexão OAuth configurada.",
     primaryField: "provider",
     secondaryFields: ["calendar_id", "account_email", "is_active"],
     searchFields: ["provider", "calendar_id", "account_email", "tenant_id"],
@@ -442,7 +442,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
     },
     fields: [
       { name: "label", label: "Pergunta", type: "text", required: true },
-      { name: "description", label: "Descricao", type: "textarea" },
+      { name: "description", label: "Descrição", type: "textarea" },
       { name: "placeholder", label: "Texto de apoio", type: "text" },
       {
         name: "type",
@@ -450,15 +450,15 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         type: "select",
         options: [
           { label: "Texto", value: "text" },
-          { label: "Numero", value: "number" },
-          { label: "Escolha unica", value: "select" },
-          { label: "Multiplas escolhas", value: "multiselect" },
-          { label: "Opcoes em radio", value: "radio" },
-          { label: "Sim ou nao", value: "boolean" },
+          { label: "Número", value: "number" },
+          { label: "Escolha única", value: "select" },
+          { label: "Múltiplas escolhas", value: "multiselect" },
+          { label: "Opções em rádio", value: "radio" },
+          { label: "Sim ou não", value: "boolean" },
         ],
       },
-      { name: "options", label: "Opcoes", type: "options", helper: "Uma opcao por linha, usada em perguntas de escolha." },
-      { name: "required", label: "Resposta obrigatoria", type: "boolean" },
+      { name: "options", label: "Opções", type: "options", helper: "Uma opção por linha, usada em perguntas de escolha." },
+      { name: "required", label: "Resposta obrigatória", type: "boolean" },
       { name: "is_active", label: "Pergunta ativa", type: "boolean" },
       { name: "sort_order", label: "Ordem", type: "number" },
     ],
@@ -484,7 +484,7 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       { name: "tutor_field", label: "Campo do tutor", type: "select", required: true, dynamicOptionsFor: "tutor" },
       {
         name: "comparison_operator",
-        label: "Condicao",
+        label: "Condição",
         type: "select",
         options: [
           { label: "Deve ser igual a", value: "=" },
@@ -495,8 +495,8 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
         ],
       },
       { name: "animal_field", label: "Campo do animal", type: "select", required: true, dynamicOptionsFor: "animal" },
-      { name: "weight", label: "Impacto na pontuacao", type: "slider", helper: "0 baixo impacto, 50 medio, 100 alto." },
-      { name: "is_dealbreaker", label: "Regra eliminatoria", type: "boolean", helper: "Se falhar, o animal nao aparece para esse tutor." },
+      { name: "weight", label: "Impacto na pontuação", type: "slider", helper: "0 baixo impacto, 50 médio, 100 alto." },
+      { name: "is_dealbreaker", label: "Regra eliminatória", type: "boolean", helper: "Se falhar, o animal não aparece para esse tutor." },
       { name: "is_active", label: "Regra ativa", type: "boolean" },
     ],
   },
@@ -525,7 +525,7 @@ const adminDataProvider = {
   getOne: async (resource: string, params: { id: string | number }) => {
     const data = await listAdminResource(resource as AdminResource);
     const record = data.find((item) => String(item.id) === String(params.id));
-    if (!record) throw new Error("Registro nao encontrado.");
+    if (!record) throw new Error("Registro não encontrado.");
     return { data: toRaRecord(record) };
   },
   create: async (resource: string, params: { data: Record<string, unknown> }) => {
@@ -677,13 +677,13 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         if (!mounted) return;
         const errorMessage = error instanceof Error ? error.message : "";
 
-        if (errorMessage.includes("Sessao ausente")) {
+        if (errorMessage.includes("Sessão ausente")) {
           router.push("/login?redirect=/admin");
           return;
         }
 
         setStatus(errorMessage.includes("administrativo") ? "denied" : "error");
-        setMessage(errorMessage || "Nao foi possivel carregar o painel.");
+        setMessage(errorMessage || "Não foi possível carregar o painel.");
       });
 
     return () => {
@@ -722,7 +722,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setIsSaving(true);
-    setMessage(mode === "create" ? "Criando registro..." : "Salvando alteracoes...");
+    setMessage(mode === "create" ? "Criando registro..." : "Salvando alterações...");
 
     try {
       const payload = formStateToPayload(formState, activeConfig, mode);
@@ -735,10 +735,10 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       await loadResource(activeResource, response?.data?.id ? String(response.data.id) : selectedId ?? undefined);
       if (activeResource === "custom-fields") await loadCustomFields();
       if (activeResource === "onboarding-questions") await loadOnboardingQuestions();
-      setMessage(mode === "create" ? "Registro criado." : "Alteracoes salvas.");
+      setMessage(mode === "create" ? "Registro criado." : "Alterações salvas.");
       setIsMobileFormOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível salvar.");
     } finally {
       setIsSaving(false);
     }
@@ -757,7 +757,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       setMessage("Registro removido.");
       setIsMobileFormOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel remover.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível remover.");
     } finally {
       setIsSaving(false);
     }
@@ -772,7 +772,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       <AdminShell>
         <div className="max-w-xl space-y-4">
           <h1 className="text-2xl font-semibold text-white">Acesso administrativo</h1>
-          <p className="text-sm leading-6 text-slate-300">Sua sessao nao possui permissao administrativa ativa.</p>
+          <p className="text-sm leading-6 text-slate-300">Sua sessão não possui permissão administrativa ativa.</p>
           <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/discover">Voltar</Link>
         </div>
       </AdminShell>
@@ -784,7 +784,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       <div className="flex w-full flex-col gap-6">
         <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase text-cyan-200">Administracao</p>
+            <p className="text-xs font-semibold uppercase text-cyan-200">Administração</p>
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -798,7 +798,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
               <DialogContent className="max-h-[90vh] overflow-hidden border-white/10 bg-[#101014] p-0 text-white sm:max-w-lg lg:hidden">
                 <DialogHeader className="border-b border-white/10 px-5 py-4">
                   <DialogTitle>Menu administrativo</DialogTitle>
-                  <DialogDescription>Escolha qual area do painel deseja gerenciar.</DialogDescription>
+                  <DialogDescription>Escolha qual área do painel deseja gerenciar.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[calc(90vh-88px)] overflow-y-auto p-4 custom-scrollbar">
                   <div className="grid gap-2">
@@ -836,9 +836,9 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
               </DialogContent>
             </Dialog>
             {showCalendarConfig && (
-              <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendario</Link>
+              <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendário</Link>
             )}
-            <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adocao</Link>
+            <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adoção</Link>
           </div>
         </div>
 
@@ -1366,7 +1366,7 @@ function RuleComparisonPreview({
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-300">
         Quando essa frase for verdadeira, o animal recebe <span className="font-bold text-cyan-100">{weight || 0} pontos</span>.
-        {isDealbreaker && " Se for falsa, o animal sera removido dos resultados desse tutor."}
+        {isDealbreaker && " Se for falsa, o animal será removido dos resultados desse tutor."}
       </p>
     </div>
   );
@@ -1387,7 +1387,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
       const filtered = data.filter((photo) => String(photo.animal_id) === animalId).map(toRaRecord);
       setPhotos(filtered);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel carregar as fotos.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível carregar as fotos.");
     } finally {
       setStatus("ready");
     }
@@ -1416,7 +1416,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
       await onRefresh();
       setMessage(`Imagem enviada em WebP 9:16 (${formatFileSize(optimizedFile.size)}) e definida como principal.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel enviar a imagem.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível enviar a imagem.");
     } finally {
       setStatus("ready");
       setUploadProgress(null);
@@ -1435,7 +1435,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
         setMessage("Foto principal atualizada.");
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel alterar a foto principal.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível alterar a foto principal.");
     } finally {
       setStatus("ready");
     }
@@ -1450,7 +1450,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
       await onRefresh();
       setMessage("Foto removida.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel remover a foto.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível remover a foto.");
     } finally {
       setStatus("ready");
     }
@@ -1561,7 +1561,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
 
 async function cropAndCompressAnimalPhoto(file: File) {
   if (!file.type.startsWith("image/")) {
-    throw new Error("Selecione um arquivo de imagem valido.");
+    throw new Error("Selecione um arquivo de imagem válido.");
   }
 
   const image = await loadImage(file);
@@ -1583,7 +1583,7 @@ async function cropAndCompressAnimalPhoto(file: File) {
     canvas.height = Math.max(1, Math.round(targetHeight * scale));
 
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Nao foi possivel preparar a imagem para upload.");
+    if (!context) throw new Error("Não foi possível preparar a imagem para upload.");
 
     context.drawImage(
       image,
@@ -1607,7 +1607,7 @@ async function cropAndCompressAnimalPhoto(file: File) {
   }
 
   throw new Error(
-    `A imagem ficou com ${formatFileSize(smallestBlob?.size ?? file.size)} apos a compactacao. Use uma imagem menor para ficar abaixo de ${formatFileSize(animalPhotoMaxSizeBytes)}.`,
+    `A imagem ficou com ${formatFileSize(smallestBlob?.size ?? file.size)} após a compactação. Use uma imagem menor para ficar abaixo de ${formatFileSize(animalPhotoMaxSizeBytes)}.`,
   );
 }
 
@@ -1622,7 +1622,7 @@ function loadImage(file: File) {
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      reject(new Error("Nao foi possivel ler a imagem selecionada."));
+      reject(new Error("Não foi possível ler a imagem selecionada."));
     };
     image.src = objectUrl;
   });
@@ -1645,12 +1645,12 @@ function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number) {
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error("Nao foi possivel converter a imagem para WebP."));
+        reject(new Error("Não foi possível converter a imagem para WebP."));
         return;
       }
 
       if (blob.type !== "image/webp") {
-        reject(new Error("Este navegador nao suportou a conversao para WebP."));
+        reject(new Error("Este navegador não suportou a conversão para WebP."));
         return;
       }
 
@@ -1700,7 +1700,7 @@ function FieldInput({
           value={toBooleanSelectValue(value)}
         >
           <option value="true">Sim</option>
-          <option value="false">Nao</option>
+          <option value="false">Não</option>
         </select>
       </div>
     );
@@ -1748,7 +1748,7 @@ function FieldInput({
           />
           <div className="mt-2 flex justify-between text-[11px] uppercase text-slate-500">
             <span>Baixo</span>
-            <span>Medio</span>
+            <span>Médio</span>
             <span>Alto</span>
           </div>
         </div>
@@ -1913,7 +1913,7 @@ function CustomFieldValueInput({
         <select className={`${inputBaseClass} appearance-none`} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
           <option value="">Valor</option>
           <option value="true">Sim</option>
-          <option value="false">Nao</option>
+          <option value="false">Não</option>
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
       </div>
@@ -1955,11 +1955,11 @@ function OptionsEditor({ disabled, onChange, options }: { disabled: boolean; onC
     <div className="space-y-2">
       {options.map((option, index) => (
         <div className="grid gap-2 md:grid-cols-[1fr_auto]" key={index}>
-          <input className={fieldClass} disabled={disabled} onChange={(event) => updateOption(index, event.target.value)} placeholder="Opcao" value={option} />
+          <input className={fieldClass} disabled={disabled} onChange={(event) => updateOption(index, event.target.value)} placeholder="Opção" value={option} />
           <Button className="min-h-11 px-4" disabled={disabled} onClick={() => onChange(options.filter((_, optionIndex) => optionIndex !== index))} type="button" variant="outline">Remover</Button>
         </div>
       ))}
-      <Button className="mt-1" disabled={disabled} onClick={() => onChange([...options, ""])} type="button" variant="outline">Adicionar opcao</Button>
+      <Button className="mt-1" disabled={disabled} onClick={() => onChange([...options, ""])} type="button" variant="outline">Adicionar opção</Button>
     </div>
   );
 }
@@ -2159,12 +2159,12 @@ function comparisonOperatorLabel(operator: string) {
     "<=": "Deve ser menor ou igual a",
   };
 
-  return labels[operator] ?? "condicao";
+  return labels[operator] ?? "condição";
 }
 
 function impactLabel(weight: number) {
   if (weight >= 70) return "Alto impacto";
-  if (weight >= 35) return "Medio impacto";
+  if (weight >= 35) return "Médio impacto";
   return "Baixo impacto";
 }
 
@@ -2343,7 +2343,7 @@ function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void
       const authorizationUrl = await getCalendarOAuthAuthorizationUrl(provider);
       window.location.assign(authorizationUrl);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel iniciar a conexao.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível iniciar a conexão.");
     } finally {
       setIsWorking(null);
     }
@@ -2357,22 +2357,22 @@ function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void
       await onRefresh();
       setMessage("Token renovado com sucesso.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel renovar a conexao.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível renovar a conexão.");
     } finally {
       setIsWorking(null);
     }
   }
 
   async function disconnect(provider: "google" | "microsoft") {
-    if (!confirm("Desconectar esta conta do calendario?")) return;
+    if (!confirm("Desconectar esta conta do calendário?")) return;
     setIsWorking(provider);
     setMessage("");
     try {
       await disconnectCalendarOAuthConnection(provider);
       await onRefresh();
-      setMessage("Conexao removida.");
+      setMessage("Conexão removida.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel desconectar.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível desconectar.");
     } finally {
       setIsWorking(null);
     }
@@ -2394,11 +2394,11 @@ function CalendarOAuthPanel({ onRefresh, rows }: { onRefresh: () => Promise<void
                   <p className="mt-1 text-xs uppercase tracking-widest text-slate-500">{isConnected ? "Conectado" : "Desconectado"}</p>
                 </div>
                 <Badge className={cn("border-none px-3 py-1 font-black uppercase tracking-widest text-[9px]", isConnected ? "bg-cyan-400/10 text-cyan-400" : "bg-white/5 text-slate-600")}>
-                  {isConnected ? "Ativo" : "Sem conexao"}
+                  {isConnected ? "Ativo" : "Sem conexão"}
                 </Badge>
               </div>
               <div className="mt-4 space-y-1 text-sm text-slate-300">
-                <p>Conta: {current?.account_email ? String(current.account_email) : "nao informada"}</p>
+                <p>Conta: {current?.account_email ? String(current.account_email) : "não informada"}</p>
                 <p>Calendar ID: {current?.calendar_id ? String(current.calendar_id) : "primary"}</p>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
