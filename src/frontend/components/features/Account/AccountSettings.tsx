@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { AccountSessionError, changeAccountPassword, fetchAccountProfile, updateAccountName, type AccountProfile } from "@/lib/account";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+
+const navigationLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export function AccountSettings() {
   const router = useRouter();
@@ -125,7 +129,10 @@ export function AccountSettings() {
             <p className="mt-2 text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Conta e seguranca</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-50 transition hover:border-cyan-200 hover:bg-cyan-200/10" href="/discover">Voltar</Link>
+            <Link className={navigationLinkClass} href="/discover">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Link>
             <button className="rounded-full border border-pink-400/40 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-pink-200 transition hover:bg-pink-400/10" onClick={handleLogout} type="button">Sair</button>
           </div>
         </header>

@@ -14,6 +14,7 @@ export interface OngSettings {
   social_links: Record<string, unknown>;
   business_hours: Record<string, unknown>;
   adoption_message_template?: string | null;
+  extension_college?: string | null;
   settings: Record<string, unknown>;
 }
 
@@ -48,6 +49,7 @@ function normalizeOngSettings(body: unknown): OngSettings | null {
     social_links: isRecord(settings.social_links) ? settings.social_links : {},
     business_hours: isRecord(settings.business_hours) ? settings.business_hours : {},
     adoption_message_template: normalizeOptionalString(settings.adoption_message_template),
+    extension_college: normalizeOptionalString(settings.extension_college),
     settings: isRecord(settings.settings) ? settings.settings : {},
   };
 }

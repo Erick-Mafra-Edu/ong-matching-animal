@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { MobileNavigation } from "@/components/features/AdoptionDashboard/MobileNavigation";
 import { Badge } from "@/components/ui/Badge";
 import { navigationItems } from "@/data/adoption.mock";
 import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
 import { listarMeusInteresses, type InteresseComAnimal } from "@/lib/interessados";
+
+const navigationLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export default function MeusInteressesPage() {
   const router = useRouter();
@@ -46,7 +50,10 @@ export default function MeusInteressesPage() {
       <div className="mx-auto w-full max-w-6xl">
         <header className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/discover">Voltar para descobrir</Link>
+            <Link className={navigationLinkClass} href="/discover">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para descobrir
+            </Link>
             <h1 className="mt-3 text-3xl font-black tracking-tight">Meus interesses</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Animais em que você demonstrou interesse e entrevistas vinculadas pela ONG.</p>
           </div>

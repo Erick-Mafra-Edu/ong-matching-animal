@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { PasswordResetForm } from "@/components/features/Auth/PasswordResetForm";
+
+const navigationLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export default function RedefinirSenhaPage() {
   return (
@@ -20,7 +24,8 @@ export default function RedefinirSenhaPage() {
         </section>
 
         <footer className="mt-8 text-center">
-          <Link className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200 transition hover:text-cyan-100" href="/login">
+          <Link className={navigationLinkClass} href="/login">
+            <ArrowLeft className="h-4 w-4" />
             Voltar para o login
           </Link>
         </footer>

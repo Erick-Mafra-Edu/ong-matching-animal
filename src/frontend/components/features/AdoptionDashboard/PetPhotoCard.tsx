@@ -134,7 +134,7 @@ export function PetPhotoCard({ action, onActionComplete, pet }: PetPhotoCardProp
           {decision === "right" ? <><PawIcon className="h-4 w-4" /> Adotar</> : <><CrossIcon className="text-xl" /> Recusar</>}
         </div>
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/85 to-transparent px-6 pb-5 pt-24 md:pb-6">
-          <ProfileSummary pet={pet} compact />
+          <ProfileSummary pet={pet} compact tone="dark" />
         </div>
       </div>
       <button className="absolute left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/30 text-white/70 backdrop-blur-sm transition hover:bg-black/55 hover:text-white md:grid" onClick={(event) => { event.stopPropagation(); showPhoto(-1); }} onPointerDown={(event) => event.stopPropagation()} aria-label="Foto anterior">

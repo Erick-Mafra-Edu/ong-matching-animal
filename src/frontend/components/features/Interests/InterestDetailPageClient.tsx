@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
@@ -10,6 +11,9 @@ import { getAdminMe } from "@/lib/admin";
 import { carregarInteresse } from "@/lib/interessados";
 
 type DetailRecord = Record<string, unknown>;
+
+const navigationLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarConfig: boolean }) {
   const params = useParams<{ uuid_registro: string }>();
@@ -122,7 +126,10 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
         <section className="w-full max-w-xl rounded-md border border-white/10 bg-white/[0.035] p-6">
           <h1 className="text-xl font-semibold text-white">Registro de interesse</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">{message}</p>
-          <Link className="mt-5 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href={backHref}>{backLabel}</Link>
+          <Link className={`mt-5 ${navigationLinkClass}`} href={backHref}>
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Link>
         </section>
       </main>
     );
@@ -140,10 +147,14 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
           <div className="flex flex-wrap gap-2">
             {showCalendarConfig && (
               <Button disabled={isScheduling} onClick={openInterviewDraft} type="button">
+                <CalendarDays className="h-4 w-4" />
                 {isScheduling ? "Abrindo agenda..." : "Marcar entrevista"}
               </Button>
             )}
-            <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-slate-300 hover:text-white" href={backHref}>{backLabel}</Link>
+            <Link className={navigationLinkClass} href={backHref}>
+              <ArrowLeft className="h-4 w-4" />
+              {backLabel}
+            </Link>
           </div>
         </header>
 

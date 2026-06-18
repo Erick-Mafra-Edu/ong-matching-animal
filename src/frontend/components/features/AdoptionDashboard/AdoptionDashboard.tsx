@@ -366,7 +366,7 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
             <h2 className="text-lg font-black" id="adoption-contact-title">Contato com a ONG</h2>
             <p className="mt-1 text-sm leading-6 text-slate-400">{dialog.animalName} foi salvo nos seus interesses.</p>
           </div>
-          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 text-slate-300 transition hover:border-cyan-200 hover:text-cyan-100" onClick={onClose} type="button" aria-label="Fechar">
+          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/12 text-white shadow-sm transition hover:border-cyan-200 hover:bg-cyan-200 hover:text-slate-950" onClick={onClose} type="button" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </div>

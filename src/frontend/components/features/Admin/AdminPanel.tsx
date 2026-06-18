@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import { AdminContext, useDataProvider, type DataProvider, type RaRecord } from "react-admin";
 import {
   ImageIcon,
+  ArrowLeft,
   Dog,
   HeartHandshake,
   Calendar,
+  CalendarDays,
   Settings,
   ShieldCheck,
   ClipboardCheck,
@@ -27,6 +30,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Link as LinkIcon,
+  Sun,
+  Moon,
 } from "lucide-react";
 import {
   Dialog,
@@ -39,6 +44,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 import {
+  AdminApiError,
   adminResources,
   createAdminResource,
   createAdminUser,
@@ -145,6 +151,7 @@ type RuleSimulationResult = {
 const fieldClass =
   "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
 const adminOutlineButtonClass = "border-white/15 text-slate-100 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
+const adminNavLinkClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 const animalPhotoMaxSizeBytes = 800 * 1024;
 const animalPhotoMaxWidth = 1080;
 const animalPhotoMaxHeight = 1920;
@@ -594,6 +601,18 @@ const adminDataProvider = {
   },
 };
 
+function isRateLimitError(error: unknown): error is AdminApiError {
+  return error instanceof AdminApiError && error.status === 429;
+}
+
+function getRateLimitMessage(error: unknown) {
+  if (isRateLimitError(error)) {
+    return error.message || "Limite de tentativas excedido. Tente novamente em uma hora.";
+  }
+
+  return "";
+}
+
 function toRaRecord(record: Record<string, unknown>): AdminRecord {
   return { ...record, id: String(record.id) };
 }
@@ -609,10 +628,12 @@ export function AdminPanel({ showCalendarConfig = false }: { showCalendarConfig?
 function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean }) {
   const router = useRouter();
   const dataProvider = useDataProvider();
+  const { resolvedTheme, setTheme } = useTheme();
   const [activeResource, setActiveResource] = useState<AdminResource>("admin-users");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileFormOpen, setIsMobileFormOpen] = useState(false);
+  const [isThemeMounted, setIsThemeMounted] = useState(false);
 
   const visibleResources = useMemo(() => {
     return visibleAdminResources.filter(r => {
@@ -635,6 +656,17 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
           }
         });
         setPhotoMap(map);
+      }).catch((error) => {
+        if (isRateLimitError(error)) {
+          setMessage(getRateLimitMessage(error));
+          return;
+        }
+        if (!(error instanceof Error)) {
+          return;
+        }
+        if (!error.message.includes("Sess")) {
+          console.error(error);
+        }
       });
     }
   }, [activeResource, rows]);
@@ -660,6 +692,11 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   const onboardingQuestionOptions = useMemo(() => buildOnboardingQuestionOptions(onboardingQuestions), [onboardingQuestions]);
   const customFieldOptions = useMemo(() => buildCustomFieldOptions(customFields, onboardingQuestions), [customFields, onboardingQuestions]);
   const customFieldDefinitions = useMemo(() => buildCustomFieldDefinitions(customFields, onboardingQuestions), [customFields, onboardingQuestions]);
+  const isLightTheme = isThemeMounted && resolvedTheme === "light";
+
+  useEffect(() => {
+    setIsThemeMounted(true);
+  }, []);
 
   const loadCustomFields = useCallback(async () => {
     const data = await listAdminResource("custom-fields");
@@ -694,17 +731,12 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     setIsResourceLoading(true);
 
     try {
-      const response = await dataProvider.getList(resource, {
-        pagination: { page: 1, perPage: 250 },
-        sort: { field: "id", order: "ASC" },
-        filter: {},
-      });
-      const data = response.data as AdminRecord[];
+      const data = (await listAdminResource(resource)).map(toRaRecord) as AdminRecord[];
       hydrateResourceState(resource, data, nextSelectedId);
     } finally {
       setIsResourceLoading(false);
     }
-  }, [dataProvider, hydrateResourceState]);
+  }, [hydrateResourceState]);
 
   useEffect(() => {
     let mounted = true;
@@ -722,6 +754,12 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       })
       .catch((error) => {
         if (!mounted) return;
+        const rateLimitMessage = getRateLimitMessage(error);
+        if (rateLimitMessage) {
+          setStatus("ready");
+          setMessage(rateLimitMessage);
+          return;
+        }
         const errorMessage = error instanceof Error ? error.message : "";
 
         if (errorMessage.includes("Sessão ausente")) {
@@ -749,6 +787,12 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
     loadResource(activeResource)
       .catch((error) => {
         if (!mounted) return;
+        const rateLimitMessage = getRateLimitMessage(error);
+        if (rateLimitMessage) {
+          setStatus("ready");
+          setMessage(rateLimitMessage);
+          return;
+        }
         const errorMessage = error instanceof Error ? error.message : "";
 
         if (errorMessage.includes("Sessao ausente")) {
@@ -828,7 +872,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       );
       if (!keepAnimalFormOpen) setIsMobileFormOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível salvar.");
+      setMessage(getRateLimitMessage(error) || (error instanceof Error ? error.message : "Não foi possível salvar."));
     } finally {
       setIsSaving(false);
     }
@@ -847,10 +891,14 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
       setMessage("Registro removido.");
       setIsMobileFormOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível remover.");
+      setMessage(getRateLimitMessage(error) || (error instanceof Error ? error.message : "Não foi possível remover."));
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function toggleTheme() {
+    setTheme(isLightTheme ? "dark" : "light");
   }
 
   if (status === "loading") {
@@ -863,14 +911,17 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
         <div className="max-w-xl space-y-4">
           <h1 className="text-2xl font-semibold text-white">Acesso administrativo</h1>
           <p className="text-sm leading-6 text-slate-300">Sua sessão não possui permissão administrativa ativa.</p>
-          <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/discover">Voltar</Link>
+          <Link className={adminNavLinkClass} href="/discover">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Link>
         </div>
       </AdminShell>
     );
   }
 
   return (
-    <AdminShell>
+    <AdminShell theme={isLightTheme ? "light" : "dark"}>
       <div className="flex w-full flex-col gap-6">
         <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
@@ -878,6 +929,10 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
             <h1 className="text-3xl font-semibold text-white">Painel administrativo</h1>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Button className={adminOutlineButtonClass} onClick={toggleTheme} type="button" variant="outline">
+              {isLightTheme ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              {isLightTheme ? "Modo escuro" : "Modo claro"}
+            </Button>
             <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <DialogTrigger asChild>
                 <Button className={`lg:hidden ${adminOutlineButtonClass}`} type="button" variant="outline">
@@ -885,7 +940,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                   Menu
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-hidden border-white/10 bg-[#101014] p-0 text-white sm:max-w-lg lg:hidden">
+              <DialogContent className="max-h-[90vh] overflow-hidden border-white/10 p-0 sm:max-w-lg lg:hidden" data-admin-theme={isLightTheme ? "light" : "dark"}>
                 <DialogHeader className="border-b border-white/10 px-5 py-4">
                   <DialogTitle>Menu administrativo</DialogTitle>
                   <DialogDescription>Escolha qual área do painel deseja gerenciar.</DialogDescription>
@@ -926,9 +981,15 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
               </DialogContent>
             </Dialog>
             {showCalendarConfig && (
-              <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/calendario">Abrir calendário</Link>
+              <Link className={adminNavLinkClass} href="/calendario">
+                <CalendarDays className="h-4 w-4" />
+                Abrir calendário
+              </Link>
             )}
-            <Link className="text-sm font-semibold text-slate-300 hover:text-white" href="/discover">Voltar para adoção</Link>
+            <Link className={adminNavLinkClass} href="/discover">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para adoção
+            </Link>
           </div>
         </div>
 
@@ -1032,6 +1093,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                     formState={formState}
                     mode={mode}
                     selectedRow={selectedRow}
+                    adminTheme={isLightTheme ? "light" : "dark"}
                     customFieldDefinitions={customFieldDefinitions}
                     customFieldOptions={customFieldOptions}
                     onboardingQuestionOptions={onboardingQuestionOptions}
@@ -1043,7 +1105,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                 </div>
 
                 <Dialog open={isMobileFormOpen} onOpenChange={setIsMobileFormOpen}>
-                  <DialogContent className="max-h-[92vh] overflow-hidden border-white/10 bg-[#101014] p-0 text-white sm:max-w-2xl lg:hidden">
+                  <DialogContent className="max-h-[92vh] overflow-hidden border-white/10 p-0 sm:max-w-2xl lg:hidden" data-admin-theme={isLightTheme ? "light" : "dark"}>
                     <DialogHeader className="border-b border-white/10 px-5 py-4">
                       <DialogTitle>{mode === "create" ? "Novo registro" : "Editar registro"}</DialogTitle>
                       <DialogDescription>
@@ -1057,6 +1119,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                         formState={formState}
                         mode={mode}
                         selectedRow={selectedRow}
+                        adminTheme={isLightTheme ? "light" : "dark"}
                         customFieldDefinitions={customFieldDefinitions}
                         customFieldOptions={customFieldOptions}
                         onboardingQuestionOptions={onboardingQuestionOptions}
@@ -1079,9 +1142,12 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
   );
 }
 
-function AdminShell({ children }: { children: ReactNode }) {
+function AdminShell({ children, theme = "dark" }: { children: ReactNode; theme?: "light" | "dark" }) {
   return (
-    <main className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/20 via-[#0a0a0c] to-[#0a0a0c] px-4 py-8 text-white md:px-8 lg:px-12">
+    <main
+      className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/20 via-[#0a0a0c] to-[#0a0a0c] px-4 py-8 text-white md:px-8 lg:px-12"
+      data-admin-theme={theme}
+    >
       <div className="mx-auto w-full max-w-[1600px] animate-state-enter">{children}</div>
     </main>
   );
@@ -1542,6 +1608,7 @@ function RecordForm({
   onSubmit,
   selectedRow,
   onClose,
+  adminTheme = "dark",
   variant = "panel",
 }: {
   config: ResourceUiConfig;
@@ -1557,6 +1624,7 @@ function RecordForm({
   onSubmit: (event: FormEvent) => void;
   selectedRow: AdminRecord | null;
   onClose?: () => void;
+  adminTheme?: "light" | "dark";
   variant?: "panel" | "modal";
 }) {
   const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
@@ -1567,26 +1635,38 @@ function RecordForm({
   const deleteAction = canDelete ? (
     <Dialog>
       <DialogTrigger asChild>
-        <Button
-          aria-label="Excluir registro"
-          className={isModal ? "h-11 w-11 shrink-0 px-0" : "h-9 px-4 text-[10px]"}
-          disabled={formDisabled}
-          title="Excluir registro"
-          type="button"
-          variant={isModal ? "danger-outline" : "danger"}
-        >
-          <Trash2 className="h-4 w-4" />
-          {!isModal && "Excluir"}
-        </Button>
+        {isModal ? (
+          <button
+            aria-label="Excluir registro"
+            className="inline-grid h-11 w-11 shrink-0 place-items-center rounded-full border border-red-700 bg-red-600 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-bg disabled:cursor-not-allowed disabled:bg-red-300 disabled:text-red-950"
+            disabled={formDisabled}
+            title="Excluir registro"
+            type="button"
+          >
+            <Trash2 className="h-4 w-4" data-admin-icon="delete-record" />
+          </button>
+        ) : (
+          <Button
+            aria-label="Excluir registro"
+            className="h-9 bg-red-600 px-4 text-[10px] text-white hover:bg-red-700"
+            disabled={formDisabled}
+            title="Excluir registro"
+            type="button"
+            variant="danger"
+          >
+            <Trash2 className="h-4 w-4 text-current" data-admin-icon="delete-record" />
+            Excluir
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent data-admin-theme={adminTheme}>
         <DialogHeader>
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 text-pink-500">
             <AlertTriangle className="h-6 w-6" />
           </div>
           <DialogTitle className="text-center">Confirmar exclusão?</DialogTitle>
           <DialogDescription className="text-center">
-            Esta ação não pode ser desfeita. O registro <span className="font-bold text-white">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
+            Esta ação não pode ser desfeita. O registro <span className="font-bold text-[var(--color-text)]">&quot;{selectedRow ? getRecordTitle(selectedRow, config) : "este item"}&quot;</span> será removido permanentemente.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="mt-4 gap-2 sm:justify-center">
@@ -1631,7 +1711,7 @@ function RecordForm({
   }
 
   return (
-    <div className={isModal ? "bg-white/[0.02]" : "rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden"}>
+    <div className={isModal ? "bg-white/[0.02]" : "rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden"} data-admin-theme={adminTheme}>
       <form onSubmit={onSubmit}>
         <div className={`flex flex-col gap-4 border-b border-white/10 bg-white/[0.01] p-5 sm:flex-row sm:items-center sm:justify-between ${isModal ? "hidden" : ""}`}>
           <div className="min-w-0">
@@ -1687,16 +1767,15 @@ function RecordForm({
               {isModal && (
                 <>
                   {deleteAction}
-                  <Button
+                  <button
                     aria-label="Fechar registro"
-                    className={`h-11 w-11 shrink-0 px-0 ${adminOutlineButtonClass}`}
+                    className="inline-grid h-11 w-11 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-800 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-bg disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-700"
                     onClick={onClose}
                     title="Fechar registro"
                     type="button"
-                    variant="outline"
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
+                    <X className="h-4 w-4" data-admin-icon="close-record" />
+                  </button>
                 </>
               )}
               <Button aria-label={mode === "create" ? "Criar registro" : "Salvar alterações"} className={`${isModal ? "flex-1" : "min-w-[160px]"} shadow-xl shadow-cyan-400/10`} disabled={formDisabled} title={mode === "create" ? "Criar registro" : "Salvar alterações"} type="submit">
@@ -2467,7 +2546,7 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
                   <Star className={`h-3.5 w-3.5 ${photo.is_primary ? "fill-current" : ""}`} />
                 </button>
                 <button
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white shadow-lg transition-all hover:border-red-500 hover:text-red-500"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-600 text-white shadow-lg transition-all hover:border-red-300 hover:bg-red-700"
                   disabled={isBusy}
                   onClick={() => deletePhoto(String(photo.id))}
                   title="Excluir foto"
@@ -2488,8 +2567,8 @@ function AnimalImagesPanel({ animal, disabled, onRefresh }: { animal: AdminRecor
           ))}
         </div>
       ) : (
-        <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-white/5 bg-white/[0.01] py-12 text-slate-500">
-          <ImageIcon className="h-10 w-10 opacity-20" />
+        <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-white/5 bg-white/[0.01] py-12 text-slate-500" data-admin-upload="empty-state">
+          <ImageIcon className="h-10 w-10 opacity-40" />
           <p className="mt-4 text-sm font-medium">Nenhuma foto enviada para este animal.</p>
         </div>
       )}
@@ -2808,7 +2887,7 @@ function KeyValueEditor({
               />
             </div>
             <button
-              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-red-500/20 bg-[#16161a] text-slate-500 opacity-0 shadow-lg transition-all hover:border-red-500/50 hover:text-red-500 group-hover:opacity-100 disabled:pointer-events-none"
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-600 text-white opacity-0 shadow-lg transition-all hover:bg-red-700 group-hover:opacity-100 disabled:pointer-events-none disabled:bg-slate-300 disabled:text-slate-600"
               disabled={disabled}
               onClick={() => removeRow(index)}
               title="Remover campo"
@@ -3567,7 +3646,7 @@ function ServiceConfigModal({
   }
 
   return (
-    <DialogContent className="max-w-md bg-[#16161a] border-white/10">
+      <DialogContent className="max-w-md border-white/10">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-3 text-white">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-400">

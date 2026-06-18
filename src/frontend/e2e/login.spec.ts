@@ -9,4 +9,5 @@ test("renderiza apenas um campo de email na tela de login", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Entre na sua conta" })).toBeVisible();
   await expect(page.locator('input[name="email"]')).toHaveCount(1);
   await expect(page.locator('input[name="password"]')).toHaveCount(1);
+  await expect(page.getByText("Projeto de Extensão Faculdade E2E.")).toBeVisible();
 });

@@ -114,6 +114,7 @@ describe("API Endpoints", () => {
           contact_email: "contato@example.org",
           contact_phone: "+5511999999999",
           whatsapp_phone: "+5511988888888",
+          extension_college: "Faculdade de Tecnologia Social",
           social_links: {},
           business_hours: {},
           settings: {},
@@ -125,6 +126,7 @@ describe("API Endpoints", () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty("id", "default");
       expect(response.body).toHaveProperty("contact_email", "contato@example.org");
+      expect(response.body).toHaveProperty("extension_college", "Faculdade de Tecnologia Social");
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/rest/v1/ong_settings"),
         expect.objectContaining({
