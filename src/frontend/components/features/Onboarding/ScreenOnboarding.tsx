@@ -45,17 +45,17 @@ const screenTours: Record<string, ScreenTour> = {
     steps: [
       {
         title: "Bem-vindo ao MatchPet",
-        description: "Aqui voce conhece a proposta da plataforma e inicia sua jornada como tutor interessado em adocao responsavel.",
+        description: "Aqui você conhece a proposta da plataforma e inicia sua jornada como tutor interessado em adoção responsável.",
         selector: "main h1",
       },
       {
         title: "Comece pelo cadastro",
-        description: "Use Cadastrar ou Encontrar meu match para criar seu perfil e informar sua rotina antes de ver animais compativeis.",
+        description: "Use Cadastrar ou Encontrar meu match para criar seu perfil e informar sua rotina antes de ver animais compatíveis.",
         selector: 'a[href="/cadastro"]',
       },
       {
         title: "Entenda o fluxo",
-        description: "A secao Como funciona resume as etapas: responder perguntas, descobrir perfis e conversar com a ONG.",
+        description: "A seção Como funciona resume as etapas: responder perguntas, descobrir perfis e conversar com a ONG.",
         selector: "#como-funciona",
       },
     ],
@@ -74,8 +74,8 @@ const screenTours: Record<string, ScreenTour> = {
         selector: "main section",
       },
       {
-        title: "Ja tem conta?",
-        description: "Use Entrar no topo da pagina se voce ja possui cadastro e quer continuar o processo.",
+        title: "Já tem conta?",
+        description: "Use Entrar no topo da página se você já possui cadastro e quer continuar o processo.",
         selector: 'a[href="/login"]',
       },
     ],
@@ -85,17 +85,17 @@ const screenTours: Record<string, ScreenTour> = {
     steps: [
       {
         title: "Entrada na conta",
-        description: "Informe seu e-mail para acessar a area de descoberta, seus interesses e o acompanhamento com a ONG.",
+        description: "Informe seu e-mail para acessar a área de descoberta, seus interesses e o acompanhamento com a ONG.",
         selector: "form",
       },
       {
         title: "Links e erros de acesso",
-        description: "Se um link expirar, solicite um novo acesso. Mensagens de validacao aparecem acima do formulario.",
+        description: "Se um link expirar, solicite um novo acesso. Mensagens de validação aparecem acima do formulário.",
         selector: '[role="alert"], form',
       },
       {
         title: "Primeiro acesso",
-        description: "Se ainda nao tiver conta, use o link de cadastro no fim do painel.",
+        description: "Se ainda não tiver conta, use o link de cadastro no fim do painel.",
         selector: 'a[href="/cadastro"]',
       },
     ],
@@ -110,12 +110,12 @@ const screenTours: Record<string, ScreenTour> = {
       },
       {
         title: "Respostas completas",
-        description: "Campos obrigatorios precisam ser preenchidos para salvar o perfil e liberar recomendacoes mais consistentes.",
+        description: "Campos obrigatórios precisam ser preenchidos para salvar o perfil e liberar recomendações mais consistentes.",
         selector: "form input, form select, form textarea, form button",
       },
       {
         title: "Matching mais preciso",
-        description: "Quanto melhor sua rotina estiver descrita, mais facil fica comparar suas preferencias com os animais disponiveis.",
+        description: "Quanto melhor sua rotina estiver descrita, mais fácil fica comparar suas preferências com os animais disponíveis.",
         selector: "main h1",
       },
     ],
@@ -135,22 +135,22 @@ const screenTours: Record<string, ScreenTour> = {
       },
       {
         title: "Desfazer ultima acao",
-        description: "Este botao retorna o ultimo animal descartado ou curtido para a pilha, quando existe historico disponivel.",
+        description: "Este botão retorna o último animal descartado ou curtido para a pilha, quando existe histórico disponível.",
         selector: 'div[aria-label="Ações do perfil"] button[aria-label="Desfazer"]',
       },
       {
         title: "Recusar este perfil",
-        description: "Use Recusar quando o animal nao combina com sua rotina. O card sai da fila e o proximo perfil e exibido.",
+        description: "Use Recusar quando o animal não combina com sua rotina. O card sai da fila e o próximo perfil é exibido.",
         selector: 'div[aria-label="Ações do perfil"] button:nth-of-type(2)',
       },
       {
         title: "Demonstrar interesse",
-        description: "Use Adotar para registrar seu interesse no animal. Depois disso, a plataforma cria o registro e abre as opcoes de contato configuradas pela ONG.",
+        description: "Use Adotar para registrar seu interesse no animal. Depois disso, a plataforma cria o registro e abre as opções de contato configuradas pela ONG.",
         selector: 'div[aria-label="Ações do perfil"] button:nth-of-type(3)',
       },
       {
         title: "Contato com a ONG",
-        description: "Ao demonstrar interesse, o registro e criado e a plataforma oferece canais configurados pela ONG para continuar a conversa.",
+        description: "Ao demonstrar interesse, o registro é criado e a plataforma oferece canais configurados pela ONG para continuar a conversa.",
         selector: 'nav[aria-label="Navegação desktop"], nav[aria-label="Navegacao desktop"]',
       },
     ],
@@ -160,12 +160,12 @@ const screenTours: Record<string, ScreenTour> = {
     steps: [
       {
         title: "Seus interesses",
-        description: "Esta tela lista os animais em que voce demonstrou interesse durante a descoberta.",
+        description: "Esta tela lista os animais em que você demonstrou interesse durante a descoberta.",
         selector: "header",
       },
       {
         title: "Status da entrevista",
-        description: "Cada card indica se ja existe entrevista vinculada ou se a ONG ainda precisa agendar.",
+        description: "Cada card indica se já existe entrevista vinculada ou se a ONG ainda precisa agendar.",
         selector: "article, section",
       },
       {
@@ -184,8 +184,8 @@ const screenTours: Record<string, ScreenTour> = {
         selector: "header",
       },
       {
-        title: "Informacoes de matching",
-        description: "Os paineis mostram campos que ajudam a avaliar compatibilidade e preparar o proximo contato.",
+        title: "Informações de matching",
+        description: "Os painéis mostram campos que ajudam a avaliar compatibilidade e preparar o próximo contato.",
         selector: "main section",
       },
       {
@@ -200,17 +200,17 @@ const screenTours: Record<string, ScreenTour> = {
     steps: [
       {
         title: "Painel administrativo",
-        description: "Gerencie animais, tutores, interesses, perguntas, regras de matching e configuracoes da ONG.",
+        description: "Gerencie animais, tutores, interesses, perguntas, regras de matching e configurações da ONG.",
         selector: "main aside",
       },
       {
         title: "Recursos e formularios",
-        description: "Escolha um recurso no menu, pesquise registros e use o painel de edicao para criar ou atualizar dados.",
+        description: "Escolha um recurso no menu, pesquise registros e use o painel de edição para criar ou atualizar dados.",
         selector: "main section",
       },
       {
-        title: "Fluxo de adocao",
-        description: "As configuracoes daqui alimentam cadastro, onboarding, descoberta, contato e agenda.",
+        title: "Fluxo de adoção",
+        description: "As configurações daqui alimentam cadastro, onboarding, descoberta, contato e agenda.",
         selector: "main",
       },
     ],
@@ -220,17 +220,17 @@ const screenTours: Record<string, ScreenTour> = {
     steps: [
       {
         title: "Agenda administrativa",
-        description: "Acompanhe entrevistas, visitas e retornos do processo de adocao em lista, mes ou semana.",
+        description: "Acompanhe entrevistas, visitas e retornos do processo de adoção em lista, mês ou semana.",
         selector: "header",
       },
       {
         title: "Filtros e eventos",
-        description: "Filtre por status e selecione eventos existentes para revisar ou editar as informacoes.",
+        description: "Filtre por status e selecione eventos existentes para revisar ou editar as informações.",
         selector: "main section",
       },
       {
-        title: "Criacao de compromisso",
-        description: "Preencha titulo, horario, tutor, animal e interesse para criar um evento conectado ao processo.",
+        title: "Criação de compromisso",
+        description: "Preencha título, horário, tutor, animal e interesse para criar um evento conectado ao processo.",
         selector: "aside form, form",
       },
     ],

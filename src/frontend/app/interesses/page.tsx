@@ -27,8 +27,8 @@ export default function MeusInteressesPage() {
       })
       .catch((error) => {
         if (!mounted) return;
-        const errorMessage = error instanceof Error ? error.message : "Nao foi possivel carregar seus interesses.";
-        if (errorMessage.includes("Sessao")) {
+        const errorMessage = error instanceof Error ? error.message : "Não foi possível carregar seus interesses.";
+        if (errorMessage.includes("Sessão")) {
           router.replace("/login?redirect=/interesses");
           return;
         }
@@ -48,9 +48,9 @@ export default function MeusInteressesPage() {
           <div>
             <Link className="text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/discover">Voltar para descobrir</Link>
             <h1 className="mt-3 text-3xl font-black tracking-tight">Meus interesses</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Animais em que voce demonstrou interesse e entrevistas vinculadas pela ONG.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Animais em que você demonstrou interesse e entrevistas vinculadas pela ONG.</p>
           </div>
-          <nav className="hidden items-center gap-2 md:flex" aria-label="Navegacao desktop">
+          <nav className="hidden items-center gap-2 md:flex" aria-label="Navegação desktop">
             <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/discover">Descobrir</Link>
             <Link className="rounded-md border border-cyan-200 bg-cyan-200 px-4 py-2 text-sm font-semibold text-slate-950" href="/interesses" aria-current="page">Meus interesses</Link>
           </nav>
@@ -64,7 +64,7 @@ export default function MeusInteressesPage() {
 
         {status === "error" && (
           <section className="mt-6 rounded-md border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-lg font-semibold text-white">Nao foi possivel carregar</h2>
+            <h2 className="text-lg font-semibold text-white">Não foi possível carregar</h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">{message}</p>
           </section>
         )}
@@ -72,7 +72,7 @@ export default function MeusInteressesPage() {
         {status === "ready" && !interesses.length && (
           <section className="mt-6 rounded-md border border-white/10 bg-white/[0.035] p-6 text-center">
             <h2 className="text-lg font-semibold text-white">Nenhum interesse registrado</h2>
-            <p className="mt-2 text-sm text-slate-400">Quando voce curtir um animal, ele aparecera aqui.</p>
+            <p className="mt-2 text-sm text-slate-400">Quando você curtir um animal, ele aparecerá aqui.</p>
             <Link className="mt-4 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/discover">Ver animais</Link>
           </section>
         )}
@@ -132,7 +132,7 @@ function InterestCard({ interesse }: { interesse: InteresseComAnimal }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-white">{animal.name ?? "Animal"}</h2>
-              <p className="mt-1 text-sm text-slate-400">{animal.species ?? "Especie nao informada"}</p>
+              <p className="mt-1 text-sm text-slate-400">{animal.species ?? "Espécie não informada"}</p>
             </div>
             <Badge>{interesse.has_schedule ? "Com entrevista" : "Aguardando agenda"}</Badge>
           </div>
@@ -146,7 +146,7 @@ function InterestCard({ interesse }: { interesse: InteresseComAnimal }) {
               <p className="mt-1 text-sm text-slate-400">{formatTimeRange(nextSchedule.starts_at, nextSchedule.ends_at)}</p>
             </>
           ) : (
-            <p className="text-sm text-slate-400">A ONG ainda nao vinculou uma entrevista para este interesse.</p>
+            <p className="text-sm text-slate-400">A ONG ainda não vinculou uma entrevista para este interesse.</p>
           )}
         </div>
 
@@ -160,14 +160,14 @@ function InterestCard({ interesse }: { interesse: InteresseComAnimal }) {
 
 function formatDate(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "data nao informada";
+  if (Number.isNaN(date.getTime())) return "data não informada";
   return date.toLocaleDateString("pt-BR");
 }
 
 function formatTimeRange(startValue: string, endValue: string) {
   const start = new Date(startValue);
   const end = new Date(endValue);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "horario nao informado";
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "horário não informado";
 
-  return `${start.toLocaleDateString("pt-BR")} das ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} as ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${start.toLocaleDateString("pt-BR")} das ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} às ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }

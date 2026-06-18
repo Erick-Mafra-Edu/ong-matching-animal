@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { fetchAnimalFallbackPhoto } from "@/lib/animalFallbackPhoto";
+import { getAdminMe } from "@/lib/admin";
 import { carregarInteresse } from "@/lib/interessados";
 
 type DetailRecord = Record<string, unknown>;
@@ -18,6 +19,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -30,8 +32,8 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
       })
       .catch((error) => {
         if (!mounted) return;
-        const errorMessage = error instanceof Error ? error.message : "Nao foi possivel carregar o registro.";
-        if (errorMessage.includes("Sessao")) {
+        const errorMessage = error instanceof Error ? error.message : "Não foi possível carregar o registro.";
+        if (errorMessage.includes("Sessão")) {
           router.replace(`/login?redirect=/interessados/${encodeURIComponent(uuidRegistro)}`);
           return;
         }
@@ -44,6 +46,22 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
     };
   }, [router, uuidRegistro]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    getAdminMe()
+      .then(() => {
+        if (mounted) setIsAdmin(true);
+      })
+      .catch(() => {
+        if (mounted) setIsAdmin(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const tutor = useMemo(() => asObject(record?.tutor), [record]);
   const animal = useMemo(() => asObject(record?.animal), [record]);
   const animalMatchingFields = getMatchingFields(asObject(animal.custom_fields));
@@ -53,6 +71,8 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
   const [photoUrl, setPhotoUrl] = useState("");
   const tutorName = String(tutor.name ?? "Tutor");
   const animalName = String(animal.name ?? "Animal");
+  const backHref = isAdmin ? "/admin" : "/interesses";
+  const backLabel = isAdmin ? "Voltar ao painel" : "Voltar aos interesses";
 
   useEffect(() => {
     let mounted = true;
@@ -102,7 +122,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
         <section className="w-full max-w-xl rounded-md border border-white/10 bg-white/[0.035] p-6">
           <h1 className="text-xl font-semibold text-white">Registro de interesse</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">{message}</p>
-          <Link className="mt-5 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href="/admin">Voltar ao painel</Link>
+          <Link className="mt-5 inline-flex text-sm font-semibold text-cyan-200 hover:text-cyan-100" href={backHref}>{backLabel}</Link>
         </section>
       </main>
     );
@@ -123,7 +143,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
                 {isScheduling ? "Abrindo agenda..." : "Marcar entrevista"}
               </Button>
             )}
-            <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-slate-300 hover:text-white" href="/admin">Voltar ao painel</Link>
+            <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-slate-300 hover:text-white" href={backHref}>{backLabel}</Link>
           </div>
         </header>
 
@@ -143,7 +163,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
             eyebrow="Pet"
             fields={[
               ["Nome", animal.name],
-              ["Especie", animal.species],
+              ["Espécie", animal.species],
               ["Cadastro", formatDate(animal.created_at)],
             ]}
             title={animalName}
@@ -191,7 +211,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
               ))}
             </div>
           ) : (
-            <p className="mt-4 text-sm leading-6 text-slate-400">Ainda nao existe entrevista agendada para este registro.</p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">Ainda não existe entrevista agendada para este registro.</p>
           )}
         </section>
       </div>
@@ -230,11 +250,11 @@ function ComparisonPanel({
 function MatchingInfoGrid({ fields }: { fields: Record<string, unknown> }) {
   const entries = Object.entries(fields);
 
-  if (!entries.length) return <p className="text-sm text-slate-500">Sem informacoes de matching.</p>;
+  if (!entries.length) return <p className="text-sm text-slate-500">Sem informações de matching.</p>;
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-slate-100">Informacoes de matching</h3>
+      <h3 className="text-sm font-semibold text-slate-100">Informações de matching</h3>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         {entries.map(([key, value]) => (
           <div className="rounded-md bg-white/[0.045] p-3" key={key}>
@@ -270,7 +290,7 @@ function formatDate(value: unknown) {
 
 function formatValue(value: unknown) {
   if (Array.isArray(value)) return value.map(String).join(", ");
-  if (typeof value === "boolean") return value ? "Sim" : "Nao";
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
   if (value === null || value === undefined || value === "") return "sem valor";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
@@ -281,16 +301,16 @@ function humanize(value: string) {
 }
 
 function formatTimeRange(startValue: unknown, endValue: unknown) {
-  if (typeof startValue !== "string" || typeof endValue !== "string") return "sem horario";
+  if (typeof startValue !== "string" || typeof endValue !== "string") return "sem horário";
   const start = new Date(startValue);
   const end = new Date(endValue);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "sem horario";
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "sem horário";
 
-  return `${start.toLocaleDateString("pt-BR")} das ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} as ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${start.toLocaleDateString("pt-BR")} das ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} às ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function statusLabel(value: unknown) {
-  if (value === "completed") return "Concluida";
+  if (value === "completed") return "Concluída";
   if (value === "cancelled") return "Cancelada";
   return "Agendada";
 }

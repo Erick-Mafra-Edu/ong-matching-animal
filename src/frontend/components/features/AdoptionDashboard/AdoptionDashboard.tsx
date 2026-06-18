@@ -240,7 +240,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       setActionMessage(`Interesse registrado para ${featuredPet.name}!`);
       requestCardAction("right");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");     
+      setActionMessage(error instanceof Error ? error.message : "Não foi possível registrar o interesse.");
       setLastActionMessageId(null);
     } finally {
       setPendingAdoptionId(null);
@@ -259,7 +259,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
         await openContactDialogForInterest(current, interest);
         setActionMessage(`Interesse registrado para ${current.name}!`);
       } catch (error) {
-        setActionMessage(error instanceof Error ? error.message : "Nao foi possivel registrar o interesse.");   
+        setActionMessage(error instanceof Error ? error.message : "Não foi possível registrar o interesse.");
       } finally {
         setPendingAdoptionId(null);
       }

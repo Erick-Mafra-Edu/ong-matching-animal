@@ -17,7 +17,7 @@ export interface OngSettings {
   settings: Record<string, unknown>;
 }
 
-export const defaultAdoptionMessageTemplate = "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:";
+export const defaultAdoptionMessageTemplate = "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse é {linkInteresse}.\n\nObservações:";
 
 export async function carregarOngSettings() {
   const response = await fetch(backendApiUrl("/api/ong-settings"), { cache: "no-store" });

@@ -1,5 +1,6 @@
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
@@ -143,6 +144,50 @@ CREATE INDEX calendar_events_animal_id_idx
 CREATE UNIQUE INDEX calendar_events_provider_external_idx
   ON calendar_events (provider, external_event_id)
   WHERE provider IS NOT NULL AND external_event_id IS NOT NULL;
+
+-- Configuration for external services
+CREATE TABLE service_configs (
+  id TEXT PRIMARY KEY,
+  service_type TEXT NOT NULL CHECK (service_type IN ('calendar')),
+  provider TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  is_active BOOLEAN DEFAULT true,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- OAuth connections used by calendar integrations
+CREATE TABLE calendar_oauth_connections (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  provider TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+  calendar_id TEXT NOT NULL DEFAULT 'primary',
+  account_email TEXT,
+  tenant_id TEXT,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  token_type TEXT DEFAULT 'Bearer',
+  scope TEXT,
+  expires_at TIMESTAMPTZ,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX calendar_oauth_connections_provider_active_idx
+  ON calendar_oauth_connections (provider, is_active, updated_at DESC);
+
+-- Audit trail for admin actions performed through the backend
+CREATE TABLE admin_audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_user_id UUID REFERENCES auth.users(id),
+  action TEXT NOT NULL,
+  resource TEXT NOT NULL,
+  resource_id TEXT,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- Public/contact settings for the ONG profile used by adoption flows
 CREATE TABLE ong_settings (
@@ -514,6 +559,9 @@ ALTER TABLE animals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tutor_interessados ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE calendar_oauth_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ong_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matching_rules ENABLE ROW LEVEL SECURITY;
@@ -623,6 +671,33 @@ CREATE POLICY "Admins can manage calendar events"
   TO authenticated
   USING (is_admin())
   WITH CHECK (is_admin());
+
+CREATE POLICY "Admins can manage service configs"
+  ON service_configs FOR ALL
+  TO authenticated
+  USING (is_admin())
+  WITH CHECK (is_admin());
+
+CREATE POLICY "Admins can read calendar oauth connections"
+  ON calendar_oauth_connections FOR SELECT
+  TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "Admins can manage calendar oauth connections"
+  ON calendar_oauth_connections FOR ALL
+  TO authenticated
+  USING (is_admin())
+  WITH CHECK (is_admin());
+
+CREATE POLICY "Admins can read admin audit logs"
+  ON admin_audit_logs FOR SELECT
+  TO authenticated
+  USING (public.is_admin(auth.uid()));
+
+CREATE POLICY "Admins can insert admin audit logs"
+  ON admin_audit_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_admin(auth.uid()) AND auth_user_id = auth.uid());
 
 CREATE POLICY "Anyone can read active ONG settings"
   ON ong_settings FOR SELECT

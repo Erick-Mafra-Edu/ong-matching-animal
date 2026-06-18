@@ -3,7 +3,7 @@ import { vercelAdapter } from "@flags-sdk/vercel";
 
 const calendarFlagBase = {
   key: "admin-calendar-screen",
-  description: "Exibe a tela administrativa de calendario.",
+  description: "Exibe a tela administrativa de calendário.",
 };
 
 export const showAdminCalendarScreen = process.env.NODE_ENV === "development"

@@ -41,7 +41,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <Suspense fallback={<div className="h-64 animate-pulse rounded-md bg-white/5" />}>
             <LoginForm />
           </Suspense>
-          <p className="text-center text-xs text-slate-500">Ainda nao tem conta? <Link className="text-cyan-200 hover:text-cyan-100" href="/cadastro">Cadastre-se</Link></p>
+          <p className="text-center text-xs text-slate-500">Ainda não tem conta? <Link className="text-cyan-200 hover:text-cyan-100" href="/cadastro">Cadastre-se</Link></p>
         </div>
       </section>
       <ScreenOnboardingRuntime />

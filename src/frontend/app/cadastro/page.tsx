@@ -13,8 +13,8 @@ export default function CadastroPage() {
         <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <section className="space-y-5">
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-300">Cadastro de tutor</p>
-            <h1 className="text-3xl font-black leading-tight sm:text-4xl">Conte sua rotina para encontrar animais compativeis.</h1>
-            <p className="leading-7 text-slate-400">O perfil usa as perguntas configuradas pela ONG para preencher os campos flexiveis do tutor e aproximar sua rotina dos animais disponiveis para adocao.</p>
+            <h1 className="text-3xl font-black leading-tight sm:text-4xl">Conte sua rotina para encontrar animais compatíveis.</h1>
+            <p className="leading-7 text-slate-400">O perfil usa as perguntas configuradas pela ONG para preencher os campos flexíveis do tutor e aproximar sua rotina dos animais disponíveis para adoção.</p>
             <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
               
             </div>

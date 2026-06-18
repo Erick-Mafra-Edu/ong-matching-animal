@@ -27,12 +27,12 @@ export function SignupForm() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data?.message ?? "Nao foi possivel carregar as perguntas.");
+          throw new Error(data?.message ?? "Não foi possível carregar as perguntas.");
         }
 
         setQuestions(data as OnboardingQuestion[]);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Nao foi possivel carregar as perguntas.");
+        setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as perguntas.");
       } finally {
         setLoadingQuestions(false);
       }
@@ -76,7 +76,7 @@ export function SignupForm() {
     }
 
     if (missingRequired.length > 0) {
-      setError("Responda todas as perguntas obrigatorias para continuar.");
+      setError("Responda todas as perguntas obrigatórias para continuar.");
       return;
     }
 
@@ -92,7 +92,7 @@ export function SignupForm() {
       });
 
       if (signupError || !data.user) {
-        setError(signupError?.message ?? "Nao foi possivel criar sua conta.");
+        setError(signupError?.message ?? "Não foi possível criar sua conta.");
         return;
       }
 
@@ -109,7 +109,7 @@ export function SignupForm() {
 
       router.push("/discover");
     } catch (signupError) {
-      setError(signupError instanceof Error ? signupError.message : "Nao foi possivel concluir o cadastro.");
+      setError(signupError instanceof Error ? signupError.message : "Não foi possível concluir o cadastro.");
     } finally {
       setSaving(false);
     }
@@ -126,12 +126,12 @@ export function SignupForm() {
           <input className="form-control" name="name" placeholder="Rodrigo Silva" required />
         </Field>
         <Field label="E-mail">
-          <input className="form-control" name="email" placeholder="voce@email.com" required type="email" />
+          <input className="form-control" name="email" placeholder="você@email.com" required type="email" />
         </Field>
       </div>
 
       <Field label="Senha">
-        <input className="form-control" minLength={6} name="password" placeholder="Minimo de 6 caracteres" required type="password" />
+        <input className="form-control" minLength={6} name="password" placeholder="Mínimo de 6 caracteres" required type="password" />
       </Field>
 
       <div className="space-y-5">
@@ -191,13 +191,13 @@ function QuestionField({ answer, hasError, index, onChange, onToggle, question }
       {question.type === "text" && <textarea className="form-control min-h-24 resize-y" placeholder={question.placeholder} value={String(answer ?? "")} onChange={(event) => onChange(event.target.value)} />}
       {question.type === "select" && (
         <select className="form-control" value={String(answer ?? "")} onChange={(event) => onChange(event.target.value)}>
-          <option value="">{question.placeholder ?? "Selecione uma opcao"}</option>
+          <option value="">{question.placeholder ?? "Selecione uma opção"}</option>
           {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       )}
       {(question.type === "radio" || question.type === "boolean") && (
         <div className="flex flex-wrap gap-2">
-          {(question.type === "boolean" ? [{ label: "Sim", value: "true" }, { label: "Nao", value: "false" }] : options).map((option) => (
+          {(question.type === "boolean" ? [{ label: "Sim", value: "true" }, { label: "Não", value: "false" }] : options).map((option) => (
             <OptionButton active={answer === option.value} key={option.value} label={option.label} onClick={() => onChange(option.value)} />
           ))}
         </div>

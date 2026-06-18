@@ -79,7 +79,7 @@ export const adminResources: AdminResourceConfig[] = [
   },
   {
     id: "calendar-events",
-    label: "Calendario",
+    label: "Calendário",
     createTemplate: {
       tutor_id: "",
       animal_id: "",
@@ -98,7 +98,7 @@ export const adminResources: AdminResourceConfig[] = [
   },
   {
     id: "calendar-oauth-connections",
-    label: "Conexoes OAuth",
+    label: "Conexões OAuth",
     createTemplate: {
       provider: "google",
       calendar_id: "primary",
@@ -126,7 +126,7 @@ export const adminResources: AdminResourceConfig[] = [
   },
   {
     id: "ong-settings",
-    label: "Configuracoes da ONG",
+    label: "Configurações da ONG",
     createTemplate: {
       id: "default",
       ong_name: "ONG Matching Animal",
@@ -140,7 +140,7 @@ export const adminResources: AdminResourceConfig[] = [
       postal_code: "",
       social_links: {},
       business_hours: {},
-      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse e {linkInteresse}.\n\nObservacoes:",
+      adoption_message_template: "Estou com interesse de adotar {nomeDoAnimal}. O link do interesse é {linkInteresse}.\n\nObservações:",
       settings: {},
       is_active: true,
     },
@@ -197,7 +197,7 @@ async function getAccessToken() {
   }
 
   const { data, error } = await getSupabaseBrowserClient().auth.getSession();
-  if (error || !data.session?.access_token) throw error ?? new Error("Sessao ausente.");
+  if (error || !data.session?.access_token) throw error ?? new Error("Sessão ausente.");
   return data.session.access_token;
 }
 
@@ -363,7 +363,7 @@ export async function uploadAnimalPhoto(
   if (!response.ok) {
     const message = responseBody && typeof responseBody === "object" && "message" in responseBody
       ? String(responseBody.message)
-      : "Nao foi possivel registrar a foto.";
+      : "Não foi possível registrar a foto.";
     throw new Error(message);
   }
 
