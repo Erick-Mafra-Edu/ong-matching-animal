@@ -78,7 +78,7 @@ export function createApp() {
     message: { message: "Muitas solicitacoes de matching. Tente novamente em breve." },
   }));
 
-  app.use("/api/admin/admin-users", strictLimiter);
+  app.post("/api/admin/admin-users", strictLimiter);
   app.use("/api/auth/password-recovery", strictLimiter);
   app.use("/api/auth/change-password", strictLimiter);
 
