@@ -1,5 +1,39 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "MatchPet | Adoção Responsável de Animais e Pets",
+  description: "Conecte-se ao seu novo melhor amigo de forma consciente. O MatchPet une adotantes e ONGs cruzando preferências, rotina e compatibilidade.",
+  keywords: ["adoção de pets", "adotar cachorro", "adotar gato", "ONG de animais", "MatchPet", "adoção responsável"],
+  authors: [{ name: "MatchPet Team" }],
+  openGraph: {
+    title: "MatchPet | Encontre uma conexão que cabe na sua vida",
+    description: "Aproximamos adotantes e animais acolhidos por ONGs usando inteligência e compatibilidade de rotina.",
+    url: "https://matchpet.com.br", // Substitua pelo seu domínio oficial
+    siteName: "MatchPet",
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&h=630&q=80", // Uma imagem otimizada para feed
+        width: 1200,
+        height: 630,
+        alt: "MatchPet - Plataforma de Adoção Responsável",
+      },
+    ],
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MatchPet | Adoção Responsável",
+    description: "Menos escolhas por impulso. Mais encontros duradouros.",
+    images: ["https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&h=630&q=80"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default function Home() {
   return (
