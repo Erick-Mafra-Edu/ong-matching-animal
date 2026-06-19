@@ -14,6 +14,12 @@ const AdminPanel = dynamic(
   },
 );
 
-export default function AdminPageWrapper({ showCalendar }: { showCalendar: boolean }) {
-  return <AdminPanel showCalendarConfig={showCalendar} />;
+export default function AdminPageWrapper({
+  hideLocationFields,
+  showCalendar,
+}: {
+  hideLocationFields: boolean;
+  showCalendar: boolean;
+}) {
+  return <AdminPanel hideLocationFields={hideLocationFields} showCalendarConfig={showCalendar} />;
 }

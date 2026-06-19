@@ -67,9 +67,11 @@ const navigationLinkClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
 export function CalendarPage({ 
+  hideLocationFields = false,
   standalone = true,
   skipAuthCheck = false
 }: { 
+  hideLocationFields?: boolean;
   standalone?: boolean;
   skipAuthCheck?: boolean;
 }) {
@@ -557,9 +559,11 @@ export function CalendarPage({
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               </div>
             </Field>
-            <Field label="Local">
-              <input className={fieldClass} disabled={isBusy} value={formState.location} onChange={(event) => setFormState({ ...formState, location: event.target.value })} />
-            </Field>
+            {!hideLocationFields ? (
+              <Field label="Local">
+                <input className={fieldClass} disabled={isBusy} value={formState.location} onChange={(event) => setFormState({ ...formState, location: event.target.value })} />
+              </Field>
+            ) : null}
             <Field label="Descrição">
               <textarea className={`${fieldClass} min-h-24 resize-y py-3`} disabled={isBusy} value={formState.description} onChange={(event) => setFormState({ ...formState, description: event.target.value })} />
             </Field>
