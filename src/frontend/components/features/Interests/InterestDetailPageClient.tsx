@@ -15,7 +15,13 @@ type DetailRecord = Record<string, unknown>;
 const navigationLinkClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 
-export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarConfig: boolean }) {
+export function InterestDetailPageClient({
+  hideLocationFields = false,
+  showCalendarConfig,
+}: {
+  hideLocationFields?: boolean;
+  showCalendarConfig: boolean;
+}) {
   const params = useParams<{ uuid_registro: string }>();
   const router = useRouter();
   const uuidRegistro = params.uuid_registro;
@@ -209,7 +215,7 @@ export function InterestDetailPageClient({ showCalendarConfig }: { showCalendarC
                     <div>
                       <h3 className="font-semibold text-white">{formatValue(event.title)}</h3>
                       <p className="mt-1 text-sm text-slate-400">{formatTimeRange(event.starts_at, event.ends_at)}</p>
-                      {event.location ? <p className="mt-1 text-sm text-slate-400">{formatValue(event.location)}</p> : null}
+                      {!hideLocationFields && event.location ? <p className="mt-1 text-sm text-slate-400">{formatValue(event.location)}</p> : null}
                     </div>
                     <Badge>{statusLabel(event.status)}</Badge>
                   </div>
