@@ -10,6 +10,7 @@ import {
   requireAuthenticated,
   validateTutorCustomFields,
 } from "./apiSupport";
+import { validateOnboardingEligibilityAnswers } from "../lib/onboardingEligibility";
 
 export class TutorsController {
   create = async (req: Request, res: Response) => {
@@ -46,6 +47,16 @@ export class TutorsController {
       const validationMessage = await validateTutorCustomFields(custom_fields, supabaseUrl, serviceRoleKey);
       if (validationMessage) {
         res.status(400).json({ message: validationMessage });
+        return;
+      }
+
+      const eligibility = await validateOnboardingEligibilityAnswers(custom_fields, supabaseUrl, serviceRoleKey);
+      if (!eligibility.eligible) {
+        res.status(403).json({
+          message: eligibility.message ?? "Cadastro bloqueado pelos requisitos da ONG.",
+          blocked_question_id: eligibility.blocked_question_id,
+          blocked_question_label: eligibility.blocked_question_label,
+        });
         return;
       }
 

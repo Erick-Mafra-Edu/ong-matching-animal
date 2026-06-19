@@ -22,6 +22,7 @@ export function createApiRouter() {
   router.get("/health", system.getHealth);
   router.get("/ong-settings", system.getOngSettings);
   router.get("/onboarding-questions", system.listOnboardingQuestions);
+  router.post("/onboarding-eligibility", system.validateOnboardingEligibility);
 
   router.post("/auth/password-recovery", auth.requestPasswordRecovery);
   router.post("/auth/change-password", auth.changePassword);

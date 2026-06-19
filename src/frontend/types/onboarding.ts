@@ -13,8 +13,18 @@ export interface OnboardingQuestion {
   required: boolean;
   type: QuestionType;
   options?: QuestionOption[];
+  is_knockout?: boolean;
+  knockout_values?: string[];
+  knockout_message?: string;
 }
 
 export type OnboardingAnswer = string | string[];
 
 export type OnboardingAnswers = Record<string, OnboardingAnswer>;
+
+export interface OnboardingEligibilityResult {
+  eligible: boolean;
+  blocked_question_id?: string;
+  blocked_question_label?: string;
+  message?: string;
+}

@@ -70,6 +70,9 @@ describe("API Endpoints", () => {
             type: "radio",
             required: true,
             options: [{ label: "Baixo", value: "baixo" }],
+            is_knockout: true,
+            knockout_values: ["alto"],
+            knockout_message: "Perfil fora do escopo da ONG.",
           },
         ],
       }) as jest.Mock;
@@ -79,6 +82,11 @@ describe("API Endpoints", () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(1);
       expect(response.body[0]).toHaveProperty("id", "preferred_energy");
+      expect(response.body[0]).toMatchObject({
+        is_knockout: true,
+        knockout_values: ["alto"],
+        knockout_message: "Perfil fora do escopo da ONG.",
+      });
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/rest/v1/onboarding_questions"),
         expect.objectContaining({
@@ -99,6 +107,40 @@ describe("API Endpoints", () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty("message");
+    });
+  });
+
+  describe("POST /api/onboarding-eligibility", () => {
+    it("should block answers that match a knockout rule", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{
+          id: "has_yard",
+          label: "Tem quintal?",
+          type: "boolean",
+          is_knockout: true,
+          knockout_values: ["false"],
+          knockout_message: "Esta ONG so atende lares com quintal.",
+        }],
+      }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/onboarding-eligibility")
+        .send({
+          answers: {
+            has_yard: "false",
+          },
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        eligible: false,
+        blocked_question_id: "has_yard",
+        blocked_question_label: "Tem quintal?",
+        message: "Esta ONG so atende lares com quintal.",
+      });
     });
   });
 
@@ -187,6 +229,10 @@ describe("API Endpoints", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
           json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
         })
         .mockResolvedValueOnce({
@@ -215,7 +261,7 @@ describe("API Endpoints", () => {
         }),
       );
       expect(global.fetch).toHaveBeenNthCalledWith(
-        4,
+        5,
         "https://example.supabase.co/rest/v1/tutors?on_conflict=auth_user_id",
         expect.objectContaining({
           method: "POST",
@@ -227,7 +273,7 @@ describe("API Endpoints", () => {
         }),
       );
       expect(global.fetch).toHaveBeenNthCalledWith(
-        5,
+        6,
         "https://example.supabase.co/rest/v1/rpc/refresh_tutor_animal_matches",
         expect.objectContaining({
           method: "POST",
@@ -253,6 +299,10 @@ describe("API Endpoints", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [{ field_key: "home_type", source_question_id: "q1" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -297,6 +347,10 @@ describe("API Endpoints", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
           json: async () => [{ id: "tutor-123", auth_user_id: "user-123" }],
         })
         .mockResolvedValueOnce({
@@ -326,6 +380,54 @@ describe("API Endpoints", () => {
         "https://example.supabase.co/rest/v1/custom_fields?select=field_key,source_question_id&entity_type=eq.tutor&is_active=eq.true",
         expect.any(Object),
       );
+    });
+
+    it("should reject tutor signup when a knockout answer is matched", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "has_yard" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "has_yard",
+            label: "Tem quintal?",
+            type: "boolean",
+            is_knockout: true,
+            knockout_values: ["false"],
+            knockout_message: "Esta ONG so atende lares com quintal.",
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/tutors")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          auth_user_id: "user-123",
+          name: "Tutor Teste",
+          custom_fields: {
+            onboarding_complete: true,
+            has_yard: "false",
+          },
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        message: "Esta ONG so atende lares com quintal.",
+        blocked_question_id: "has_yard",
+        blocked_question_label: "Tem quintal?",
+      });
     });
   });
 
@@ -474,6 +576,7 @@ describe("API Endpoints", () => {
         questionnaire_updated_at: "2026-06-11T12:00:00.000Z",
         onboarding_outdated: false,
         tutor_id: "tutor-123",
+        is_admin: false,
       });
 
       // Valida se a chamada ao fetch foi feita para o endpoint correto do RPC
@@ -816,6 +919,62 @@ describe("API Endpoints", () => {
           body: expect.stringContaining("\"id\":\"pet_name\""),
         }),
       );
+    });
+
+    it("should create onboarding questions with knockout configuration", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "admin-auth-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "admin-row-123", auth_user_id: "admin-auth-123", email: "admin@example.com", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{
+            id: "has_yard",
+            label: "Tem quintal?",
+            description: null,
+            placeholder: null,
+            type: "boolean",
+            options: null,
+            required: true,
+            is_knockout: true,
+            knockout_values: ["false"],
+            knockout_message: "Esta ONG so atende lares com quintal.",
+            is_active: true,
+            sort_order: 20,
+          }],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .post("/api/admin/onboarding-questions")
+        .set("Authorization", "Bearer access-token")
+        .send({
+          id: "has_yard",
+          label: "Tem quintal?",
+          description: "",
+          placeholder: "",
+          type: "boolean",
+          options: null,
+          required: true,
+          is_knockout: true,
+          knockout_values: ["false"],
+          knockout_message: "Esta ONG so atende lares com quintal.",
+          is_active: true,
+          sort_order: 20,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        id: "has_yard",
+        is_knockout: true,
+        knockout_values: ["false"],
+      });
     });
 
     it("should update ONG settings for active admins", async () => {

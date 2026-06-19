@@ -532,22 +532,26 @@ CREATE TABLE onboarding_questions (
   type VARCHAR(32) NOT NULL CHECK (type IN ('text', 'select', 'radio', 'boolean', 'multiselect')),
   options JSONB,
   required BOOLEAN DEFAULT true,
+  is_knockout BOOLEAN NOT NULL DEFAULT false,
+  knockout_values JSONB,
+  knockout_message TEXT,
   is_active BOOLEAN DEFAULT true,
   sort_order INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CHECK (knockout_values IS NULL OR jsonb_typeof(knockout_values) = 'array')
 );
 
 CREATE INDEX onboarding_questions_active_updated_at_idx
   ON onboarding_questions (is_active, updated_at DESC);
 
-INSERT INTO onboarding_questions (id, label, description, placeholder, type, options, required, sort_order) VALUES
-  ('home_type', 'Como é a sua moradia?', 'Isso ajuda a recomendar animais compatíveis com o espaço disponível.', NULL, 'radio', '[{"label":"Apartamento","value":"apartamento"},{"label":"Casa sem quintal","value":"casa_sem_quintal"},{"label":"Casa com quintal","value":"casa_com_quintal"}]'::jsonb, true, 10),
-  ('routine', 'Quanto tempo você costuma passar em casa?', NULL, 'Selecione sua rotina', 'select', '[{"label":"Poucas horas por dia","value":"poucas_horas"},{"label":"Meio período","value":"meio_periodo"},{"label":"A maior parte do dia","value":"maior_parte_dia"}]'::jsonb, true, 20),
-  ('has_children', 'Há crianças na residência?', NULL, NULL, 'boolean', NULL, true, 30),
-  ('preferred_energy', 'Qual nível de energia combina com sua rotina?', NULL, NULL, 'radio', '[{"label":"Tranquilo","value":"baixo"},{"label":"Equilibrado","value":"medio"},{"label":"Ativo","value":"alto"}]'::jsonb, true, 40),
-  ('preferences', 'O que você procura em um novo companheiro?', 'Escolha uma ou mais opções.', NULL, 'multiselect', '[{"label":"Companhia","value":"companhia"},{"label":"Passeios","value":"passeios"},{"label":"Convívio com outros animais","value":"outros_animais"},{"label":"Perfil independente","value":"independente"}]'::jsonb, true, 50),
-  ('notes', 'Quer contar algo importante para a ONG?', NULL, 'Ex.: já tenho um gato adulto em casa', 'text', NULL, false, 60);
+INSERT INTO onboarding_questions (id, label, description, placeholder, type, options, required, is_knockout, knockout_values, knockout_message, sort_order) VALUES
+  ('home_type', 'Como é a sua moradia?', 'Isso ajuda a recomendar animais compatíveis com o espaço disponível.', NULL, 'radio', '[{"label":"Apartamento","value":"apartamento"},{"label":"Casa sem quintal","value":"casa_sem_quintal"},{"label":"Casa com quintal","value":"casa_com_quintal"}]'::jsonb, true, false, NULL, NULL, 10),
+  ('routine', 'Quanto tempo você costuma passar em casa?', NULL, 'Selecione sua rotina', 'select', '[{"label":"Poucas horas por dia","value":"poucas_horas"},{"label":"Meio período","value":"meio_periodo"},{"label":"A maior parte do dia","value":"maior_parte_dia"}]'::jsonb, true, false, NULL, NULL, 20),
+  ('has_children', 'Há crianças na residência?', NULL, NULL, 'boolean', NULL, true, false, NULL, NULL, 30),
+  ('preferred_energy', 'Qual nível de energia combina com sua rotina?', NULL, NULL, 'radio', '[{"label":"Tranquilo","value":"baixo"},{"label":"Equilibrado","value":"medio"},{"label":"Ativo","value":"alto"}]'::jsonb, true, false, NULL, NULL, 40),
+  ('preferences', 'O que você procura em um novo companheiro?', 'Escolha uma ou mais opções.', NULL, 'multiselect', '[{"label":"Companhia","value":"companhia"},{"label":"Passeios","value":"passeios"},{"label":"Convívio com outros animais","value":"outros_animais"},{"label":"Perfil independente","value":"independente"}]'::jsonb, true, false, NULL, NULL, 50),
+  ('notes', 'Quer contar algo importante para a ONG?', NULL, 'Ex.: já tenho um gato adulto em casa', 'text', NULL, false, false, NULL, NULL, 60);
 
 ALTER TABLE custom_fields
   ADD CONSTRAINT custom_fields_source_question_id_fkey

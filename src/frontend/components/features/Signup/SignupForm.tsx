@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { syncAuthSessionCookies } from "@/lib/auth/session";
-import { backendApiUrl } from "@/lib/backend";
-import { saveOnboardingAnswers } from "@/lib/onboarding";
+import { fetchOnboardingQuestions, filterOnboardingQuestions, saveOnboardingAnswers, validateOnboardingEligibility } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { OnboardingAnswer, OnboardingAnswers, OnboardingQuestion } from "@/types/onboarding";
 
-export function SignupForm() {
+interface SignupFormProps {
+  hideLocationFields?: boolean;
+}
+
+export function SignupForm({ hideLocationFields = false }: SignupFormProps) {
   const router = useRouter();
   const [questions, setQuestions] = useState<OnboardingQuestion[]>([]);
   const [answers, setAnswers] = useState<OnboardingAnswers>({});
@@ -22,15 +25,7 @@ export function SignupForm() {
   useEffect(() => {
     async function loadQuestions() {
       try {
-        const response = await fetch(backendApiUrl("/api/onboarding-questions"));
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.message ?? "Não foi possível carregar as perguntas.");
-        }
-
-        setQuestions(data as OnboardingQuestion[]);
+        setQuestions(await fetchOnboardingQuestions());
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as perguntas.");
       } finally {
@@ -41,12 +36,17 @@ export function SignupForm() {
     void loadQuestions();
   }, []);
 
+  const visibleQuestions = useMemo(
+    () => filterOnboardingQuestions(questions, hideLocationFields),
+    [hideLocationFields, questions],
+  );
+
   const missingRequired = useMemo(
-    () => questions.filter((question) => {
+    () => visibleQuestions.filter((question) => {
       const answer = answers[question.id];
       return question.required && (!answer || (Array.isArray(answer) && answer.length === 0));
     }),
-    [answers, questions],
+    [answers, visibleQuestions],
   );
 
   function updateAnswer(questionId: string, answer: OnboardingAnswer) {
@@ -82,6 +82,12 @@ export function SignupForm() {
 
     setSaving(true);
     try {
+      const eligibility = await validateOnboardingEligibility(answers);
+      if (!eligibility.eligible) {
+        setError(eligibility.message ?? "Seu perfil não atende aos requisitos mínimos definidos pela ONG para cadastro.");
+        return;
+      }
+
       const supabase = getSupabaseBrowserClient();
       const { data, error: signupError } = await supabase.auth.signUp({
         email,
@@ -135,7 +141,7 @@ export function SignupForm() {
       </Field>
 
       <div className="space-y-5">
-        {questions.map((question, index) => (
+        {visibleQuestions.map((question, index) => (
           <QuestionField
             answer={answers[question.id]}
             hasError={submitted && missingRequired.some(({ id }) => id === question.id)}
@@ -150,7 +156,7 @@ export function SignupForm() {
 
       {error && <p className="text-sm text-pink-300" role="alert">{error}</p>}
       {notice && <p className="rounded-xl border border-cyan-200/30 bg-cyan-200/10 p-3 text-sm leading-6 text-cyan-50" role="status">{notice}</p>}
-      <Button className="w-full" disabled={saving || questions.length === 0} type="submit">{saving ? "Criando conta..." : "Criar conta e ver matches"}</Button>
+      <Button className="w-full" disabled={saving || visibleQuestions.length === 0} type="submit">{saving ? "Criando conta..." : "Criar conta e ver matches"}</Button>
     </form>
   );
 }

@@ -3,12 +3,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { fetchOnboardingQuestions, saveOnboardingAnswers } from "@/lib/onboarding";
+import { fetchOnboardingQuestions, filterOnboardingQuestions, saveOnboardingAnswers } from "@/lib/onboarding";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { OnboardingAnswer, OnboardingAnswers, OnboardingQuestion } from "@/types/onboarding";
 
-export function OnboardingForm() {
+interface OnboardingFormProps {
+  hideLocationFields?: boolean;
+}
+
+export function OnboardingForm({ hideLocationFields = false }: OnboardingFormProps) {
   const router = useRouter();
   const [questions, setQuestions] = useState<OnboardingQuestion[]>([]);
   const [answers, setAnswers] = useState<OnboardingAnswers>({});
@@ -39,12 +43,17 @@ export function OnboardingForm() {
     void loadQuestions();
   }, [router]);
 
+  const visibleQuestions = useMemo(
+    () => filterOnboardingQuestions(questions, hideLocationFields),
+    [hideLocationFields, questions],
+  );
+
   const missingRequired = useMemo(
-    () => questions.filter((question) => {
+    () => visibleQuestions.filter((question) => {
       const answer = answers[question.id];
       return question.required && (!answer || (Array.isArray(answer) && answer.length === 0));
     }),
-    [answers, questions],
+    [answers, visibleQuestions],
   );
 
   function updateAnswer(questionId: string, answer: OnboardingAnswer) {
@@ -67,8 +76,8 @@ export function OnboardingForm() {
     try {
       await saveOnboardingAnswers(getSupabaseBrowserClient(), user, answers);
       router.push("/discover");
-    } catch {
-      setError("Não foi possível salvar suas respostas. Tente novamente.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Não foi possível salvar suas respostas. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -84,7 +93,7 @@ export function OnboardingForm() {
 
   return (
     <form className="space-y-8" onSubmit={handleSubmit}>
-      {questions.map((question, index) => (
+      {visibleQuestions.map((question, index) => (
         <QuestionField
           answer={answers[question.id]}
           hasError={submitted && missingRequired.some(({ id }) => id === question.id)}

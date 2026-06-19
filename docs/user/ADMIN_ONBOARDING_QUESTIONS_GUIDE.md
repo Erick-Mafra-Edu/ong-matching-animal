@@ -32,6 +32,7 @@ Cada pergunta cadastrada possui:
 - um tipo de resposta;
 - opcionalmente uma lista de opcoes;
 - definicao de obrigatoriedade;
+- opcionalmente uma condicao eliminatoria;
 - status ativo ou inativo;
 - ordem de exibicao.
 
@@ -45,6 +46,7 @@ Antes de cadastrar, defina:
 2. qual tipo de resposta faz sentido;
 3. se a resposta precisa ser obrigatoria;
 4. se essa pergunta sera usada depois em `Campos customizados` e `Regras`.
+5. se essa pergunta deve bloquear o cadastro quando o tutor responder um valor especifico.
 
 Exemplos comuns:
 
@@ -170,14 +172,64 @@ No campo `Resposta obrigatória`:
 - ligado: o tutor precisa responder;
 - desligado: a pergunta pode ser pulada.
 
-### 9. Definir se a pergunta esta ativa
+### 9. Definir se a pergunta e eliminatoria
+
+No campo `Pergunta eliminatória`:
+
+- desligado: a pergunta apenas coleta informacao;
+- ligado: a pergunta pode bloquear o cadastro se a resposta bater com um dos valores configurados.
+
+Quando ativar essa opcao, o admin libera mais dois campos:
+
+- `Valores que bloqueiam`
+- `Mensagem de bloqueio`
+
+### 10. Preencher os valores que bloqueiam
+
+Use o campo `Valores que bloqueiam` para informar quais respostas impedem o cadastro.
+
+Regras praticas:
+
+- informe um valor por linha;
+- use o `value` tecnico da pergunta, nao o texto visivel;
+- para perguntas `Sim ou não`, use `true` ou `false`.
+
+Exemplos:
+
+```text
+false
+```
+
+ou
+
+```text
+apartamento
+casa_sem_quintal
+```
+
+Observacao importante:
+
+- o backend valida se esses valores realmente existem entre as opcoes da pergunta;
+- perguntas eliminatorias so funcionam com `Escolha única`, `Múltiplas escolhas`, `Opções em rádio` e `Sim ou não`.
+
+### 11. Definir a mensagem de bloqueio
+
+No campo `Mensagem de bloqueio`, escreva o texto que o tutor vera quando a resposta impedir o cadastro.
+
+Exemplo:
+
+- `No momento, esta ONG atende apenas lares com quintal fechado.`
+
+Se esse campo ficar vazio, o sistema usa uma mensagem padrao.
+
+### 12. Definir se a pergunta esta ativa
 
 No campo `Pergunta ativa`:
 
 - ligada: a pergunta pode aparecer no onboarding;
 - desligada: a pergunta fica cadastrada, mas fora de uso.
 
-### 10. Definir a ordem
+### 13. Definir a ordem
 
 No campo `Ordem`, informe a posicao desejada.
 
@@ -226,6 +278,24 @@ Usado apenas em perguntas de escolha.
 ### Resposta obrigatória
 
 Define se o sistema impede o envio sem resposta.
+
+### Pergunta eliminatória
+
+Define se a resposta pode barrar o cadastro.
+
+Quando ativada:
+
+- o frontend valida antes de concluir o cadastro;
+- o backend valida novamente antes de salvar o tutor;
+- o tutor nao entra no sistema se responder um valor bloqueado.
+
+### Valores que bloqueiam
+
+Lista tecnica de respostas que impedem o cadastro.
+
+### Mensagem de bloqueio
+
+Texto devolvido ao tutor quando a regra eliminatoria for acionada.
 
 ### Pergunta ativa
 
@@ -284,6 +354,8 @@ Use para:
 - perguntas binarias;
 - condicoes objetivas.
 
+Esse tipo tambem pode ser usado como pergunta eliminatoria.
+
 ### Número
 
 Cuidado operacional:
@@ -305,6 +377,45 @@ As opcoes sao obrigatorias para perguntas de escolha:
 - `Opções em rádio`
 
 Se voce tentar salvar uma dessas perguntas sem opcoes, o backend rejeita o cadastro.
+
+## Como Funciona Uma Pergunta Eliminatoria Na Pratica
+
+Quando uma pergunta eliminatoria esta ativa:
+
+1. o tutor responde normalmente no cadastro;
+2. o frontend consulta a validacao de elegibilidade antes de concluir;
+3. se a resposta bater em um valor bloqueado, a conta nao e criada;
+4. se alguem tentar burlar o frontend, o backend bloqueia do mesmo jeito antes de salvar o tutor.
+
+Isso significa que a regra nao depende apenas da interface visual.
+
+## Exemplo Pratico De Pergunta Eliminatoria
+
+### Cenário
+
+Voce quer impedir cadastro de lares sem quintal.
+
+### Cadastro
+
+- `Identificador`: `has_yard`
+- `Pergunta`: `Voce tem quintal?`
+- `Tipo de resposta`: `Sim ou não`
+- `Resposta obrigatória`: ligada
+- `Pergunta eliminatória`: ligada
+- `Valores que bloqueiam`:
+
+```text
+false
+```
+
+- `Mensagem de bloqueio`: `No momento, esta ONG atende apenas lares com quintal fechado.`
+- `Pergunta ativa`: ligada
+- `Ordem`: `15`
+
+### Resultado esperado
+
+- se o tutor responder `Sim`, o cadastro continua;
+- se o tutor responder `Não`, o sistema mostra a mensagem configurada e interrompe o cadastro.
 
 ## Exemplo Pratico
 
@@ -424,6 +535,13 @@ Exemplos mais livres, normalmente sem regra direta:
 - observacoes abertas
 - comentarios gerais
 
+Importante:
+
+- uma pergunta eliminatoria de onboarding barra a entrada do tutor no sistema;
+- uma regra eliminatoria de matching barra apenas determinados animais.
+
+Sao camadas diferentes e com objetivos diferentes.
+
 ## Validações Importantes
 
 O backend valida:
@@ -432,6 +550,9 @@ O backend valida:
 - texto da pergunta preenchido;
 - tipo valido;
 - opcoes obrigatorias para perguntas de escolha.
+- se a pergunta eliminatoria usa um tipo suportado;
+- se os valores bloqueados existem entre as opcoes da pergunta;
+- o bloqueio do cadastro antes de salvar o tutor.
 
 ## Erros Comuns
 
@@ -440,6 +561,18 @@ O backend valida:
 Resultado:
 
 - o cadastro falha
+
+### Marcar pergunta eliminatoria sem informar valores que bloqueiam
+
+Resultado:
+
+- o backend rejeita o cadastro da pergunta no admin
+
+### Informar valor bloqueado diferente das opcoes da pergunta
+
+Resultado:
+
+- o backend rejeita o cadastro da pergunta no admin
 
 ### Usar identificador com espacos, acentos ou maiusculas
 
@@ -465,6 +598,8 @@ Risco:
 - use descricao apenas quando ela realmente ajuda;
 - padronize identificadores em ingles tecnico ou outro padrao interno consistente;
 - use opcoes com valores simples e estaveis;
+- use pergunta eliminatoria apenas para requisitos reais da ONG;
+- escreva a mensagem de bloqueio em linguagem clara e objetiva;
 - prefira desativar antes de excluir;
 - revise a relacao entre onboarding, campos customizados e regras de matching.
 
@@ -473,9 +608,10 @@ Risco:
 1. definir a informacao que deseja coletar;
 2. criar a pergunta em `Onboarding`;
 3. testar se o tipo faz sentido para o tutor;
-4. ajustar a ordem e obrigatoriedade;
-5. se a resposta precisar entrar no matching, criar ou vincular o campo customizado correspondente;
-6. depois usar esse campo nas regras, se necessario.
+4. decidir se a pergunta e eliminatoria ou apenas informativa;
+5. ajustar a ordem e obrigatoriedade;
+6. se a resposta precisar entrar no matching, criar ou vincular o campo customizado correspondente;
+7. depois usar esse campo nas regras, se necessario.
 
 ## Referencias Tecnicas
 
