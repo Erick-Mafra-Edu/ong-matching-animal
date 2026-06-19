@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listUserDocs } from "@/lib/userDocs";
+import { ScrollToTopButton } from "@/components/ui/ScrollToTopButton";
 
 export const metadata: Metadata = {
   title: "Documentacao Do Usuario | Match Pet",
@@ -15,16 +16,8 @@ export default async function UserDocsPage() {
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-8">
         <aside className="lg:sticky lg:top-8 lg:self-start">
           <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
-              <Link
-                className="inline-flex min-h-10 items-center justify-center rounded-full border border-[var(--color-field-border)] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)]"
-                href="/docs/user"
-              >
-                Inicio
-              </Link>
-            </div>
-            <nav className="mt-4 flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Documentacao do usuario">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
+            <nav className="custom-scrollbar mt-4 flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Documentacao do usuario">
               {docs.map((doc) => (
                 <Link
                   className="block min-w-[220px] rounded-2xl border border-[var(--color-border)] bg-[var(--color-card-muted)] px-4 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card)] lg:min-w-0"
@@ -73,6 +66,7 @@ export default async function UserDocsPage() {
           </section>
         </section>
       </div>
+      <ScrollToTopButton />
     </main>
   );
 }

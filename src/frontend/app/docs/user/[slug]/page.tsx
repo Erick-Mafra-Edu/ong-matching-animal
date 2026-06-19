@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { getUserDocBySlug, listUserDocs, slugifyHeading } from "@/lib/userDocs";
+import { ScrollToTopButton } from "@/components/ui/ScrollToTopButton";
 
 interface UserDocDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -46,16 +47,8 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-8">
         <aside className="space-y-5 lg:sticky lg:top-8 lg:self-start">
           <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
-              <Link
-                className="inline-flex min-h-10 items-center justify-center rounded-full border border-[var(--color-field-border)] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)]"
-                href="/docs/user"
-              >
-                Inicio
-              </Link>
-            </div>
-            <nav className="mt-4 flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Menu lateral de documentacao">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
+            <nav className="custom-scrollbar mt-4 flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Menu lateral de documentacao">
               {allDocs.map((item) => {
                 const isActive = item.slug === doc.slug;
 
@@ -79,12 +72,12 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
           {doc.headings.length > 0 && (
             <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Topicos</p>
-              <nav className="mt-4 space-y-2" aria-label="Topicos do documento">
+              <nav className="custom-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Topicos do documento">
                 {doc.headings.map((heading) => (
                   <a
-                    className={`block rounded-xl px-3 py-2 text-sm transition hover:bg-[var(--color-card-muted)] ${
+                    className={`block min-w-fit whitespace-nowrap rounded-xl px-3 py-2 text-sm transition hover:bg-[var(--color-card-muted)] lg:min-w-0 lg:whitespace-normal ${
                       heading.level === 3
-                        ? "ml-4 text-[var(--color-text-soft)]"
+                        ? "text-[var(--color-text-soft)] lg:ml-4"
                         : "font-semibold text-[var(--color-text-muted)]"
                     }`}
                     href={`#${heading.id}`}
@@ -115,7 +108,7 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
           )}
         </aside>
 
-        <section className="space-y-8">
+        <section className="min-w-0 space-y-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link
               className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] sm:w-auto"
@@ -133,8 +126,8 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
             </a>
           </div>
 
-          <article className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-sm sm:p-10">
-            <div className="markdown-doc">
+          <article className="min-w-0 overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-6 md:p-8 lg:p-10">
+            <div className="markdown-doc min-w-0">
             <ReactMarkdown
               components={{
                 h2: ({ children }) => <h2 id={slugifyHeading(flattenMarkdownText(children))}>{children}</h2>,
@@ -155,6 +148,7 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
           </article>
         </section>
       </div>
+      <ScrollToTopButton />
     </main>
   );
 }

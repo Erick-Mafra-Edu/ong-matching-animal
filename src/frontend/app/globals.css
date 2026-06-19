@@ -590,9 +590,14 @@
 }
 
 .markdown-doc {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   color: var(--color-text);
   font-size: 1rem;
   line-height: 1.75;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-doc > :first-child {
@@ -657,6 +662,7 @@
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 0.18em;
+  overflow-wrap: anywhere;
 }
 
 .markdown-doc strong {
@@ -664,16 +670,21 @@
 }
 
 .markdown-doc code {
+  display: inline-block;
+  max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   background: var(--color-card-muted);
   color: var(--color-text);
   font-size: 0.92em;
   padding: 0.15rem 0.42rem;
+  white-space: break-spaces;
 }
 
 .markdown-doc pre {
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--color-border);
   border-radius: 1rem;
   background: var(--color-card-muted);
@@ -681,9 +692,11 @@
 }
 
 .markdown-doc pre code {
+  display: block;
   border: 0;
   background: transparent;
   padding: 0;
+  white-space: pre;
 }
 
 .markdown-doc blockquote {
@@ -700,11 +713,40 @@
 }
 
 .markdown-doc table {
+  display: block;
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--color-border);
   border-radius: 1rem;
+}
+
+.markdown-doc th,
+.markdown-doc td {
+  min-width: 0;
+}
+
+@media (max-width: 660px) {
+  .markdown-doc {
+    font-size: 0.95rem;
+    line-height: 1.65;
+  }
+
+  .markdown-doc ul,
+  .markdown-doc ol {
+    padding-left: 1.1rem;
+  }
+
+  .markdown-doc pre {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .markdown-doc th,
+  .markdown-doc td {
+    padding: 0.7rem 0.75rem;
+  }
 }
 
 .markdown-doc th,
