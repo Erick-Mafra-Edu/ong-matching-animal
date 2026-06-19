@@ -296,6 +296,24 @@
     color: #065f46 !important;
   }
 
+  [data-admin-theme="light"] .text-emerald-100 {
+    color: #065f46 !important;
+  }
+
+  [data-admin-theme="light"] .text-emerald-200\/70 {
+    color: rgba(6, 95, 70, 0.78) !important;
+  }
+
+  [data-admin-theme="light"] .text-amber-400,
+  [data-admin-theme="light"] .text-amber-200,
+  [data-admin-theme="light"] .text-amber-100 {
+    color: #92400e !important;
+  }
+
+  [data-admin-theme="light"] .text-amber-300\/70 {
+    color: rgba(146, 64, 14, 0.78) !important;
+  }
+
   [data-admin-theme="light"] .text-cyan-200 {
     color: #155e75 !important;
   }
@@ -312,6 +330,54 @@
 
   [data-admin-theme="light"] .border-red-500\/45 {
     border-color: rgba(185, 28, 28, 0.4) !important;
+  }
+
+  [data-admin-theme="light"] .border-emerald-400\/20,
+  [data-admin-theme="light"] .border-emerald-400\/25,
+  [data-admin-theme="light"] .border-emerald-400\/30,
+  [data-admin-theme="light"] .border-emerald-300\/40 {
+    border-color: rgba(5, 150, 105, 0.28) !important;
+  }
+
+  [data-admin-theme="light"] .border-amber-400\/20,
+  [data-admin-theme="light"] .border-amber-400\/30,
+  [data-admin-theme="light"] .border-amber-300\/40 {
+    border-color: rgba(217, 119, 6, 0.3) !important;
+  }
+
+  [data-admin-theme="light"] .border-red-400\/15,
+  [data-admin-theme="light"] .border-red-400\/20,
+  [data-admin-theme="light"] .border-red-400\/25,
+  [data-admin-theme="light"] .border-red-400\/30,
+  [data-admin-theme="light"] .border-red-300\/40 {
+    border-color: rgba(220, 38, 38, 0.28) !important;
+  }
+
+  [data-admin-theme="light"] .bg-emerald-400\/10,
+  [data-admin-theme="light"] .bg-emerald-400\/15,
+  [data-admin-theme="light"] .bg-emerald-400\/\[0\.04\],
+  [data-admin-theme="light"] .bg-emerald-400\/\[0\.05\],
+  [data-admin-theme="light"] .bg-emerald-400\/\[0\.06\],
+  [data-admin-theme="light"] .bg-emerald-400\/\[0\.08\],
+  [data-admin-theme="light"] .bg-emerald-500\/20 {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+  }
+
+  [data-admin-theme="light"] .bg-amber-400\/10,
+  [data-admin-theme="light"] .bg-amber-400\/15,
+  [data-admin-theme="light"] .bg-amber-400\/\[0\.05\] {
+    background-color: rgba(245, 158, 11, 0.14) !important;
+  }
+
+  [data-admin-theme="light"] .bg-red-400\/10,
+  [data-admin-theme="light"] .bg-red-400\/15,
+  [data-admin-theme="light"] .bg-red-500\/10,
+  [data-admin-theme="light"] .bg-red-500\/\[0\.04\],
+  [data-admin-theme="light"] .bg-red-500\/\[0\.06\],
+  [data-admin-theme="light"] .bg-red-500\/\[0\.07\],
+  [data-admin-theme="light"] .bg-red-500\/\[0\.08\],
+  [data-admin-theme="light"] .bg-red-500\/20 {
+    background-color: rgba(239, 68, 68, 0.12) !important;
   }
 
   [data-admin-theme="light"] button:has([data-admin-icon="delete-record"]) {
@@ -336,6 +402,48 @@
 
   [data-admin-theme="light"] .bg-cyan-400\/10 .border-white\/10 {
     border-color: rgba(8, 145, 178, 0.24) !important;
+  }
+
+  [data-admin-theme="light"] .bg-emerald-400\/10.text-emerald-100,
+  [data-admin-theme="light"] .bg-emerald-400\/10.text-emerald-200,
+  [data-admin-theme="light"] .bg-emerald-400\/10 .text-emerald-100,
+  [data-admin-theme="light"] .bg-emerald-400\/10 .text-emerald-200,
+  [data-admin-theme="light"] .bg-emerald-400\/10 .text-emerald-200\/70,
+  [data-admin-theme="light"] .bg-emerald-400\/15.text-emerald-100,
+  [data-admin-theme="light"] .bg-emerald-400\/15 .text-emerald-100,
+  [data-admin-theme="light"] .bg-emerald-400\/15 .text-emerald-200,
+  [data-admin-theme="light"] .bg-emerald-400\/15 .text-emerald-200\/70,
+  [data-admin-theme="light"] .bg-emerald-500\/20.text-emerald-100,
+  [data-admin-theme="light"] .bg-emerald-500\/20 .text-emerald-100 {
+    color: #064e3b !important;
+  }
+
+  [data-admin-theme="light"] .bg-amber-400\/10.text-amber-100,
+  [data-admin-theme="light"] .bg-amber-400\/10.text-amber-200,
+  [data-admin-theme="light"] .bg-amber-400\/10 .text-amber-100,
+  [data-admin-theme="light"] .bg-amber-400\/10 .text-amber-200,
+  [data-admin-theme="light"] .bg-amber-400\/15.text-amber-100,
+  [data-admin-theme="light"] .bg-amber-400\/15 .text-amber-100,
+  [data-admin-theme="light"] .bg-amber-400\/15 .text-amber-200 {
+    color: #78350f !important;
+  }
+
+  [data-admin-theme="light"] .bg-red-400\/10.text-red-100,
+  [data-admin-theme="light"] .bg-red-400\/15.text-red-100,
+  [data-admin-theme="light"] .bg-red-500\/10.text-red-100,
+  [data-admin-theme="light"] .bg-red-500\/20.text-red-100,
+  [data-admin-theme="light"] .bg-red-400\/10 .text-red-100,
+  [data-admin-theme="light"] .bg-red-400\/10 .text-red-200,
+  [data-admin-theme="light"] .bg-red-400\/15 .text-red-100,
+  [data-admin-theme="light"] .bg-red-400\/15 .text-red-200,
+  [data-admin-theme="light"] .bg-red-500\/10 .text-red-100,
+  [data-admin-theme="light"] .bg-red-500\/10 .text-red-200,
+  [data-admin-theme="light"] .bg-red-500\/20 .text-red-100,
+  [data-admin-theme="light"] .bg-red-500\/20 .text-red-200,
+  [data-admin-theme="light"] .text-red-100,
+  [data-admin-theme="light"] .text-red-200,
+  [data-admin-theme="light"] .text-red-100\/70 {
+    color: #991b1b !important;
   }
 
   [data-admin-theme="light"] .group:hover .group-hover\:text-slate-300,
