@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { hideSignupLocationFields } from "@/flags";
+import { showSignupLocationFields } from "@/flags";
 import { OnboardingForm } from "@/components/features/Onboarding/OnboardingForm";
 import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/ScreenOnboardingRuntime";
 
 export default async function OnboardingPage() {
-  const shouldHideLocationFields = await hideSignupLocationFields();
+  const shouldShowLocationFields = await showSignupLocationFields();
 
   return (
     <main className="min-h-screen bg-[#0e0e12] px-5 py-8 text-white sm:px-8 lg:py-12">
@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
           <h1 className="text-3xl font-black sm:text-4xl">Vamos encontrar o perfil certo para você.</h1>
           <p className="max-w-2xl leading-7 text-slate-400">As perguntas são configuradas pela ONG e carregadas dinamicamente. Suas respostas ajudam a priorizar animais compatíveis com sua rotina.</p>
         </section>
-        <OnboardingForm hideLocationFields={shouldHideLocationFields} />
+        <OnboardingForm hideLocationFields={!shouldShowLocationFields} />
       </div>
       <ScreenOnboardingRuntime />
     </main>
