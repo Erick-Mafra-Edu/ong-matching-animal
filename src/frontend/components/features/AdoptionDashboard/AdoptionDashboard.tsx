@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import { X } from "lucide-react";
+import { HeartHandshake, ShieldCheck, User, X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 
@@ -42,6 +42,9 @@ interface ContactDialogState {
   ongName: string;
   whatsappUrl: string;
 }
+
+const desktopHeaderLinkClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--color-border)] px-6 text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] transition duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] hover:text-[var(--color-text)]";
 
 export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tutorIdProp = null }: AdoptionDashboardProps) {
   const { resolvedTheme } = useTheme();
@@ -307,11 +310,18 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <Link className="text-sm font-semibold text-[var(--color-text)]" href="/discover">Match Pet</Link>
           <nav className="flex items-center gap-2" aria-label="Navegação desktop">
-            <Link className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] transition hover:border-[var(--color-field-border-focus)] hover:text-[var(--color-text)]" href="/interesses">
+            <Link className={desktopHeaderLinkClass} href="/perfil">
+              <User className="h-4 w-4" />
+              Perfil
+              {onboardingOutdated && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-rose-500 align-middle" />}
+            </Link>
+            <Link className={desktopHeaderLinkClass} href="/interesses">
+              <HeartHandshake className="h-4 w-4" />
               Meus interesses
             </Link>
             {userIsAdmin && (
-              <Link className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] transition hover:border-[var(--color-field-border-focus)] hover:text-[var(--color-text)]" href="/admin">
+              <Link className={desktopHeaderLinkClass} href="/admin">
+                <ShieldCheck className="h-4 w-4" />
                 Painel administrativo
               </Link>
             )}
