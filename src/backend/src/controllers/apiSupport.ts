@@ -416,7 +416,18 @@ export function validateCalendarEventPayload(payload: Record<string, unknown>, i
   }
 }
 
+function normalizeOptionalLocation(payload: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(payload, "location")) return;
+  if (typeof payload.location === "string" && payload.location.trim() === "") {
+    payload.location = null;
+  }
+}
+
 export async function validateResourcePayload(resource: string, payload: Record<string, unknown>, supabaseUrl: string, serviceRoleKey: string, isUpdate = false) {
+  if (resource === "tutors" || resource === "animals") {
+    normalizeOptionalLocation(payload);
+  }
+
   if (resource === "custom-fields") {
     return validateCustomFieldPayload(payload, supabaseUrl, serviceRoleKey);
   }
