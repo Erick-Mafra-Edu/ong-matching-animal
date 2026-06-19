@@ -15,8 +15,8 @@ export function DashboardState({ status }: DashboardStateProps) {
   return (
     <section className="grid min-h-screen w-full place-items-center px-6 text-center" aria-live="polite">
       <div className={`animate-state-enter max-w-sm space-y-3 ${status === "loading" ? "animate-loading-pulse" : ""}`}>
-        <h1 className="text-2xl font-bold text-cyan-100">{title}</h1>
-        <p className="text-sm text-slate-400">{description}</p>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">{title}</h1>
+        <p className="text-sm text-[var(--color-text-muted)]">{description}</p>
         {status === "error" && <Button className="mt-4">Tentar novamente</Button>}
       </div>
     </section>

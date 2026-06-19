@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import { X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
@@ -43,6 +44,7 @@ interface ContactDialogState {
 }
 
 export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tutorIdProp = null }: AdoptionDashboardProps) {
+  const { resolvedTheme } = useTheme();
   const discoverAccess = useDiscoverAccess();
   const tutorId = tutorIdProp ?? discoverAccess.tutorId;
   const initialItems = initialPage?.items ?? [];
@@ -68,6 +70,11 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
   const [userIsAdmin, setUserIsAdmin] = useState(false);
   const [lastActionMessageId, setLastActionMessageId] = useState<string | null>(null);
   const [, setOngSettings] = useState<OngSettings | null>(null);
+  const [isThemeMounted, setIsThemeMounted] = useState(false);
+
+  useEffect(() => {
+    setIsThemeMounted(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -292,18 +299,19 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       onUndo={history.length > 0 ? handleUndo : undefined}
     />
   );
+  const desktopProfileTone = isThemeMounted && resolvedTheme === "light" ? "light" : "dark";
 
   return (
     <PageContainer>
-      <header className="fixed left-0 right-0 top-0 z-20 hidden border-b border-white/10 bg-[#0e0e12]/90 px-10 py-4 backdrop-blur md:block">
+      <header className="theme-panel fixed left-0 right-0 top-0 z-20 hidden border-b px-10 py-4 backdrop-blur md:block">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
-          <Link className="text-sm font-semibold text-white" href="/discover">Match Pet</Link>
+          <Link className="text-sm font-semibold text-[var(--color-text)]" href="/discover">Match Pet</Link>
           <nav className="flex items-center gap-2" aria-label="Navegação desktop">
-            <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/interesses">
+            <Link className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] transition hover:border-[var(--color-field-border-focus)] hover:text-[var(--color-text)]" href="/interesses">
               Meus interesses
             </Link>
             {userIsAdmin && (
-              <Link className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-200 hover:text-cyan-100" href="/admin">
+              <Link className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-muted)] transition hover:border-[var(--color-field-border-focus)] hover:text-[var(--color-text)]" href="/admin">
                 Painel administrativo
               </Link>
             )}
@@ -318,18 +326,18 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
             pet={featuredPet}
           />
           <div className="md:hidden">
-            <div className="animate-actions-enter bg-black px-5 py-3">
+            <div className="theme-panel animate-actions-enter border-t px-5 py-3">
               {actions}
-              {actionMessage && <p className="mt-3 text-center text-xs text-cyan-100">{actionMessage}</p>}      
+              {actionMessage && <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">{actionMessage}</p>}
             </div>
             <MobileNavigation items={mobileNavigationItems} />
           </div>
         </div>
         <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
-          <ProfileSummary pet={featuredPet} />
+          <ProfileSummary pet={featuredPet} tone={desktopProfileTone} />
           <div className="animate-actions-enter">
             {actions}
-            {actionMessage && <p className="mt-4 text-sm text-cyan-100">{actionMessage}</p>}
+            {actionMessage && <p className="mt-4 text-sm text-[var(--color-text-muted)]">{actionMessage}</p>}
           </div>
         </section>
       </div>
@@ -359,20 +367,20 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
     : "";
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="adoption-contact-title">
-      <div className="w-full max-w-lg rounded-lg border border-white/12 bg-[#141419] p-5 text-cyan-50 shadow-2xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--color-overlay)] px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="adoption-contact-title">
+      <div className="theme-panel w-full max-w-lg rounded-lg border p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-black" id="adoption-contact-title">Contato com a ONG</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-400">{dialog.animalName} foi salvo nos seus interesses.</p>
+            <h2 className="text-lg font-black text-[var(--color-text)]" id="adoption-contact-title">Contato com a ONG</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">{dialog.animalName} foi salvo nos seus interesses.</p>
           </div>
-          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/12 text-white shadow-sm transition hover:border-cyan-200 hover:bg-cyan-200 hover:text-slate-950" onClick={onClose} type="button" aria-label="Fechar">
+          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-card-muted)] text-[var(--color-text)] shadow-sm transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card)]" onClick={onClose} type="button" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <label className="mt-5 block space-y-2">
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Mensagem para {dialog.ongName}</span>
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">Mensagem para {dialog.ongName}</span>
           <textarea
             className="form-control min-h-40 resize-y text-sm leading-6"
             value={dialog.message}
@@ -380,8 +388,8 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
           />
         </label>
 
-        <div className="mt-5 rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-300">    
-          <span className="font-semibold text-cyan-100">Link do interesse:</span> {dialog.interestLink}
+        <div className="mt-5 rounded-md border border-[var(--color-border)] bg-[var(--color-card-muted)] p-3 text-sm text-[var(--color-text-muted)]">
+          <span className="font-semibold text-[var(--color-text)]">Link do interesse:</span> {dialog.interestLink}
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -396,7 +404,7 @@ function AdoptionContactDialog({ dialog, onChange, onClose }: AdoptionContactDia
             </a>
           )}
           {!whatsappUrl && !emailUrl && (
-            <p className="text-sm leading-6 text-slate-400">Nenhum WhatsApp ou e-mail de contato foi configurado para a ONG.</p>
+            <p className="text-sm leading-6 text-[var(--color-text-muted)]">Nenhum WhatsApp ou e-mail de contato foi configurado para a ONG.</p>
           )}
         </div>
       </div>

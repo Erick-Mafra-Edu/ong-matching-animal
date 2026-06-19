@@ -11,7 +11,7 @@ interface MobileNavigationProps {
 export function MobileNavigation({ items }: MobileNavigationProps) {
   return (
     <nav
-      className="animate-mobile-enter grid h-18 border-t border-white/10 bg-[#05070b]/95 backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.35)]"
+      className="theme-panel animate-mobile-enter grid h-18 border-t backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.12)]"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       aria-label="Navegação principal"
     >
@@ -23,8 +23,8 @@ export function MobileNavigation({ items }: MobileNavigationProps) {
           key={item.id}
           className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 transition duration-300 active:scale-95 ${
             item.active
-              ? "bg-cyan-400/10 text-cyan-100"
-              : "text-slate-200/85 hover:bg-white/5 hover:text-cyan-100"
+              ? "bg-cyan-400/10 text-[var(--color-text)]"
+              : "text-[var(--color-text-muted)] hover:bg-[var(--color-card-muted)] hover:text-[var(--color-text)]"
           }`}
         >
           <span className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${
@@ -37,7 +37,7 @@ export function MobileNavigation({ items }: MobileNavigationProps) {
             {item.icon === "admin" && <Settings className="h-5 w-5" aria-hidden="true" strokeWidth={2.2} />}
           </span>
           <span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${
-            item.active ? "text-cyan-100" : "text-slate-300"
+            item.active ? "text-[var(--color-text)]" : "text-[var(--color-text-muted)]"
           }`}>
             {item.label}
           </span>
