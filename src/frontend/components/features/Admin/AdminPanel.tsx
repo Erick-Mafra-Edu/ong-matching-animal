@@ -1109,6 +1109,7 @@ function AdminWorkspace({
               <div className="grid gap-5 lg:grid-cols-[minmax(300px,420px)_1fr]">
                 <RecordList
                   config={activeConfig}
+                  hideLocationFields={hideLocationFields}
                   photoMap={photoMap}
                   query={query}
                   rows={filteredRows}
@@ -1509,6 +1510,7 @@ function MatchingRuleQueue({
 
 function RecordList({
   config,
+  hideLocationFields = false,
   onQueryChange,
   onSelect,
   photoMap = {},
@@ -1518,6 +1520,7 @@ function RecordList({
   total,
 }: {
   config: ResourceUiConfig;
+  hideLocationFields?: boolean;
   onQueryChange: (value: string) => void;
   onSelect: (row: AdminRecord) => void;
   photoMap?: Record<string, string>;
@@ -1527,6 +1530,8 @@ function RecordList({
   total: number;
 }) {
   const [fallbackPhotoMap, setFallbackPhotoMap] = useState<Record<string, string>>({});
+  const visibleSecondaryFields = hideLocationFields ? config.secondaryFields.filter((field) => field !== "location") : config.secondaryFields;
+  const visibleSearchFields = hideLocationFields ? config.searchFields.filter((field) => field !== "location") : config.searchFields;
 
   useEffect(() => {
     if (config.id !== "animals") return;
@@ -1558,7 +1563,7 @@ function RecordList({
             className={`${fieldClass} pl-10 h-12 border-white/5 focus:border-cyan-400/50 bg-black/40`}
             id="admin-search"
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder={`Pesquisar por ${config.searchFields.join(", ")}...`}
+            placeholder={`Pesquisar por ${visibleSearchFields.join(", ")}...`}
             value={query}
           />
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
@@ -1607,7 +1612,7 @@ function RecordList({
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {config.secondaryFields.map((field) => {
+                    {visibleSecondaryFields.map((field) => {
                       const val = row[field];
                       if (val === null || val === undefined || val === "") return null;
                       return (
@@ -1692,6 +1697,11 @@ function RecordForm({
   const formDisabled = disabled || config.readonly === true;
   const isModal = variant === "modal";
   const canDelete = mode === "edit" && !config.readonly;
+  const [hasManualCustomFieldKeyEdit, setHasManualCustomFieldKeyEdit] = useState(mode === "edit");
+
+  useEffect(() => {
+    setHasManualCustomFieldKeyEdit(config.id === "custom-fields" && mode === "edit");
+  }, [config.id, mode, selectedRow?.id]);
 
   const deleteAction = canDelete ? (
     <Dialog>
@@ -1758,6 +1768,7 @@ function RecordForm({
     }
 
     if (config.id === "custom-fields" && field.name === "field_key") {
+      setHasManualCustomFieldKeyEdit(true);
       onChange({ ...formState, field_key: sanitizeAdminIdentifier(String(value ?? "")) });
       return;
     }
@@ -1769,7 +1780,7 @@ function RecordForm({
 
     if (field.name === "label") {
       const nextState: FormState = { ...formState, label: value };
-      if (config.id === "custom-fields" && !String(formState.field_key ?? "").trim()) {
+      if (config.id === "custom-fields" && !hasManualCustomFieldKeyEdit) {
         nextState.field_key = sanitizeAdminIdentifier(String(value ?? ""));
       }
       if (config.id === "onboarding-questions" && !String(formState.id ?? "").trim()) {

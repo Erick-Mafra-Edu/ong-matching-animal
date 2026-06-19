@@ -434,6 +434,7 @@ export function CalendarPage({
                           <EventCard 
                             key={event.id} 
                             event={event} 
+                            hideLocationFields={hideLocationFields}
                             isSelected={selectedEvent?.id === event.id} 
                             onClick={() => selectEvent(event)} 
                           />
@@ -477,6 +478,7 @@ export function CalendarPage({
                         <EventCard 
                           key={event.id} 
                           event={event} 
+                          hideLocationFields={hideLocationFields}
                           isSelected={selectedEvent?.id === event.id} 
                           onClick={() => selectEvent(event)} 
                         />
@@ -513,6 +515,7 @@ export function CalendarPage({
                             <EventCard 
                               key={event.id} 
                               event={event} 
+                              hideLocationFields={hideLocationFields}
                               isSelected={selectedEvent?.id === event.id} 
                               onClick={() => selectEvent(event)} 
                             />
@@ -767,7 +770,17 @@ export function CalendarPage({
   );
 }
 
-function EventCard({ event, isSelected, onClick }: { event: CalendarEventRecord, isSelected: boolean, onClick: () => void }) {
+function EventCard({
+  event,
+  hideLocationFields = false,
+  isSelected,
+  onClick,
+}: {
+  event: CalendarEventRecord;
+  hideLocationFields?: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       className={cn(
@@ -784,7 +797,7 @@ function EventCard({ event, isSelected, onClick }: { event: CalendarEventRecord,
       </div>
       <div className="min-w-0">
         <span className={cn("block font-bold text-sm tracking-tight truncate", isSelected ? "text-white" : "text-slate-200 group-hover:text-white")}>{event.title}</span>
-        <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{eventSubtitle(event)}</span>
+        <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{eventSubtitle(event, hideLocationFields)}</span>
       </div>
       <div className="flex items-center justify-end">
         <Badge className={cn(
@@ -872,8 +885,8 @@ function formatTimeRange(event: CalendarEventRecord) {
   return `${start} - ${end}`;
 }
 
-function eventSubtitle(event: CalendarEventRecord) {
-  return [event.animal_name, event.tutor_name, event.location].filter(Boolean).join(" · ") || "Sem vínculo definido";
+function eventSubtitle(event: CalendarEventRecord, hideLocationFields = false) {
+  return [event.animal_name, event.tutor_name, hideLocationFields ? null : event.location].filter(Boolean).join(" · ") || "Sem vínculo definido";
 }
 
 function statusLabel(status: "all" | CalendarEventStatus) {
