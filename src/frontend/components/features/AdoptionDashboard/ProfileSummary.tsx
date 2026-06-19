@@ -10,14 +10,16 @@ interface ProfileSummaryProps {
 
 export function ProfileSummary({ pet, compact = false, tone = "light" }: ProfileSummaryProps) {
   const isDark = tone === "dark";
+  const nameColor = isDark ? "text-white" : "text-slate-950";
+  const metaColor = isDark ? "text-slate-300" : "text-slate-700";
 
   return (
     <section className={compact ? "space-y-3" : "space-y-4"} aria-label={`Informações de ${pet.name}`}>
       <div className="flex items-center gap-2">
-        <h1 className={`${compact ? "text-xl" : "text-2xl"} font-bold tracking-tight ${isDark ? "text-cyan-100" : "text-slate-950"}`}>
-          {pet.name} <span className={`font-normal ${isDark ? "text-white" : "text-slate-700"}`}>{pet.age}</span>
+        <h1 className={`${compact ? "text-xl" : "text-2xl"} font-bold tracking-tight ${nameColor}`}>
+          {pet.name} <span className={`font-normal ${metaColor}`}>{pet.age}</span>
         </h1>
-        {pet.verified && <VerifiedIcon className={`h-4 w-4 ${isDark ? "text-cyan-100" : "text-slate-700"}`} />}
+        {pet.verified && <VerifiedIcon className={`h-4 w-4 ${metaColor}`} />}
       </div>
       <div className={`flex flex-wrap gap-1.5 ${compact ? "md:hidden" : ""}`}>
         {pet.traits.map((trait, index) => (
