@@ -51,8 +51,34 @@ export const apiDoc = {
           items: { $ref: "#/definitions/QuestionOption" },
         },
         required: { type: "boolean" },
+        is_knockout: { type: "boolean" },
+        knockout_values: {
+          type: "array",
+          items: { type: "string" },
+        },
+        knockout_message: { type: "string" },
       },
       required: ["id", "label", "type", "required"],
+    },
+    OnboardingEligibilityRequest: {
+      type: "object",
+      properties: {
+        answers: {
+          type: "object",
+          additionalProperties: true,
+        },
+      },
+      required: ["answers"],
+    },
+    OnboardingEligibilityResult: {
+      type: "object",
+      properties: {
+        eligible: { type: "boolean" },
+        blocked_question_id: { type: "string" },
+        blocked_question_label: { type: "string" },
+        message: { type: "string" },
+      },
+      required: ["eligible"],
     },
     QuestionOption: {
       type: "object",
@@ -244,6 +270,35 @@ export const apiDoc = {
           },
           500: {
             description: "Configuração ou conexão Supabase inválida.",
+            schema: { $ref: "#/definitions/ErrorResponse" },
+          },
+        },
+      },
+    },
+    "/onboarding-eligibility": {
+      post: {
+        tags: ["Onboarding"],
+        operationId: "validateOnboardingEligibility",
+        summary: "Valida se as respostas do onboarding atendem aos requisitos minimos da ONG.",
+        parameters: [
+          {
+            in: "body",
+            name: "body",
+            required: true,
+            schema: { $ref: "#/definitions/OnboardingEligibilityRequest" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Resultado da validacao de elegibilidade.",
+            schema: { $ref: "#/definitions/OnboardingEligibilityResult" },
+          },
+          400: {
+            description: "Payload invalido.",
+            schema: { $ref: "#/definitions/ErrorResponse" },
+          },
+          500: {
+            description: "Erro de configuração ou conexão Supabase.",
             schema: { $ref: "#/definitions/ErrorResponse" },
           },
         },
@@ -545,6 +600,7 @@ export const openApiOperations = {
   getHealth: operationPassThrough,
   getOngSettings: operationPassThrough,
   listOnboardingQuestions: operationPassThrough,
+  validateOnboardingEligibility: operationPassThrough,
   upsertTutor: operationPassThrough,
   getTutorMe: operationPassThrough,
   updateTutorMe: operationPassThrough,

@@ -119,6 +119,9 @@ type OnboardingQuestionRecord = AdminRecord & {
   label?: string;
   type?: string;
   options?: unknown;
+  is_knockout?: boolean;
+  knockout_values?: unknown;
+  knockout_message?: string | null;
   is_active?: boolean;
   sort_order?: number;
 };
@@ -474,6 +477,9 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       type: "text",
       options: [],
       required: true,
+      is_knockout: false,
+      knockout_values: [],
+      knockout_message: "",
       is_active: true,
       sort_order: 0,
     },
@@ -497,6 +503,9 @@ const resourceUiConfigs: Record<AdminResource, ResourceUiConfig> = {
       },
       { name: "options", label: "Opções", type: "options", helper: "Uma opção por linha, usada em perguntas de escolha." },
       { name: "required", label: "Resposta obrigatória", type: "boolean" },
+      { name: "is_knockout", label: "Pergunta eliminatória", type: "boolean", helper: "Se a resposta cair nos valores abaixo, o cadastro é bloqueado." },
+      { name: "knockout_values", label: "Valores que bloqueiam", type: "options", helper: "Use os values da pergunta. Para boolean, informe true ou false." },
+      { name: "knockout_message", label: "Mensagem de bloqueio", type: "textarea", helper: "Mensagem exibida quando a resposta impedir o cadastro." },
       { name: "is_active", label: "Pergunta ativa", type: "boolean" },
       { name: "sort_order", label: "Ordem", type: "number" },
     ],
@@ -1652,7 +1661,17 @@ function RecordForm({
   adminTheme?: "light" | "dark";
   variant?: "panel" | "modal";
 }) {
-  const visibleFields = config.fields.filter((field) => mode === "create" || !field.createOnly);
+  const visibleFields = config.fields.filter((field) => {
+    if (mode !== "create" && field.createOnly) return false;
+    if (
+      config.id === "onboarding-questions"
+      && formState.is_knockout !== true
+      && (field.name === "knockout_values" || field.name === "knockout_message")
+    ) {
+      return false;
+    }
+    return true;
+  });
   const formDisabled = disabled || config.readonly === true;
   const isModal = variant === "modal";
   const canDelete = mode === "edit" && !config.readonly;
@@ -1707,6 +1726,17 @@ function RecordForm({
   function handleFieldChange(field: FieldConfig, value: unknown) {
     if (config.id !== "custom-fields" && config.id !== "onboarding-questions") {
       onChange({ ...formState, [field.name]: value });
+      return;
+    }
+
+    if (config.id === "onboarding-questions" && field.name === "is_knockout") {
+      const enabled = value === true;
+      onChange({
+        ...formState,
+        is_knockout: enabled,
+        knockout_values: enabled ? formState.knockout_values : [],
+        knockout_message: enabled ? formState.knockout_message : "",
+      });
       return;
     }
 
@@ -3028,7 +3058,7 @@ function recordToFormState(record: Record<string, unknown> | null, config: Resou
 }
 
 function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "create" | "edit") {
-  return config.fields.reduce<Record<string, unknown>>((payload, field) => {
+  const payload = config.fields.reduce<Record<string, unknown>>((payload, field) => {
     if (mode === "edit" && field.createOnly) return payload;
     const value = state[field.name];
 
@@ -3037,7 +3067,7 @@ function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "c
     } else if (field.type === "options") {
       const options = normalizeOptions(value).map((option) => option.trim()).filter(Boolean);
       payload[field.name] = options.length
-        ? config.id === "onboarding-questions"
+        ? config.id === "onboarding-questions" && field.name !== "knockout_values"
           ? options.map((option) => ({ label: humanizeFieldKey(option), value: option }))
           : options
         : null;
@@ -3051,6 +3081,13 @@ function formStateToPayload(state: FormState, config: ResourceUiConfig, mode: "c
 
     return payload;
   }, {});
+
+  if (config.id === "onboarding-questions" && payload.is_knockout !== true) {
+    payload.knockout_values = null;
+    payload.knockout_message = null;
+  }
+
+  return payload;
 }
 
 function objectToKeyValueRows(value: unknown): KeyValueRow[] {

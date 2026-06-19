@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { z } from "zod";
+import { knockoutEligibleQuestionTypes } from "../lib/onboardingEligibility";
 
 export const animalPhotosBucket = "animal-photos";
 export const maxAnimalPhotoSizeBytes = 5 * 1024 * 1024;
@@ -64,10 +65,10 @@ export const adminTables = {
   },
   "onboarding-questions": {
     table: "onboarding_questions",
-    select: "id,label,description,placeholder,type,options,required,is_active,sort_order,created_at,updated_at",
+    select: "id,label,description,placeholder,type,options,required,is_knockout,knockout_values,knockout_message,is_active,sort_order,created_at,updated_at",
     order: "sort_order.asc",
-    createFields: ["id", "label", "description", "placeholder", "type", "options", "required", "is_active", "sort_order"],
-    updateFields: ["label", "description", "placeholder", "type", "options", "required", "is_active", "sort_order", "updated_at"],
+    createFields: ["id", "label", "description", "placeholder", "type", "options", "required", "is_knockout", "knockout_values", "knockout_message", "is_active", "sort_order"],
+    updateFields: ["label", "description", "placeholder", "type", "options", "required", "is_knockout", "knockout_values", "knockout_message", "is_active", "sort_order", "updated_at"],
   },
   "matching-rules": {
     table: "matching_rules",
@@ -587,20 +588,27 @@ const OnboardingQuestionPayloadSchema = z.object({
   type: z.enum(["text", "number", "select", "multiselect", "radio", "boolean"], { message: "Tipo de pergunta invalido." }),
   options: ChoiceOptionsSchema,
   required: z.boolean().optional(),
+  is_knockout: z.boolean().optional(),
+  knockout_values: z.array(z.string().trim().min(1, "Cada valor eliminatorio precisa estar preenchido.")).nullable().optional(),
+  knockout_message: z.string().nullable().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
 });
 
 function validateOnboardingQuestionPayload(payload: Record<string, unknown>, isUpdate = false) {
-  for (const field of ["description", "placeholder"] as const) {
+  for (const field of ["description", "placeholder", "knockout_message"] as const) {
     if (payload[field] === "") payload[field] = null;
   }
   if (payload.options === null) payload.options = undefined;
+  if (payload.knockout_values === null) payload.knockout_values = undefined;
 
   try {
     const parsedPayload = (isUpdate ? OnboardingQuestionPayloadSchema.partial() : OnboardingQuestionPayloadSchema).parse(payload);
     const questionType = typeof parsedPayload.type === "string" ? parsedPayload.type : undefined;
     const hasChoiceOptions = Array.isArray(parsedPayload.options) && parsedPayload.options.length > 0;
+    const knockoutValues = Array.isArray(parsedPayload.knockout_values)
+      ? parsedPayload.knockout_values.map((value) => value.trim()).filter(Boolean)
+      : [];
 
     if (questionType && ChoiceFieldTypes.has(questionType) && !hasChoiceOptions) {
       return "Perguntas de escolha precisam de pelo menos uma opcao.";
@@ -608,6 +616,30 @@ function validateOnboardingQuestionPayload(payload: Record<string, unknown>, isU
 
     if (questionType && !ChoiceFieldTypes.has(questionType)) {
       payload.options = undefined;
+    }
+
+    if (parsedPayload.is_knockout === true) {
+      if (!questionType || !knockoutEligibleQuestionTypes.has(questionType)) {
+        return "Perguntas eliminatorias precisam ser do tipo select, multiselect, radio ou boolean.";
+      }
+
+      if (knockoutValues.length === 0) {
+        return "Informe pelo menos um valor eliminatorio para a pergunta.";
+      }
+
+      const allowedValues = questionType === "boolean"
+        ? ["true", "false"]
+        : (parsedPayload.options ?? []).map((option) => option.value);
+      const invalidKnockoutValues = knockoutValues.filter((value) => !allowedValues.includes(value));
+
+      if (invalidKnockoutValues.length > 0) {
+        return "Os valores eliminatorios precisam existir entre as opcoes da pergunta.";
+      }
+
+      payload.knockout_values = knockoutValues;
+    } else {
+      payload.knockout_values = undefined;
+      payload.knockout_message = null;
     }
 
     if (parsedPayload.id) payload.id = parsedPayload.id;

@@ -1,7 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { backendApiUrl } from "@/lib/backend";
 import type { Database } from "@/lib/supabase/client";
-import type { OnboardingAnswers, OnboardingQuestion, QuestionOption, QuestionType } from "@/types/onboarding";
+import type { OnboardingAnswers, OnboardingEligibilityResult, OnboardingQuestion, QuestionOption, QuestionType } from "@/types/onboarding";
 import type { TutorProfile } from "@/types/shared";
 
 type TutorCustomFields = TutorProfile["custom_fields"] & Record<string, string | string[] | boolean | undefined> & {
@@ -90,6 +90,9 @@ export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> 
     required: boolean;
     type: string;
     options: unknown;
+    is_knockout?: boolean;
+    knockout_values?: unknown;
+    knockout_message?: string | null;
   }>;
   return data.map((question) => ({
     id: question.id,
@@ -99,7 +102,67 @@ export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> 
     required: question.required,
     type: question.type as QuestionType,
     options: normalizeOptions(question.options),
+    is_knockout: question.is_knockout === true,
+    knockout_values: Array.isArray(question.knockout_values) ? question.knockout_values.filter((value): value is string => typeof value === "string") : undefined,
+    knockout_message: question.knockout_message ?? undefined,
   }));
+}
+
+export async function validateOnboardingEligibility(answers: OnboardingAnswers): Promise<OnboardingEligibilityResult> {
+  const response = await fetch(backendApiUrl("/api/onboarding-eligibility"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ answers }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(body?.message ?? "Nao foi possivel validar os requisitos de cadastro.");
+  }
+
+  return response.json() as Promise<OnboardingEligibilityResult>;
+}
+
+const locationQuestionPatterns = [
+  "location",
+  "localizacao",
+  "localização",
+  "cidade",
+  "estado",
+  "bairro",
+  "endereco",
+  "endereço",
+  "cep",
+  "postal",
+  "regiao",
+  "região",
+  "onde voce mora",
+  "onde você mora",
+];
+
+function normalizeQuestionText(value: string | undefined) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function isLocationQuestion(question: OnboardingQuestion) {
+  const haystack = [
+    question.id,
+    question.label,
+    question.description,
+    question.placeholder,
+  ].map(normalizeQuestionText).join(" ");
+
+  return locationQuestionPatterns.some((pattern) => haystack.includes(normalizeQuestionText(pattern)));
+}
+
+export function filterOnboardingQuestions(questions: OnboardingQuestion[], hideLocationFields = false) {
+  if (!hideLocationFields) return questions;
+  return questions.filter((question) => !isLocationQuestion(question));
 }
 
 export async function hasCompletedOnboarding(supabase: SupabaseClient<Database>, userId: string) {
@@ -158,6 +221,11 @@ export async function fetchDiscoverAccess(supabase: SupabaseClient<Database>) {
 }
 
 export async function saveOnboardingAnswers(supabase: SupabaseClient<Database>, user: User, answers: OnboardingAnswers) {
+  const eligibility = await validateOnboardingEligibility(answers);
+  if (!eligibility.eligible) {
+    throw new Error(eligibility.message ?? "Seu perfil nao atende aos requisitos minimos definidos pela ONG para cadastro.");
+  }
+
   const customFields = buildTutorCustomFields(answers);
   const name = String(user.user_metadata.full_name ?? user.email?.split("@")[0] ?? "Adotante");
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();

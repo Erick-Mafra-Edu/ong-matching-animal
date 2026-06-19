@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import type { MatchResponse, MatchResult } from "@ong-matching-animal/shared/types";
 import { getSupabaseBackendConfig, readJsonResponse } from "./apiSupport";
+import { validateOnboardingEligibilityAnswers } from "../lib/onboardingEligibility";
 
 export class SystemController {
   getHealth = (_req: Request, res: Response) => {
@@ -47,7 +48,7 @@ export class SystemController {
     }
 
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=id,label,description,placeholder,type,options,required&is_active=eq.true&order=sort_order.asc`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/onboarding_questions?select=id,label,description,placeholder,type,options,required,is_knockout,knockout_values,knockout_message&is_active=eq.true&order=sort_order.asc`, {
         headers: {
           apikey: serviceRoleKey,
           authorization: `Bearer ${serviceRoleKey}`,
@@ -64,6 +65,31 @@ export class SystemController {
     } catch (error) {
       res.status(500).json({
         message: "Nao foi possivel conectar ao Supabase",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  };
+
+  validateOnboardingEligibility = async (req: Request, res: Response) => {
+    const { supabaseUrl, serviceRoleKey } = getSupabaseBackendConfig();
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(500).json({ message: "Variaveis do Supabase nao configuradas" });
+      return;
+    }
+
+    const answers = req.body?.answers;
+    if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
+      res.status(400).json({ message: "Informe as respostas do onboarding em answers." });
+      return;
+    }
+
+    try {
+      const result = await validateOnboardingEligibilityAnswers(answers as Record<string, unknown>, supabaseUrl, serviceRoleKey);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({
+        message: "Nao foi possivel validar os requisitos de cadastro.",
         details: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
