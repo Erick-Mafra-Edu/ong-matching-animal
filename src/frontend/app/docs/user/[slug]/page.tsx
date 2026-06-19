@@ -42,18 +42,26 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
   const relatedDocs = allDocs.filter((item) => doc.relatedSlugs.includes(item.slug));
 
   return (
-    <main className="min-h-screen bg-surface-bg px-6 py-12 text-surface-text sm:px-10 lg:px-16">
-      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[290px_minmax(0,1fr)]">
+    <main className="min-h-screen bg-surface-bg px-4 py-8 text-surface-text sm:px-6 sm:py-10 lg:px-16 lg:py-12">
+      <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-8">
         <aside className="space-y-5 lg:sticky lg:top-8 lg:self-start">
-          <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
-            <nav className="mt-4 space-y-2" aria-label="Menu lateral de documentacao">
+          <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Documentos</p>
+              <Link
+                className="inline-flex min-h-10 items-center justify-center rounded-full border border-[var(--color-field-border)] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)]"
+                href="/docs/user"
+              >
+                Inicio
+              </Link>
+            </div>
+            <nav className="mt-4 flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0" aria-label="Menu lateral de documentacao">
               {allDocs.map((item) => {
                 const isActive = item.slug === doc.slug;
 
                 return (
                   <Link
-                    className={`block rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                    className={`block min-w-[220px] rounded-2xl border px-4 py-3 text-sm font-semibold transition lg:min-w-0 ${
                       isActive
                         ? "border-[var(--color-field-border-focus)] bg-[var(--color-card-muted)] text-[var(--color-text)]"
                         : "border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-text-muted)] hover:border-[var(--color-field-border-focus)] hover:text-[var(--color-text)]"
@@ -69,7 +77,7 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
           </div>
 
           {doc.headings.length > 0 && (
-            <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-sm">
+            <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Topicos</p>
               <nav className="mt-4 space-y-2" aria-label="Topicos do documento">
                 {doc.headings.map((heading) => (
@@ -90,7 +98,7 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
           )}
 
           {relatedDocs.length > 0 && (
-            <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-sm">
+            <div className="rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm sm:p-5">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">Relacionados</p>
               <div className="mt-4 space-y-2">
                 {relatedDocs.map((item) => (
@@ -108,15 +116,15 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
         </aside>
 
         <section className="space-y-8">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)]"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] sm:w-auto"
               href="/docs/user"
             >
-              Voltar para documentos
+              Voltar para o inicio da documentacao
             </Link>
             <a
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)]"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] sm:w-auto"
               href={`/api/user-docs/${doc.slug}`}
               rel="noreferrer"
               target="_blank"
@@ -135,6 +143,14 @@ export default async function UserDocDetailPage({ params }: UserDocDetailPagePro
             >
               {doc.content}
             </ReactMarkdown>
+            </div>
+            <div className="mt-8 border-t border-[var(--color-border)] pt-6">
+              <Link
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--color-field-border)] px-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text)] transition hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] sm:w-auto"
+                href="/docs/user"
+              >
+                Voltar para o inicio da documentacao
+              </Link>
             </div>
           </article>
         </section>

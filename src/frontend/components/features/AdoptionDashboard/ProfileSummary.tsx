@@ -11,7 +11,7 @@ interface ProfileSummaryProps {
 export function ProfileSummary({ pet, compact = false, tone = "light" }: ProfileSummaryProps) {
   const isDark = tone === "dark";
   const nameColor = isDark ? "text-white" : "text-slate-950";
-  const metaColor = isDark ? "text-slate-300" : "text-slate-700";
+  const metaColor = isDark ? "text-slate-200" : "text-slate-700";
 
   return (
     <section className={compact ? "space-y-3" : "space-y-4"} aria-label={`Informações de ${pet.name}`}>
