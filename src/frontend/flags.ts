@@ -7,8 +7,8 @@ const calendarFlagBase = {
 };
 
 const signupLocationFlagBase = {
-  key: "hide-signup-location-fields",
-  description: "Oculta perguntas de localização nas telas de cadastro e onboarding.",
+  key: "signup-location-fields",
+  description: "Permite usar campos de localização nas telas de cadastro, onboarding e admin.",
 };
 
 export const showAdminCalendarScreen = process.env.NODE_ENV === "development"
@@ -22,7 +22,7 @@ export const showAdminCalendarScreen = process.env.NODE_ENV === "development"
     decide: () => false,
   });
 
-export const hideSignupLocationFields = process.env.NODE_ENV === "development"
+export const showSignupLocationFields = process.env.NODE_ENV === "development"
   ? flag<boolean>({
     ...signupLocationFlagBase,
     decide: () => false,

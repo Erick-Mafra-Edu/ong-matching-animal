@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { hideSignupLocationFields } from "@/flags";
+import { showSignupLocationFields } from "@/flags";
 import { SignupForm } from "@/components/features/Signup/SignupForm";
 
 export default async function CadastroPage() {
-  const shouldHideLocationFields = await hideSignupLocationFields();
+  const shouldShowLocationFields = await showSignupLocationFields();
 
   return (
     <main className="min-h-screen bg-[#0e0e12] px-5 py-8 text-white sm:px-8 lg:py-12">
@@ -24,7 +24,7 @@ export default async function CadastroPage() {
           </section>
 
           <section className="animate-state-enter rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-2xl sm:p-6">
-            <SignupForm hideLocationFields={shouldHideLocationFields} />
+            <SignupForm hideLocationFields={!shouldShowLocationFields} />
           </section>
         </div>
       </div>

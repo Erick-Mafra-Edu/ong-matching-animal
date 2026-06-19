@@ -1,10 +1,10 @@
 import { InterestDetailPageClient } from "@/components/features/Interests/InterestDetailPageClient";
-import { hideSignupLocationFields, showAdminCalendarScreen } from "@/flags";
+import { showAdminCalendarScreen, showSignupLocationFields } from "@/flags";
 
 export default async function InteresseDetalhePage() {
   const isDevelopment = process.env.NODE_ENV === "development";
   const showCalendar = isDevelopment || await showAdminCalendarScreen();
-  const hideLocationFields = await hideSignupLocationFields();
+  const showLocationFields = await showSignupLocationFields();
 
-  return <InterestDetailPageClient hideLocationFields={hideLocationFields} showCalendarConfig={showCalendar} />;
+  return <InterestDetailPageClient hideLocationFields={!showLocationFields} showCalendarConfig={showCalendar} />;
 }
