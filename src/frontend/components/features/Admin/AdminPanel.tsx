@@ -637,15 +637,27 @@ function toRaRecord(record: Record<string, unknown>): AdminRecord {
   return { ...record, id: String(record.id) };
 }
 
-export function AdminPanel({ showCalendarConfig = false }: { showCalendarConfig?: boolean }) {
+export function AdminPanel({
+  hideLocationFields = false,
+  showCalendarConfig = false,
+}: {
+  hideLocationFields?: boolean;
+  showCalendarConfig?: boolean;
+}) {
   return (
     <AdminContext dataProvider={adminDataProvider as DataProvider}>
-      <AdminWorkspace showCalendarConfig={showCalendarConfig} />
+      <AdminWorkspace hideLocationFields={hideLocationFields} showCalendarConfig={showCalendarConfig} />
     </AdminContext>
   );
 }
 
-function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean }) {
+function AdminWorkspace({
+  hideLocationFields,
+  showCalendarConfig,
+}: {
+  hideLocationFields: boolean;
+  showCalendarConfig: boolean;
+}) {
   const router = useRouter();
   const dataProvider = useDataProvider();
   const { resolvedTheme, setTheme } = useTheme();
@@ -1067,7 +1079,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
               <MenuLoadingPanel label={adminResources.find((resource) => resource.id === activeResource)?.label ?? "menu"} />
             ) : activeResource === "calendar-events" ? (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <CalendarPage skipAuthCheck standalone={false} />
+                <CalendarPage hideLocationFields={hideLocationFields} skipAuthCheck standalone={false} />
               </div>
             ) : activeResource === "service-configs" ? (
               <ServiceConfigsPanel onRefresh={() => loadResource(activeResource)} rows={rows} />
@@ -1108,6 +1120,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
 
                 <div className="hidden lg:block">
                   <RecordForm
+                    hideLocationFields={hideLocationFields}
                     config={activeConfig}
                     disabled={isSaving || (mode === "edit" && !selectedRow)}
                     formState={formState}
@@ -1134,6 +1147,7 @@ function AdminWorkspace({ showCalendarConfig }: { showCalendarConfig: boolean })
                     </DialogHeader>
                     <div className="max-h-[calc(92vh-88px)] overflow-y-auto custom-scrollbar">
                       <RecordForm
+                        hideLocationFields={hideLocationFields}
                         config={activeConfig}
                         disabled={isSaving || (mode === "edit" && !selectedRow)}
                         formState={formState}
@@ -1629,6 +1643,7 @@ function RecordList({
 }
 
 function RecordForm({
+  hideLocationFields = false,
   config,
   customFieldDefinitions,
   customFieldOptions,
@@ -1645,6 +1660,7 @@ function RecordForm({
   adminTheme = "dark",
   variant = "panel",
 }: {
+  hideLocationFields?: boolean;
   config: ResourceUiConfig;
   customFieldDefinitions: Record<CustomFieldEntity, CustomFieldDefinition[]>;
   customFieldOptions: Record<CustomFieldEntity, Array<{ label: string; value: string }>>;
@@ -1663,6 +1679,7 @@ function RecordForm({
 }) {
   const visibleFields = config.fields.filter((field) => {
     if (mode !== "create" && field.createOnly) return false;
+    if (hideLocationFields && field.name === "location") return false;
     if (
       config.id === "onboarding-questions"
       && formState.is_knockout !== true
