@@ -150,7 +150,7 @@ type RuleSimulationResult = {
 
 const fieldClass =
   "min-h-12 w-full rounded-xl border border-white/5 bg-black/40 px-4 text-sm text-white outline-none transition-all duration-200 focus:border-cyan-400/50 focus:bg-black/60 focus:ring-4 focus:ring-cyan-400/5 disabled:opacity-40 placeholder:text-slate-600";
-const adminOutlineButtonClass = "border-white/15 text-slate-100 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
+const adminOutlineButtonClass = "border-[var(--color-border)] text-[var(--color-text)] hover:border-[var(--color-field-border-focus)] hover:bg-[var(--color-card-muted)] hover:text-[var(--color-text)]";
 const adminNavLinkClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 px-6 text-xs font-bold uppercase tracking-wide text-slate-100 transition duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white/5 hover:text-white";
 const animalPhotoMaxSizeBytes = 800 * 1024;
 const animalPhotoMaxWidth = 1080;
@@ -1307,15 +1307,15 @@ function RuleEngineWorkspace({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl border border-white/10 bg-[#111116]">
-        <div className="grid gap-5 border-b border-white/10 bg-black/30 p-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+      <section className="theme-panel overflow-hidden rounded-xl border">
+        <div className="grid gap-5 border-b border-[var(--color-border)] bg-[var(--color-card-muted)] p-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-none bg-cyan-400/10 text-cyan-200">Motor de Regras</Badge>
               <Badge className="border-none bg-amber-400/10 text-amber-200">Maturidade: regras auditaveis</Badge>
             </div>
-            <h3 className="mt-3 text-2xl font-bold tracking-tight text-white">Construa, teste e audite o matching</h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            <h3 className="mt-3 text-2xl font-bold tracking-tight text-[var(--color-text)]">Construa, teste e audite o matching</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">
               Cada regra abaixo alimenta o simulador: dealbreakers cortam animais da fila, regras de score somam pontos quando a comparacao passa.
             </p>
           </div>
@@ -1853,7 +1853,7 @@ function RuleBuilderControls({
           />
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+        <div className="theme-surface rounded-xl border p-3">
           <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</p>
           <button
             className={`h-11 min-w-[160px] rounded-full border px-4 text-xs font-black uppercase tracking-widest transition ${
@@ -1870,13 +1870,13 @@ function RuleBuilderControls({
         </div>
       </div>
 
-      <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <section className="theme-surface rounded-xl border p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-cyan-200">Logica de comparacao</p>
-            <h4 className="mt-1 text-lg font-bold text-white">Construtor logico visual</h4>
+            <h4 className="mt-1 text-lg font-bold text-[var(--color-text)]">Construtor logico visual</h4>
           </div>
-          <Badge className="border-none bg-white/5 font-mono text-slate-300">{buildRuleExpression(formState)}</Badge>
+          <Badge className="border-none bg-white/5 font-mono text-[var(--color-text-muted)]">{buildRuleExpression(formState)}</Badge>
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_220px_1fr]">
@@ -1922,7 +1922,7 @@ function RuleBuilderControls({
             <p className={`text-[10px] font-black uppercase tracking-widest ${isDealbreaker ? "text-red-200" : "text-emerald-200"}`}>
               Chaveador de impacto
             </p>
-            <h4 className="mt-1 text-lg font-bold text-white">
+            <h4 className="mt-1 text-lg font-bold text-[var(--color-text)]">
               {isDealbreaker ? "Dealbreaker: falhou, sai da fila" : "Score: passou, soma pontos"}
             </h4>
           </div>
@@ -1947,7 +1947,7 @@ function RuleBuilderControls({
         </div>
 
         {isDealbreaker ? (
-          <div className="mt-5 flex gap-3 rounded-xl border border-red-400/25 bg-black/20 p-4 text-red-100">
+          <div className="mt-5 flex gap-3 rounded-xl border border-red-400/25 bg-red-500/[0.08] p-4 text-red-100">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <p className="text-sm leading-6">
               Se essa comparacao falhar, o pet sera excluido dos resultados do tutor antes da pontuacao final.
@@ -1958,7 +1958,7 @@ function RuleBuilderControls({
             <label className="text-[11px] font-black uppercase tracking-widest text-emerald-100" htmlFor="rule-weight">
               Pontos somados
             </label>
-            <div className="rounded-xl border border-emerald-400/20 bg-black/20 p-4">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.08] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm font-bold text-emerald-100">{impactLabel(weight)}</span>
                 <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-sm font-black text-emerald-100">+{weight || 0}</span>
@@ -2004,7 +2004,7 @@ function HumanSelect({
       <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
       <div className="relative">
         <select
-          className={`${fieldClass} appearance-none bg-black/50`}
+          className={`${fieldClass} appearance-none`}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           required
@@ -2048,14 +2048,14 @@ function RuleComparisonPreview({
         </div>
       </div>
       <div className="mt-3 grid items-center gap-3 text-sm md:grid-cols-[1fr_auto_1fr]">
-        <div className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+        <div className="theme-surface min-h-11 rounded-xl border px-3 py-2 text-[var(--color-text)]">
           <span className="block text-[11px] uppercase text-slate-500">Perfil do tutor</span>
           <span className="font-semibold">{tutorLabel}</span>
         </div>
-        <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-center font-semibold text-cyan-100">
+        <div className="theme-surface rounded-xl border px-3 py-2 text-center font-semibold text-cyan-100">
           {conditionLabel}
         </div>
-        <div className="min-h-11 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-slate-100">
+        <div className="theme-surface min-h-11 rounded-xl border px-3 py-2 text-[var(--color-text)]">
           <span className="block text-[11px] uppercase text-slate-500">Atributo do animal</span>
           <span className="font-semibold">{animalLabel}</span>
         </div>
@@ -2131,13 +2131,13 @@ function RuleSimulatorPanel({
   }, [matches, selectedAnimalId]);
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.03]">
-      <div className="border-b border-white/10 bg-black/20 p-5">
+    <section className="theme-panel rounded-xl border">
+      <div className="border-b border-[var(--color-border)] bg-[var(--color-card-muted)] p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-cyan-200">Simulador conectado</p>
-            <h3 className="mt-1 text-2xl font-bold tracking-tight text-white">Resultado em tempo real</h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            <h3 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)]">Resultado em tempo real</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">
               Use tutores reais ou monte um cenario sandbox para validar como as regras afetam score e cortes.
             </p>
           </div>
@@ -2160,7 +2160,7 @@ function RuleSimulatorPanel({
               </div>
             </label>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <div className="theme-surface rounded-xl border p-3">
               <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">Modo</span>
               <button
                 className={`h-12 min-w-[170px] rounded-full border px-4 text-xs font-black uppercase tracking-widest transition ${
@@ -2207,11 +2207,11 @@ function RuleSimulatorPanel({
       </div>
 
       <div className="grid gap-5 p-5 xl:grid-cols-[minmax(300px,420px)_1fr]">
-        <section className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+        <section className="theme-surface overflow-hidden rounded-xl border">
           <div className="border-b border-white/10 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h4 className="text-lg font-bold text-white">Fila de matches</h4>
+                <h4 className="text-lg font-bold text-[var(--color-text)]">Fila de matches</h4>
                 <p className="mt-1 text-xs text-slate-500">{matches.length} animais com score positivo</p>
               </div>
               <Badge className="border-none bg-emerald-400/10 text-emerald-100">Score</Badge>
@@ -2231,7 +2231,7 @@ function RuleSimulatorPanel({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">#{index + 1}</p>
-                      <h5 className="truncate text-base font-bold text-white">{String(result.animal.name ?? result.animal.id)}</h5>
+                      <h5 className="truncate text-base font-bold text-[var(--color-text)]">{String(result.animal.name ?? result.animal.id)}</h5>
                       <p className="mt-1 text-xs text-slate-500">{String(result.animal.species ?? "Animal")}</p>
                     </div>
                     <div className="text-right">
@@ -2250,11 +2250,11 @@ function RuleSimulatorPanel({
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+        <section className="theme-surface overflow-hidden rounded-xl border">
           <div className="border-b border-white/10 p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h4 className="text-lg font-bold text-white">Raio-X do resultado</h4>
+                <h4 className="text-lg font-bold text-[var(--color-text)]">Raio-X do resultado</h4>
                 <p className="mt-1 text-xs text-slate-500">
                   {dealbreakerCount} dealbreakers ativos podem remover pets antes da soma de pontos.
                 </p>
@@ -2395,7 +2395,7 @@ function DealbreakerAudit({ rejected }: { rejected: RuleSimulationResult[] }) {
             </div>
             <div className="mt-4 space-y-3">
               {result.failedDealbreakers.map((detail) => (
-                <div className="rounded-xl border border-red-400/15 bg-black/20 p-3" key={String(detail.rule.id)}>
+                <div className="rounded-xl border border-red-400/15 bg-red-500/[0.08] p-3" key={String(detail.rule.id)}>
                   <p className="text-sm font-bold text-red-100">{String(detail.rule.rule_name ?? "Regra eliminatoria")}</p>
                   <p className="mt-1 text-[11px] font-mono text-red-100/70">{detail.expression}</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">{detail.reason}</p>
