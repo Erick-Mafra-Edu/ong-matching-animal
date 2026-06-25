@@ -1,5 +1,6 @@
 import request from "supertest";
 import app from "../index";
+import { getAuthenticatedUserIdFromTokenPayload, getBearerToken } from "../controllers/apiSupport";
 
 describe("API Endpoints", () => {
   const originalEnv = process.env;
@@ -32,6 +33,27 @@ describe("API Endpoints", () => {
       const timestamp = response.body.timestamp;
       expect(() => new Date(timestamp)).not.toThrow();
       expect(new Date(timestamp).getTime()).toBeGreaterThan(0);
+    });
+  });
+
+  describe("getBearerToken", () => {
+    it("should extract bearer tokens without regex backtracking", () => {
+      expect(getBearerToken("Bearer access-token")).toBe("access-token");
+      expect(getBearerToken("bearer    access-token")).toBe("access-token");
+      expect(getBearerToken("Basic access-token")).toBeNull();
+      expect(getBearerToken("Bearer")).toBeNull();
+      expect(getBearerToken("Bearer      ")).toBeNull();
+    });
+  });
+
+  describe("getAuthenticatedUserIdFromTokenPayload", () => {
+    it("should decode the sub claim from a bearer token payload", () => {
+      const payload = Buffer.from(JSON.stringify({ sub: "user-123" })).toString("base64url");
+      const authorization = `Bearer header.${payload}.signature`;
+
+      expect(getAuthenticatedUserIdFromTokenPayload(authorization)).toBe("user-123");
+      expect(getAuthenticatedUserIdFromTokenPayload("Bearer invalid")).toBeNull();
+      expect(getAuthenticatedUserIdFromTokenPayload("Basic token")).toBeNull();
     });
   });
 

@@ -140,7 +140,7 @@ export async function getAuthenticatedUserId(supabaseUrl: string, serviceRoleKey
 }
 
 export function getAuthenticatedUserIdFromTokenPayload(authorization?: string) {
-  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const accessToken = getBearerToken(authorization);
   if (!accessToken) return null;
 
   const [, payloadSegment] = accessToken.split(".");
@@ -208,7 +208,11 @@ export async function requireAuthenticated(req: Request, res: Response) {
 }
 
 export function getBearerToken(authorization?: string) {
-  return authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+  if (!authorization || authorization.length < 7) return null;
+  if (authorization.slice(0, 6).toLowerCase() !== "bearer") return null;
+
+  const token = authorization.slice(6).trimStart();
+  return token.length > 0 ? token : null;
 }
 
 export function getAdminTable(resource: string) {
