@@ -63,8 +63,11 @@ export class AnimalsController {
       }
 
       const rows = Array.isArray(body) ? body : [];
-      const items = rows.slice(0, limit).map((row) => normalizeAnimal(row.animal ?? row));
-      const hasMore = rows.length > limit;
+      const normalizedRows = rows
+        .map((row) => row?.animal ?? row)
+        .filter((row) => row && typeof row === "object" && row.id);
+      const items = normalizedRows.slice(0, limit).map((row) => normalizeAnimal(row));
+      const hasMore = normalizedRows.length > limit;
 
       res.json({
         items,

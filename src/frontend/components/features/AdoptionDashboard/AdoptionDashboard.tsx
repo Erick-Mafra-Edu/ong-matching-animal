@@ -57,12 +57,17 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     nextOffset: 0,
     hasMore: true,
   };
+  const initialDashboardStatus: DashboardStatus = status !== "ready"
+    ? status
+    : initialItems.length
+      ? "ready"
+      : initialPagination.hasMore
+        ? "loading"
+        : "empty";
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [pets, setPets] = useState<AnimalListItem[]>(initialItems);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
-    status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
-  );
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(initialDashboardStatus);
   const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);      
   const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
@@ -131,11 +136,19 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     }
 
     let isMounted = true;
-    setLoadStatus(initialItems.length ? "ready" : "loading");
     setPets(initialItems);
     setHistory([]);
     setNextAnimalsOffset(initialPagination.nextOffset);
     setHasMoreAnimals(initialPagination.hasMore);
+
+    if (!initialItems.length && !initialPagination.hasMore) {
+      setLoadStatus("empty");
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setLoadStatus(initialItems.length ? "ready" : "loading");
 
     fetchAnimalsPage(0, tutorId)
       .then((page) => {
