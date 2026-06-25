@@ -6,7 +6,7 @@ interface DashboardStateProps {
 
 const messages = {
   loading: ["Buscando perfis...", "Estamos procurando uma combinação para você."],
-  empty: ["Nenhum perfil disponível", "Volte em breve para conhecer novos candidatos."],
+  empty: ["Nenhum animal disponivel", "Ainda nao ha animal cadastrado ou compativel com o seu perfil."],
   error: ["Não foi possível carregar", "Tente novamente em alguns instantes."],
 };
 

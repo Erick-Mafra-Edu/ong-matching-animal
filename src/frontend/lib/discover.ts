@@ -23,6 +23,10 @@ interface FetchAnimalsPageOptions {
   init?: RequestInit;
 }
 
+interface ApiErrorResponse {
+  message?: string;
+}
+
 async function withFallbackPhoto(animal: AnimalListItem): Promise<AnimalListItem> {
   if (animal.photoUrl || animal.photoUrls?.length) return animal;
 
@@ -74,7 +78,10 @@ export async function fetchAnimalsPage(offset: number, optionsOrTutorId?: string
     },
   );
 
-  if (!response.ok) throw new Error("Nao foi possivel carregar os animais.");
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as ApiErrorResponse | null;
+    throw new Error(body?.message ?? "Nao foi possivel carregar os animais.");
+  }
 
   const body = await response.json() as AnimalsPageResponse | AnimalListItem[];
   if (Array.isArray(body)) {
@@ -111,6 +118,25 @@ function normalizeFetchOptions(optionsOrTutorId?: string | null | FetchAnimalsPa
   }
 
   return optionsOrTutorId;
+}
+
+export function isNoAnimalsAvailableMessage(message: string | null | undefined) {
+  if (!message) return false;
+
+  const normalizedMessage = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return [
+    "nenhum animal",
+    "nao ha animal",
+    "nao existem animais",
+    "nao foi encontrado animal",
+    "sem animais",
+    "animal cadastrado",
+    "compativel com o perfil",
+  ].some((fragment) => normalizedMessage.includes(fragment));
 }
 
 async function resolveAccessToken(options: FetchAnimalsPageOptions) {
