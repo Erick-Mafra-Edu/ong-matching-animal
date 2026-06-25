@@ -8,7 +8,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
-import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
+import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, isNoAnimalsAvailableMessage, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
 
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
@@ -158,9 +158,9 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
         setHasMoreAnimals(page.pagination.hasMore);
         setLoadStatus(page.items.length ? "ready" : "empty");
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setLoadStatus("error");
+        setLoadStatus(error instanceof Error && isNoAnimalsAvailableMessage(error.message) ? "empty" : "error");
       });
 
     return () => {
@@ -181,8 +181,10 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       });
       setNextAnimalsOffset(page.pagination.nextOffset);
       setHasMoreAnimals(page.pagination.hasMore);
-    } catch {
-      if (pets.length === 0) setLoadStatus("error");
+    } catch (error) {
+      if (pets.length === 0) {
+        setLoadStatus(error instanceof Error && isNoAnimalsAvailableMessage(error.message) ? "empty" : "error");
+      }
     } finally {
       setIsLoadingMoreAnimals(false);
     }
