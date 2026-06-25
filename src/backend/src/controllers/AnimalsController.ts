@@ -6,7 +6,7 @@ import {
   allowedAnimalPhotoTypes,
   animalPhotoExtensions,
   animalPhotosBucket,
-  getRouteParam,
+  getUuidRouteParam,
   getSupabaseBackendConfig,
   maxAnimalPhotoSizeBytes,
   normalizeAnimal,
@@ -15,6 +15,8 @@ import {
   requireAuthenticated,
   requireAdmin,
   toPublicStorageUrl,
+  toSignedUploadStorageUrl,
+  toStorageObjectUrl,
 } from "./apiSupport";
 
 const animalSelect = "id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)";
@@ -134,7 +136,7 @@ export class AnimalsController {
       if (!context) return;
 
       const { contentType, fileName } = req.body as { contentType?: string; fileName?: string };
-      const animalId = getRouteParam(req.params.id);
+      const animalId = getUuidRouteParam(req.params.id);
       if (!contentType) {
         res.status(400).json({ message: "Informe o contentType da imagem." });
         return;
@@ -149,7 +151,7 @@ export class AnimalsController {
       const storagePath = `animals/${animalId}/${photoId}.${extension}`;
       const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
 
-      const supabaseResponse = await fetch(`${context.supabaseUrl}/storage/v1/object/upload/sign/${animalPhotosBucket}/${storagePath}`, {
+      const supabaseResponse = await fetch(toSignedUploadStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath), {
         method: "POST",
         headers: {
           apikey: context.serviceRoleKey,
@@ -188,7 +190,7 @@ export class AnimalsController {
     }
 
     try {
-      const animalId = getRouteParam(req.params.id);
+      const animalId = getUuidRouteParam(req.params.id);
       if (!animalId) {
         res.status(400).json({ message: "Identificador do animal invalido." });
         return;
@@ -256,7 +258,7 @@ export class AnimalsController {
         return;
       }
 
-      const animalId = getRouteParam(req.params.id);
+      const animalId = getUuidRouteParam(req.params.id);
       if (!animalId) {
         res.status(400).json({ message: "Identificador do animal invalido." });
         return;
@@ -268,7 +270,7 @@ export class AnimalsController {
       const publicUrl = toPublicStorageUrl(context.supabaseUrl, animalPhotosBucket, storagePath);
 
       try {
-        const storageResponse = await fetch(`${context.supabaseUrl}/storage/v1/object/${animalPhotosBucket}/${storagePath}`, {
+        const storageResponse = await fetch(toStorageObjectUrl(context.supabaseUrl, animalPhotosBucket, storagePath), {
           method: "POST",
           headers: {
             apikey: context.serviceRoleKey,
@@ -310,7 +312,7 @@ export class AnimalsController {
 
       const rawPayload = req.body ?? {};
       const payload = pickFields(rawPayload, adminTables["animal-photos"].createFields);
-      const animalId = getRouteParam(req.params.id);
+      const animalId = getUuidRouteParam(req.params.id);
 
       if (!animalId || !payload.id || !payload.storage_path || !payload.content_type) {
         res.status(400).json({ message: "Dados da foto incompletos para registro." });

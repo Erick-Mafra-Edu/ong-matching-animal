@@ -102,6 +102,7 @@ export const adminTables = {
 
 export type AdminResource = keyof typeof adminTables;
 export type AdminContext = Awaited<ReturnType<typeof requireAdmin>>;
+const uuidParamSchema = z.string().uuid();
 
 export function getSupabaseBackendConfig() {
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -218,6 +219,12 @@ export function getRouteParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+export function getUuidRouteParam(value: string | string[] | undefined) {
+  const param = getRouteParam(value);
+  const result = uuidParamSchema.safeParse(param);
+  return result.success ? result.data : null;
+}
+
 export async function readJsonResponse(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return null;
@@ -232,6 +239,16 @@ export async function readJsonResponse(response: globalThis.Response) {
 export function toPublicStorageUrl(supabaseUrl: string, bucket: string, storagePath: string) {
   const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedPath}`;
+}
+
+export function toStorageObjectUrl(supabaseUrl: string, bucket: string, storagePath: string) {
+  const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+  return `${supabaseUrl}/storage/v1/object/${bucket}/${encodedPath}`;
+}
+
+export function toSignedUploadStorageUrl(supabaseUrl: string, bucket: string, storagePath: string) {
+  const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+  return `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${encodedPath}`;
 }
 
 export function normalizeAnimal(rawAnimal: any) {

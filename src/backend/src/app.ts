@@ -63,9 +63,16 @@ export function createApp() {
   const app = express();
 
   const isDevelopment = process.env.NODE_ENV === "development";
+  const docsContentSecurityPolicyDirectives = {
+    defaultSrc: ["'self'"],
+    imgSrc: ["'self'", "data:"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    fontSrc: ["'self'", "data:"],
+    connectSrc: ["'self'"],
+  };
 
   app.use(helmet({
-    contentSecurityPolicy: false, // Desabilitado pois e uma API REST que retorna JSON
     hsts: !isDevelopment, // Habilitar HSTS apenas em producao
   }));
   app.use(globalLimiter);
@@ -85,6 +92,13 @@ export function createApp() {
   app.get("/api/openapi.json", (_req, res) => {
     res.json(apiDoc);
   });
+
+  app.use("/api/docs", helmet({
+    contentSecurityPolicy: {
+      directives: docsContentSecurityPolicyDirectives,
+    },
+    hsts: !isDevelopment,
+  }));
 
   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(apiDoc, {
     explorer: true,
