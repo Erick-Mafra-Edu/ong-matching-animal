@@ -1721,6 +1721,41 @@ describe("API Endpoints", () => {
       );
     });
 
+    it("should return an empty page when cached matches do not contain animals", async () => {
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: "user-123" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ id: "tutor-123" }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            { compatibility_score: 98, animal: null },
+          ],
+        }) as jest.Mock;
+
+      const response = await request(app)
+        .get("/api/animals?limit=2&offset=0&tutor_id=tutor-123")
+        .set("Authorization", "Bearer access-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        items: [],
+        pagination: {
+          limit: 2,
+          offset: 0,
+          nextOffset: null,
+          hasMore: false,
+        },
+      });
+    });
+
     it("should reject cached match listing for a different tutor", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
