@@ -210,25 +210,15 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       />
     );
   }
-
-  if (loadStatus !== "ready") {
-    return (
-      <>
-        <DashboardState status={loadStatus} />
-        {renderContactDialog()}
-      </>
-    );
-  }
-
   const featuredPet = pets[0];
-  if (!featuredPet) {
-    return (
-      <>
-        <DashboardState status={hasMoreAnimals || isLoadingMoreAnimals ? "loading" : "empty"} />
-        {renderContactDialog()}
-      </>
-    );
-  }
+  const displayStatus = loadStatus !== "ready"
+    ? loadStatus
+    : featuredPet
+      ? "ready"
+      : (hasMoreAnimals || isLoadingMoreAnimals ? "loading" : "empty");
+  const stateStatus: Exclude<DashboardStatus, "ready"> = displayStatus === "ready"
+    ? "empty"
+    : displayStatus;
 
   function requestCardAction(direction: SwipeDirection) {
     setCardAction({ direction, id: Date.now() });
@@ -343,29 +333,40 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
           </nav>
         </div>
       </header>
-      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
-        <div>
-          <PetPhotoCard
-            action={cardAction}
-            onActionComplete={handleActionComplete}
-            pet={featuredPet}
-          />
-          <div className="md:hidden">
-            <div className="theme-panel animate-actions-enter border-t px-5 py-3">
-              {actions}
-              {actionMessage && <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">{actionMessage}</p>}
+      {displayStatus === "ready" && featuredPet ? (
+        <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
+          <div>
+            <PetPhotoCard
+              action={cardAction}
+              onActionComplete={handleActionComplete}
+              pet={featuredPet}
+            />
+            <div className="md:hidden">
+              <div className="theme-panel animate-actions-enter border-t px-5 py-3">
+                {actions}
+                {actionMessage && <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">{actionMessage}</p>}
+              </div>
+              <MobileNavigation items={mobileNavigationItems} />
             </div>
+          </div>
+          <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
+            <ProfileSummary pet={featuredPet} tone={desktopProfileTone} />
+            <div className="animate-actions-enter">
+              {actions}
+              {actionMessage && <p className="mt-4 text-sm text-[var(--color-text-muted)]">{actionMessage}</p>}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="flex min-h-screen w-full flex-col pt-20 md:pt-24">
+          <div className="flex-1">
+            <DashboardState status={stateStatus} />
+          </div>
+          <div className="md:hidden">
             <MobileNavigation items={mobileNavigationItems} />
           </div>
         </div>
-        <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
-          <ProfileSummary pet={featuredPet} tone={desktopProfileTone} />
-          <div className="animate-actions-enter">
-            {actions}
-            {actionMessage && <p className="mt-4 text-sm text-[var(--color-text-muted)]">{actionMessage}</p>}
-          </div>
-        </section>
-      </div>
+      )}
       {renderContactDialog()}
     </PageContainer>
   );
