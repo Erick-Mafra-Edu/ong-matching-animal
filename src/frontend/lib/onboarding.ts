@@ -125,22 +125,11 @@ export async function validateOnboardingEligibility(answers: OnboardingAnswers):
   return response.json() as Promise<OnboardingEligibilityResult>;
 }
 
-const locationQuestionPatterns = [
+const locationQuestionIds = new Set([
   "location",
   "localizacao",
   "localização",
-  "cidade",
-  "estado",
-  "bairro",
-  "endereco",
-  "endereço",
-  "cep",
-  "postal",
-  "regiao",
-  "região",
-  "onde voce mora",
-  "onde você mora",
-];
+]);
 
 function normalizeQuestionText(value: string | undefined) {
   return String(value ?? "")
@@ -150,14 +139,7 @@ function normalizeQuestionText(value: string | undefined) {
 }
 
 export function isLocationQuestion(question: OnboardingQuestion) {
-  const haystack = [
-    question.id,
-    question.label,
-    question.description,
-    question.placeholder,
-  ].map(normalizeQuestionText).join(" ");
-
-  return locationQuestionPatterns.some((pattern) => haystack.includes(normalizeQuestionText(pattern)));
+  return locationQuestionIds.has(normalizeQuestionText(question.id));
 }
 
 export function filterOnboardingQuestions(questions: OnboardingQuestion[], hideLocationFields = false) {
