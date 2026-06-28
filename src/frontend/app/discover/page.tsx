@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AdoptionDashboard } from "@/components/features/AdoptionDashboard/AdoptionDashboard";
 import { ScreenOnboardingRuntime } from "@/components/features/Onboarding/ScreenOnboardingRuntime";
 import { authCookieNames } from "@/lib/auth/session";
-import { fetchAnimalsPage, type AnimalsPageResponse } from "@/lib/discover";
+import { fetchAnimalsPage, isNoAnimalsAvailableMessage, type AnimalsPageResponse } from "@/lib/discover";
 
 interface DiscoverAccessResponse {
   authenticated: boolean;
@@ -77,11 +77,19 @@ export default async function DiscoverPage() {
     redirect("/onboarding");
   }
 
-  const initialPage = await fetchInitialAnimals(access.tutor_id, accessToken);
+  let initialPage: AnimalsPageResponse | undefined;
+  let status: "ready" | "empty" | "error" = "ready";
+
+  try {
+    initialPage = await fetchInitialAnimals(access.tutor_id, accessToken);
+  } catch (error) {
+    status = error instanceof Error && isNoAnimalsAvailableMessage(error.message) ? "empty" : "error";
+    console.error("DiscoverPage: failed to load initial animals", error);
+  }
 
   return (
     <>
-      <AdoptionDashboard initialPage={initialPage} tutorId={access.tutor_id} />
+      <AdoptionDashboard initialPage={initialPage} status={status} tutorId={access.tutor_id} />
       <ScreenOnboardingRuntime />
     </>
   );

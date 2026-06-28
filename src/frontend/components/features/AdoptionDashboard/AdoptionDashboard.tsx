@@ -8,7 +8,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { navigationItems } from "@/data/adoption.mock";
 
 import { registrarInteresse, type InteresseRegistro } from "@/lib/interessados";
-import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
+import { fetchAnimalsPage, IMAGE_PRELOAD_WINDOW, isNoAnimalsAvailableMessage, preloadPrimaryAnimalPhotos, type AnimalsPageResponse } from "@/lib/discover";
 
 import { buildAdoptionMessage, buildWhatsAppUrl, carregarOngSettings, type OngSettings } from "@/lib/ongSettings";
 import type { AnimalListItem, DashboardStatus } from "@/types/adoption";
@@ -57,12 +57,17 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     nextOffset: 0,
     hasMore: true,
   };
+  const initialDashboardStatus: DashboardStatus = status !== "ready"
+    ? status
+    : initialItems.length
+      ? "ready"
+      : initialPagination.hasMore
+        ? "loading"
+        : "empty";
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const [pets, setPets] = useState<AnimalListItem[]>(initialItems);
   const [history, setHistory] = useState<AnimalListItem[]>([]);
-  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(
-    status !== "ready" ? status : (initialItems.length ? "ready" : "loading"),
-  );
+  const [loadStatus, setLoadStatus] = useState<DashboardStatus>(initialDashboardStatus);
   const [nextAnimalsOffset, setNextAnimalsOffset] = useState<number | null>(initialPagination.nextOffset);      
   const [hasMoreAnimals, setHasMoreAnimals] = useState(initialPagination.hasMore);
   const [isLoadingMoreAnimals, setIsLoadingMoreAnimals] = useState(false);
@@ -131,11 +136,19 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     }
 
     let isMounted = true;
-    setLoadStatus(initialItems.length ? "ready" : "loading");
     setPets(initialItems);
     setHistory([]);
     setNextAnimalsOffset(initialPagination.nextOffset);
     setHasMoreAnimals(initialPagination.hasMore);
+
+    if (!initialItems.length && !initialPagination.hasMore) {
+      setLoadStatus("empty");
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setLoadStatus(initialItems.length ? "ready" : "loading");
 
     fetchAnimalsPage(0, tutorId)
       .then((page) => {
@@ -145,9 +158,9 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
         setHasMoreAnimals(page.pagination.hasMore);
         setLoadStatus(page.items.length ? "ready" : "empty");
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isMounted) return;
-        setLoadStatus("error");
+        setLoadStatus(error instanceof Error && isNoAnimalsAvailableMessage(error.message) ? "empty" : "error");
       });
 
     return () => {
@@ -168,8 +181,10 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       });
       setNextAnimalsOffset(page.pagination.nextOffset);
       setHasMoreAnimals(page.pagination.hasMore);
-    } catch {
-      if (pets.length === 0) setLoadStatus("error");
+    } catch (error) {
+      if (pets.length === 0) {
+        setLoadStatus(error instanceof Error && isNoAnimalsAvailableMessage(error.message) ? "empty" : "error");
+      }
     } finally {
       setIsLoadingMoreAnimals(false);
     }
@@ -195,25 +210,15 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
       />
     );
   }
-
-  if (loadStatus !== "ready") {
-    return (
-      <>
-        <DashboardState status={loadStatus} />
-        {renderContactDialog()}
-      </>
-    );
-  }
-
   const featuredPet = pets[0];
-  if (!featuredPet) {
-    return (
-      <>
-        <DashboardState status={hasMoreAnimals || isLoadingMoreAnimals ? "loading" : "empty"} />
-        {renderContactDialog()}
-      </>
-    );
-  }
+  const displayStatus = loadStatus !== "ready"
+    ? loadStatus
+    : featuredPet
+      ? "ready"
+      : (hasMoreAnimals || isLoadingMoreAnimals ? "loading" : "empty");
+  const stateStatus: Exclude<DashboardStatus, "ready"> = displayStatus === "ready"
+    ? "empty"
+    : displayStatus;
 
   function requestCardAction(direction: SwipeDirection) {
     setCardAction({ direction, id: Date.now() });
@@ -328,29 +333,40 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
           </nav>
         </div>
       </header>
-      <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
-        <div>
-          <PetPhotoCard
-            action={cardAction}
-            onActionComplete={handleActionComplete}
-            pet={featuredPet}
-          />
-          <div className="md:hidden">
-            <div className="theme-panel animate-actions-enter border-t px-5 py-3">
-              {actions}
-              {actionMessage && <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">{actionMessage}</p>}
+      {displayStatus === "ready" && featuredPet ? (
+        <div className="grid w-full md:grid-cols-[minmax(360px,430px)_1fr] md:items-center md:gap-16 lg:gap-24">  
+          <div>
+            <PetPhotoCard
+              action={cardAction}
+              onActionComplete={handleActionComplete}
+              pet={featuredPet}
+            />
+            <div className="md:hidden">
+              <div className="theme-panel animate-actions-enter border-t px-5 py-3">
+                {actions}
+                {actionMessage && <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">{actionMessage}</p>}
+              </div>
+              <MobileNavigation items={mobileNavigationItems} />
             </div>
+          </div>
+          <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
+            <ProfileSummary pet={featuredPet} tone={desktopProfileTone} />
+            <div className="animate-actions-enter">
+              {actions}
+              {actionMessage && <p className="mt-4 text-sm text-[var(--color-text-muted)]">{actionMessage}</p>}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="flex min-h-screen w-full flex-col pt-20 md:pt-24">
+          <div className="flex-1">
+            <DashboardState status={stateStatus} />
+          </div>
+          <div className="md:hidden">
             <MobileNavigation items={mobileNavigationItems} />
           </div>
         </div>
-        <section className="animate-details-enter hidden max-w-[620px] space-y-12 md:block" aria-label="Detalhes e ações de adoção">
-          <ProfileSummary pet={featuredPet} tone={desktopProfileTone} />
-          <div className="animate-actions-enter">
-            {actions}
-            {actionMessage && <p className="mt-4 text-sm text-[var(--color-text-muted)]">{actionMessage}</p>}
-          </div>
-        </section>
-      </div>
+      )}
       {renderContactDialog()}
     </PageContainer>
   );
