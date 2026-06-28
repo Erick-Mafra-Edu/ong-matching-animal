@@ -236,4 +236,4 @@ Itens ainda razoaveis para evolucao:
 
 ## Licenca
 
-MIT
+GPL
