@@ -61,7 +61,7 @@ const strictLimiter = rateLimit({
 
 export function createApp() {
   const app = express();
-
+  app.set("trust proxy", true);
   const isDevelopment = process.env.NODE_ENV === "development";
   const docsContentSecurityPolicyDirectives = {
     defaultSrc: ["'self'"],
