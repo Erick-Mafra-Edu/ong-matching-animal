@@ -22,6 +22,28 @@ function normalizeOrigin(origin?: string) {
   }
 }
 
+function resolveTrustProxySetting() {
+  const configuredValue = process.env.EXPRESS_TRUST_PROXY?.trim();
+  if (!configuredValue) {
+    return process.env.NODE_ENV === "production" ? 1 : false;
+  }
+
+  if (configuredValue === "true") {
+    return 1;
+  }
+
+  if (configuredValue === "false") {
+    return false;
+  }
+
+  const hopCount = Number.parseInt(configuredValue, 10);
+  if (Number.isInteger(hopCount) && hopCount >= 0) {
+    return hopCount;
+  }
+
+  return configuredValue;
+}
+
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_FRONTEND_URL,
   process.env.FRONTEND_URL,
@@ -61,7 +83,7 @@ const strictLimiter = rateLimit({
 
 export function createApp() {
   const app = express();
-  app.set("trust proxy", true);
+
   const isDevelopment = process.env.NODE_ENV === "development";
   const docsContentSecurityPolicyDirectives = {
     defaultSrc: ["'self'"],
@@ -72,6 +94,8 @@ export function createApp() {
     connectSrc: ["'self'"],
   };
 
+  app.set("trust proxy", resolveTrustProxySetting());
+
   app.use(helmet({
     hsts: !isDevelopment, // Habilitar HSTS apenas em producao
   }));
@@ -79,12 +103,12 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.use(express.json());
 
-  /*app.use("/api/match", rateLimit({
+  app.use("/api/match", rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 20,
     message: { message: "Muitas solicitacoes de matching. Tente novamente em breve." },
   }));
-*/
+
   app.post("/api/admin/admin-users", strictLimiter);
   app.use("/api/auth/password-recovery", strictLimiter);
   app.use("/api/auth/change-password", strictLimiter);
@@ -114,7 +138,7 @@ export function createApp() {
     apiDoc: apiDoc as any,
     operations: openApiOperations,
     exposeApiDocs: false,
-    validateApiDoc: false,
+    validateApiDoc: true,
   }).catch((error) => {
     console.error("Erro ao inicializar express-openapi:", error);
   });
