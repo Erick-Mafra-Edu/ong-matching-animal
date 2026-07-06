@@ -114,7 +114,7 @@ export function createApp() {
     apiDoc: apiDoc as any,
     operations: openApiOperations,
     exposeApiDocs: false,
-    validateApiDoc: true,
+    validateApiDoc: false,
   }).catch((error) => {
     console.error("Erro ao inicializar express-openapi:", error);
   });
