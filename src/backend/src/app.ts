@@ -4,7 +4,7 @@ import { config } from "dotenv";
 import { initialize } from "express-openapi";
 import path from "path";
 import swaggerUi from "swagger-ui-express";
-import { rateLimit } from "express-rate-limit";
+//import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { apiDoc, openApiOperations } from "./openapi";
 import { createApiRouter } from "./routes/apiRouter";
@@ -43,7 +43,7 @@ const corsOptions: CorsOptions = {
   optionsSuccessStatus: 200,
 };
 
-const globalLimiter = rateLimit({
+/*const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
   standardHeaders: "draft-7",
@@ -58,7 +58,7 @@ const strictLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Limite de tentativas excedido. Tente novamente em uma hora." },
 });
-
+*/
 export function createApp() {
   const app = express();
 
@@ -79,12 +79,12 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.use(express.json());
 
-  app.use("/api/match", rateLimit({
+  /*app.use("/api/match", rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 20,
     message: { message: "Muitas solicitacoes de matching. Tente novamente em breve." },
   }));
-
+*/
   app.post("/api/admin/admin-users", strictLimiter);
   app.use("/api/auth/password-recovery", strictLimiter);
   app.use("/api/auth/change-password", strictLimiter);
