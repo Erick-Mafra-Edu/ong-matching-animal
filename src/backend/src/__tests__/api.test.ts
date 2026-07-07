@@ -1819,7 +1819,7 @@ describe("API Endpoints", () => {
       );
     });
 
-    it("should return an empty page when cached matches do not contain animals", async () => {
+    it("should fall back to general animals when cached matches are empty", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
       global.fetch = jest.fn()
@@ -1834,6 +1834,16 @@ describe("API Endpoints", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            { id: "animal-123", name: "Yolo", species: "Cachorro", custom_fields: {} },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
         }) as jest.Mock;
 
       const response = await request(app)
@@ -1841,15 +1851,21 @@ describe("API Endpoints", () => {
         .set("Authorization", "Bearer access-token");
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        items: [],
-        pagination: {
-          limit: 2,
-          offset: 0,
-          nextOffset: null,
-          hasMore: false,
-        },
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0]).toMatchObject({
+        id: "animal-123",
+        name: "Yolo",
       });
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining("/rest/v1/animals?select="),
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining("/rest/v1/animal_photos?select="),
+        expect.any(Object),
+      );
     });
 
     it("should reject cached match listing for a different tutor", async () => {

@@ -149,7 +149,9 @@ export class AnimalsController {
       : [];
 
     if (animalIds.length === 0) {
-      return jsonResponse([], 200);
+      return fetch(`${options.supabaseUrl}/rest/v1/animals?select=${animalSelect}&order=created_at.desc&limit=${options.supabaseLimit}&offset=${options.offset}`, {
+        headers: authHeaders,
+      });
     }
 
     const animalResponse = await fetch(`${options.supabaseUrl}/rest/v1/animals?select=${animalSelect}&id=in.(${animalIds.map(encodeURIComponent).join(",")})`, {
