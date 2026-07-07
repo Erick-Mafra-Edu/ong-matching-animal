@@ -18,7 +18,7 @@
     "@faker-js/faker": "^10.5.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@ong-matching-animal/shared": "file:../shared",
-    "@supabase/supabase-js": "^2.108.2",
+    "@supabase/supabase-js": "^2.110.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
