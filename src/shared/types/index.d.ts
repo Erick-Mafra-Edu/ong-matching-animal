@@ -66,6 +66,7 @@ export interface MatchResult {
     animal_id: string;
     animal_name: string;
     compatibility_score: number;
+    disqualified?: boolean;
     matched_rules: string[];
     details: {
         rule_id: string;

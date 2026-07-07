@@ -59,6 +59,10 @@ export function buildTutorCustomFields(answers: OnboardingAnswers): TutorCustomF
     customFields.pref_energia = energyAliases[answers.preferred_energy];
   }
 
+  if (typeof answers.routine === "string") {
+    customFields.disponibilidade_tempo = answers.routine;
+  }
+
   if (typeof answers.home_type === "string") {
     customFields.tamanho_casa = homeTypeAliases[answers.home_type];
   }

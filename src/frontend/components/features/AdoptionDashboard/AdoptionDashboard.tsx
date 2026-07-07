@@ -50,13 +50,15 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
   const { resolvedTheme } = useTheme();
   const discoverAccess = useDiscoverAccess();
   const tutorId = tutorIdProp ?? discoverAccess.tutorId;
-  const initialItems = initialPage?.items ?? [];
-  const initialPagination = initialPage?.pagination ?? {
+  const hasInitialPage = initialPage !== undefined;
+  const initialItems = useMemo(() => initialPage?.items ?? [], [initialPage]);
+  const initialPagination = useMemo(() => initialPage?.pagination ?? {
     limit: 0,
     offset: 0,
     nextOffset: 0,
     hasMore: true,
-  };
+  }, [initialPage]);
+  const shouldUseInitialPage = hasInitialPage && (initialItems.length > 0 || !initialPagination.hasMore);
   const initialDashboardStatus: DashboardStatus = status !== "ready"
     ? status
     : initialItems.length
@@ -150,6 +152,12 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
 
     setLoadStatus(initialItems.length ? "ready" : "loading");
 
+    if (shouldUseInitialPage) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
     fetchAnimalsPage(0, tutorId)
       .then((page) => {
         if (!isMounted) return;
@@ -166,7 +174,7 @@ export function AdoptionDashboard({ initialPage, status = "ready", tutorId: tuto
     return () => {
       isMounted = false;
     };
-  }, [initialItems, initialPagination.hasMore, initialPagination.nextOffset, status, tutorId]);
+  }, [initialItems, initialPagination.hasMore, initialPagination.nextOffset, shouldUseInitialPage, status, tutorId]);
 
   const loadNextAnimalsPage = useCallback(async () => {
     if (isLoadingMoreAnimals || !hasMoreAnimals || nextAnimalsOffset === null) return;

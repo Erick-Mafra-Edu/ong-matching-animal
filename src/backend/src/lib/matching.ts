@@ -133,6 +133,7 @@ export class MatchingAlgorithm {
       animal_id: animal.id,
       animal_name: animal.name,
       compatibility_score: disqualified ? 0 : totalScore,
+      disqualified,
       matched_rules: matchedRules,
       details,
     };
@@ -150,7 +151,7 @@ export class MatchingAlgorithm {
   ): MatchResult[] {
     const matches = animals
       .map((animal) => this.calculateScore(tutor, animal, rules))
-      .filter((match) => match.compatibility_score > 0)
+      .filter((match) => !match.disqualified)
       .sort((a, b) => b.compatibility_score - a.compatibility_score)
       .slice(0, limit);
 

@@ -71,6 +71,7 @@ export interface MatchResult {
   animal_id: string;
   animal_name: string;
   compatibility_score: number; // Score total (0-500 ou mais)
+  disqualified?: boolean; // True quando alguma regra dealbreaker falhou
   matched_rules: string[]; // IDs das regras que fizeram match
   details: {
     rule_id: string;

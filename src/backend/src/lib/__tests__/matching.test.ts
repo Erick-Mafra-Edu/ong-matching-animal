@@ -890,7 +890,7 @@ describe("MatchingAlgorithm", () => {
       expect(matches.length).toBeLessThanOrEqual(5);
     });
 
-    it("should filter out matches with zero score", () => {
+    it("should keep zero-score matches when no dealbreaker fails", () => {
       const tutor: TutorProfile = {
         id: "tutor1",
         name: "Test",
@@ -937,8 +937,10 @@ describe("MatchingAlgorithm", () => {
 
       const matches = algorithm.findBestMatches(tutor, animals, rules);
 
-      expect(matches.length).toBe(1);
+      expect(matches.length).toBe(2);
       expect(matches[0].animal_id).toBe("animal1");
+      expect(matches[1].animal_id).toBe("animal2");
+      expect(matches[1].compatibility_score).toBe(0);
     });
 
     it("should sort matches by score in descending order", () => {

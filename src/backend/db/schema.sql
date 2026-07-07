@@ -315,10 +315,15 @@ AS $$
       rules.rule_name,
       rules.weight,
       rules.is_dealbreaker,
-      CASE rules.comparison_operator
-        WHEN '=' THEN tutor_profile.custom_fields -> rules.tutor_field = animals.custom_fields -> rules.animal_field
-        WHEN '!=' THEN tutor_profile.custom_fields -> rules.tutor_field <> animals.custom_fields -> rules.animal_field
-        WHEN 'contains' THEN
+      CASE
+        WHEN NOT (tutor_profile.custom_fields ? rules.tutor_field)
+          OR NOT (animals.custom_fields ? rules.animal_field)
+          THEN false
+        WHEN rules.comparison_operator = '='
+          THEN tutor_profile.custom_fields -> rules.tutor_field = animals.custom_fields -> rules.animal_field
+        WHEN rules.comparison_operator = '!='
+          THEN tutor_profile.custom_fields -> rules.tutor_field <> animals.custom_fields -> rules.animal_field
+        WHEN rules.comparison_operator = 'contains' THEN
           CASE
             WHEN jsonb_typeof(tutor_profile.custom_fields -> rules.tutor_field) = 'array'
               AND jsonb_typeof(animals.custom_fields -> rules.animal_field) = 'array'
@@ -337,16 +342,16 @@ AS $$
               )
             ELSE tutor_profile.custom_fields ->> rules.tutor_field ILIKE '%' || (animals.custom_fields ->> rules.animal_field) || '%'
           END
-        WHEN '>=' THEN matching_value_rank(tutor_profile.custom_fields ->> rules.tutor_field) >= matching_value_rank(animals.custom_fields ->> rules.animal_field)
-        WHEN '<=' THEN matching_value_rank(tutor_profile.custom_fields ->> rules.tutor_field) <= matching_value_rank(animals.custom_fields ->> rules.animal_field)
+        WHEN rules.comparison_operator = '>='
+          THEN matching_value_rank(tutor_profile.custom_fields ->> rules.tutor_field) >= matching_value_rank(animals.custom_fields ->> rules.animal_field)
+        WHEN rules.comparison_operator = '<='
+          THEN matching_value_rank(tutor_profile.custom_fields ->> rules.tutor_field) <= matching_value_rank(animals.custom_fields ->> rules.animal_field)
         ELSE false
       END AS matched
     FROM tutor_profile
     JOIN animals ON true
     CROSS JOIN matching_rules rules
     WHERE rules.is_active = true
-      AND tutor_profile.custom_fields ? rules.tutor_field
-      AND animals.custom_fields ? rules.animal_field
   ),
   grouped AS (
     SELECT
@@ -372,8 +377,7 @@ AS $$
     COALESCE(grouped.matched_rules, '[]'::jsonb),
     COALESCE(grouped.details, '[]'::jsonb)
   FROM grouped
-  WHERE grouped.disqualified = false
-    AND grouped.compatibility_score > 0;
+  WHERE grouped.disqualified = false;
 $$;
 
 CREATE OR REPLACE FUNCTION refresh_tutor_animal_matches(target_tutor_id UUID)
@@ -810,3 +814,76 @@ BEGIN
   );
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.refresh_all_matches_on_entity_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.refresh_all_tutor_animal_matches();
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS refresh_matches_on_animals_change ON public.animals;
+
+CREATE TRIGGER refresh_matches_on_animals_change
+AFTER INSERT OR UPDATE OR DELETE
+ON public.animals
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.refresh_all_matches_on_entity_change();
+
+DROP TRIGGER IF EXISTS refresh_matches_on_tutors_change ON public.tutors;
+
+CREATE TRIGGER refresh_matches_on_tutors_change
+AFTER INSERT OR UPDATE OR DELETE
+ON public.tutors
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.refresh_all_matches_on_entity_change();
+
+DROP TRIGGER IF EXISTS refresh_matches_on_matching_rules_change ON public.matching_rules;
+
+CREATE TRIGGER refresh_matches_on_matching_rules_change
+AFTER INSERT OR UPDATE OR DELETE
+ON public.matching_rules
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.refresh_all_matches_on_entity_change();
+
+UPDATE public.tutors
+SET custom_fields = jsonb_set(
+  custom_fields,
+  '{disponibilidade_tempo}',
+  custom_fields -> 'routine',
+  true
+)
+WHERE custom_fields ? 'routine'
+  AND NOT custom_fields ? 'disponibilidade_tempo';
+
+SELECT public.refresh_all_tutor_animal_matches();
+
+UPDATE public.matching_rules
+SET
+  rule_name = 'Energia desejada vs energia do animal',
+  tutor_field = 'pref_energia',
+  animal_field = 'nivel_energia',
+  comparison_operator = '=',
+  weight = 40,
+  is_dealbreaker = false,
+  is_active = true
+WHERE rule_name = 'Tempo disponível vs energia do animal'
+   OR (
+    tutor_field = 'disponibilidade_tempo'
+    AND animal_field = 'nivel_energia'
+  );
+
+UPDATE public.matching_rules
+SET is_active = false
+WHERE tutor_field IN ('tem_quintal', 'renda_mensal')
+  AND rule_name IN (
+    'Quintal vs tamanho do animal',
+    'Renda vs necessidade de cuidados'
+  );
+
+SELECT public.refresh_all_tutor_animal_matches();
