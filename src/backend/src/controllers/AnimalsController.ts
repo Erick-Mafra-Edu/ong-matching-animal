@@ -19,7 +19,8 @@ import {
   toStorageObjectUrl,
 } from "./apiSupport";
 
-const animalSelect = "id,owner_id,name,species,custom_fields,created_at,animal_photos(id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at)";
+const animalSelect = "id,owner_id,name,species,custom_fields,created_at";
+const animalPhotoSelect = "id,animal_id,bucket_id,storage_path,public_url,content_type,size_bytes,is_primary,created_at";
 
 export class AnimalsController {
   private readonly uploadAnimalPhoto = multer({
@@ -68,7 +69,14 @@ export class AnimalsController {
       const normalizedRows = rows
         .map((row) => row?.animal ?? row)
         .filter((row) => row && typeof row === "object" && row.id);
-      const items = normalizedRows.slice(0, limit).map((row) => normalizeAnimal(row));
+      const pageRows = normalizedRows.slice(0, limit);
+      const rowsWithPhotosResponse = await this.withAnimalPhotos(pageRows, { supabaseUrl, serviceRoleKey });
+      if (!rowsWithPhotosResponse.ok) {
+        res.status(rowsWithPhotosResponse.status).json({ message: "Nao foi possivel listar as fotos dos animais", details: rowsWithPhotosResponse.body });
+        return;
+      }
+
+      const items = rowsWithPhotosResponse.rows.map((row) => normalizeAnimal(row));
       const hasMore = normalizedRows.length > limit;
 
       res.json({
@@ -163,6 +171,44 @@ export class AnimalsController {
       .filter(Boolean);
 
     return jsonResponse(orderedAnimals, 200);
+  }
+
+  private async withAnimalPhotos(rows: any[], options: { supabaseUrl: string; serviceRoleKey: string }) {
+    const animalIds = rows
+      .map((row) => typeof row?.id === "string" ? row.id : "")
+      .filter(Boolean);
+
+    if (animalIds.length === 0) {
+      return { ok: true as const, rows };
+    }
+
+    const photosResponse = await fetch(`${options.supabaseUrl}/rest/v1/animal_photos?select=${animalPhotoSelect}&animal_id=in.(${animalIds.map(encodeURIComponent).join(",")})&order=is_primary.desc,created_at.asc`, {
+      headers: {
+        apikey: options.serviceRoleKey,
+        authorization: `Bearer ${options.serviceRoleKey}`,
+      },
+    });
+    const photosBody = await photosResponse.json();
+
+    if (!photosResponse.ok) {
+      return { ok: false as const, status: photosResponse.status, body: photosBody };
+    }
+
+    const photosByAnimalId = new Map<string, any[]>();
+    for (const photo of Array.isArray(photosBody) ? photosBody : []) {
+      if (!photo || typeof photo.animal_id !== "string") continue;
+      const animalPhotos = photosByAnimalId.get(photo.animal_id) ?? [];
+      animalPhotos.push(photo);
+      photosByAnimalId.set(photo.animal_id, animalPhotos);
+    }
+
+    return {
+      ok: true as const,
+      rows: rows.map((row) => ({
+        ...row,
+        animal_photos: photosByAnimalId.get(row.id) ?? [],
+      })),
+    };
   }
 
   create = (_req: Request, res: Response) => {

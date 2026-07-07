@@ -1595,28 +1595,31 @@ describe("API Endpoints", () => {
     it("should list animals with photo URLs", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [
-          {
-            id: "animal-123",
-            owner_id: "tutor-123",
-            name: "Yolo",
-            species: "Cachorro",
-            custom_fields: { age: 2, traits: ["Calmo"], verified: true },
-            animal_photos: [
-              {
-                id: "photo-123",
-                animal_id: "animal-123",
-                public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
-                is_primary: true,
-                created_at: "2026-01-01T00:00:00.000Z",
-              },
-            ],
-          },
-        ],
-      }) as jest.Mock;
-
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              id: "animal-123",
+              owner_id: "tutor-123",
+              name: "Yolo",
+              species: "Cachorro",
+              custom_fields: { age: 2, traits: ["Calmo"], verified: true },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              id: "photo-123",
+              animal_id: "animal-123",
+              public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+              is_primary: true,
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }) as jest.Mock;
       const response = await request(app).get("/api/animals?limit=2&offset=0");
 
       expect(response.status).toBe(200);
@@ -1641,18 +1644,31 @@ describe("API Endpoints", () => {
         expect.stringContaining("limit=3&offset=0"),
         expect.any(Object),
       );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/rest/v1/animal_photos?select="),
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("animal_id=in.(animal-123)"),
+        expect.any(Object),
+      );
     });
 
     it("should expose the next offset when more animals are available", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [
-          { id: "animal-1", name: "Yolo", species: "Cachorro", custom_fields: {} },
-          { id: "animal-2", name: "Lua", species: "Gato", custom_fields: {} },
-        ],
-      }) as jest.Mock;
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            { id: "animal-1", name: "Yolo", species: "Cachorro", custom_fields: {} },
+            { id: "animal-2", name: "Lua", species: "Gato", custom_fields: {} },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [],
+        }) as jest.Mock;
 
       const response = await request(app).get("/api/animals?limit=1&offset=4");
 
@@ -1708,18 +1724,23 @@ describe("API Endpoints", () => {
           ok: true,
           json: async () => [
             {
-                id: "animal-123",
-                owner_id: "owner-123",
-                name: "Yolo",
-                species: "Cachorro",
-                custom_fields: { age: 2, traits: ["Calmo"] },
-                animal_photos: [{
-                  id: "photo-123",
-                  animal_id: "animal-123",
-                  public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
-                  is_primary: true,
-                  created_at: "2026-01-01T00:00:00.000Z",
-                }],
+              id: "animal-123",
+              owner_id: "owner-123",
+              name: "Yolo",
+              species: "Cachorro",
+              custom_fields: { age: 2, traits: ["Calmo"] },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              id: "photo-123",
+              animal_id: "animal-123",
+              public_url: "https://example.supabase.co/storage/v1/object/public/animal-photos/animals/animal-123/photo-123.webp",
+              is_primary: true,
+              created_at: "2026-01-01T00:00:00.000Z",
             },
           ],
         }) as jest.Mock;
@@ -1780,6 +1801,20 @@ describe("API Endpoints", () => {
       expect(global.fetch).toHaveBeenNthCalledWith(
         4,
         expect.stringContaining("id=in.(animal-123)"),
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining("/rest/v1/animal_photos?select="),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining("animal_id=in.(animal-123)"),
         expect.any(Object),
       );
     });
