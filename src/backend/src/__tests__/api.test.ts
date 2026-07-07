@@ -1,5 +1,6 @@
 import request from "supertest";
 import app from "../index";
+import { resolveRateLimitIp } from "../app";
 import { getAuthenticatedUserIdFromTokenPayload, getBearerToken } from "../controllers/apiSupport";
 
 describe("API Endpoints", () => {
@@ -43,6 +44,26 @@ describe("API Endpoints", () => {
       expect(getBearerToken("Basic access-token")).toBeNull();
       expect(getBearerToken("Bearer")).toBeNull();
       expect(getBearerToken("Bearer      ")).toBeNull();
+    });
+  });
+
+  describe("resolveRateLimitIp", () => {
+    it("should prefer the first x-forwarded-for entry", () => {
+      expect(resolveRateLimitIp({
+        "x-forwarded-for": "198.51.100.10, 10.0.0.2",
+      } as any, "10.0.0.2", "10.0.0.3")).toBe("198.51.100.10");
+    });
+
+    it("should fall back to the forwarded header", () => {
+      expect(resolveRateLimitIp({
+        forwarded: 'for=203.0.113.7;proto=https;host=example.com',
+      } as any, "10.0.0.2", "10.0.0.3")).toBe("203.0.113.7");
+    });
+
+    it("should strip ports from forwarded addresses when needed", () => {
+      expect(resolveRateLimitIp({
+        "x-forwarded-for": "198.51.100.10:54321",
+      } as any, "10.0.0.2", "10.0.0.3")).toBe("198.51.100.10");
     });
   });
 

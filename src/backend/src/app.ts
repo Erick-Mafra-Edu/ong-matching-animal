@@ -2,9 +2,10 @@ import express from "express";
 import cors, { CorsOptions } from "cors";
 import { config } from "dotenv";
 import { initialize } from "express-openapi";
+import { IncomingHttpHeaders } from "http";
 import path from "path";
 import swaggerUi from "swagger-ui-express";
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { apiDoc, openApiOperations } from "./openapi";
 import { createApiRouter } from "./routes/apiRouter";
@@ -44,6 +45,79 @@ function resolveTrustProxySetting() {
   return configuredValue;
 }
 
+function firstHeaderValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
+
+function stripWrappingCharacters(value: string) {
+  return value.trim().replace(/^"+|"+$/g, "").replace(/^\[|\]$/g, "");
+}
+
+function stripPortIfPresent(value: string) {
+  const normalizedValue = stripWrappingCharacters(value);
+  if (!normalizedValue) return normalizedValue;
+
+  if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(normalizedValue)) {
+    return normalizedValue.replace(/:\d+$/, "");
+  }
+
+  return normalizedValue;
+}
+
+function parseForwardedHeader(value: string | string[] | undefined) {
+  const headerValue = firstHeaderValue(value);
+  if (!headerValue) return null;
+
+  for (const entry of headerValue.split(",")) {
+    for (const segment of entry.split(";")) {
+      const [rawKey, rawValue] = segment.split("=", 2);
+      if (!rawKey || !rawValue || rawKey.trim().toLowerCase() !== "for") continue;
+
+      const candidate = stripPortIfPresent(rawValue);
+      if (candidate && candidate.toLowerCase() !== "unknown") {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function resolveRateLimitIp(headers: IncomingHttpHeaders, requestIp?: string, remoteAddress?: string) {
+  const forwardedFor = firstHeaderValue(headers["x-forwarded-for"]);
+  if (forwardedFor) {
+    const candidate = stripPortIfPresent(forwardedFor.split(",")[0] ?? "");
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  const forwardedHeaderIp = parseForwardedHeader(headers.forwarded);
+  if (forwardedHeaderIp) {
+    return forwardedHeaderIp;
+  }
+
+  const requestIpCandidate = stripPortIfPresent(requestIp ?? "");
+  if (requestIpCandidate) {
+    return requestIpCandidate;
+  }
+
+  const remoteAddressCandidate = stripPortIfPresent(remoteAddress ?? "");
+  if (remoteAddressCandidate) {
+    return remoteAddressCandidate;
+  }
+
+  return "127.0.0.1";
+}
+
+function createRateLimitKeyGenerator() {
+  return (req: express.Request) => ipKeyGenerator(resolveRateLimitIp(req.headers, req.ip, req.socket.remoteAddress));
+}
+
 const allowedOrigins = [
   process.env.NEXT_PUBLIC_FRONTEND_URL,
   process.env.FRONTEND_URL,
@@ -70,6 +144,7 @@ const globalLimiter = rateLimit({
   limit: 100,
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  keyGenerator: createRateLimitKeyGenerator(),
   message: { message: "Muitas requisicoes vindas deste IP, tente novamente mais tarde." },
 });
 
@@ -78,6 +153,7 @@ const strictLimiter = rateLimit({
   limit: 10,
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  keyGenerator: createRateLimitKeyGenerator(),
   message: { message: "Limite de tentativas excedido. Tente novamente em uma hora." },
 });
 
@@ -106,6 +182,7 @@ export function createApp() {
   app.use("/api/match", rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 20,
+    keyGenerator: createRateLimitKeyGenerator(),
     message: { message: "Muitas solicitacoes de matching. Tente novamente em breve." },
   }));
 
