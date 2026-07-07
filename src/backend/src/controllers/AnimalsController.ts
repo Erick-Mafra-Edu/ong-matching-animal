@@ -121,12 +121,48 @@ export class AnimalsController {
       return null;
     }
 
-    return fetch(`${options.supabaseUrl}/rest/v1/tutor_animal_matches?select=compatibility_score,animal:animals(${animalSelect})&tutor_id=eq.${encodeURIComponent(options.tutorId)}&order=compatibility_score.desc,animal_id.asc&limit=${options.supabaseLimit}&offset=${options.offset}`, {
-        headers: {
-          apikey: options.serviceRoleKey,
-          authorization: `Bearer ${options.serviceRoleKey}`,
-        },
-      });
+    const authHeaders = {
+      apikey: options.serviceRoleKey,
+      authorization: `Bearer ${options.serviceRoleKey}`,
+    };
+    const matchesResponse = await fetch(`${options.supabaseUrl}/rest/v1/tutor_animal_matches?select=animal_id,compatibility_score&tutor_id=eq.${encodeURIComponent(options.tutorId)}&order=compatibility_score.desc,animal_id.asc&limit=${options.supabaseLimit}&offset=${options.offset}`, {
+      headers: authHeaders,
+    });
+    const matchesBody = await matchesResponse.json();
+
+    if (!matchesResponse.ok) {
+      return jsonResponse(matchesBody, matchesResponse.status);
+    }
+
+    const animalIds = Array.isArray(matchesBody)
+      ? matchesBody
+        .map((match) => typeof match?.animal_id === "string" ? match.animal_id : "")
+        .filter(Boolean)
+      : [];
+
+    if (animalIds.length === 0) {
+      return jsonResponse([], 200);
+    }
+
+    const animalResponse = await fetch(`${options.supabaseUrl}/rest/v1/animals?select=${animalSelect}&id=in.(${animalIds.map(encodeURIComponent).join(",")})`, {
+      headers: authHeaders,
+    });
+    const animalBody = await animalResponse.json();
+
+    if (!animalResponse.ok) {
+      return jsonResponse(animalBody, animalResponse.status);
+    }
+
+    const animalsById = new Map(
+      (Array.isArray(animalBody) ? animalBody : [])
+        .filter((animal) => animal && typeof animal === "object" && typeof animal.id === "string")
+        .map((animal) => [animal.id, animal]),
+    );
+    const orderedAnimals = animalIds
+      .map((animalId) => animalsById.get(animalId))
+      .filter(Boolean);
+
+    return jsonResponse(orderedAnimals, 200);
   }
 
   create = (_req: Request, res: Response) => {
@@ -363,4 +399,13 @@ function parseBoundedInteger(value: unknown, fallback: number, min: number, max:
   const parsed = Number.parseInt(String(rawValue ?? ""), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(parsed, min), max);
+}
+
+function jsonResponse(body: unknown, status: number) {
+  return new globalThis.Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
 }

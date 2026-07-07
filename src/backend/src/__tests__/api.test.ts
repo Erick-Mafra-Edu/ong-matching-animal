@@ -1700,7 +1700,14 @@ describe("API Endpoints", () => {
           json: async () => [
             {
               compatibility_score: 98,
-              animal: {
+              animal_id: "animal-123",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
                 id: "animal-123",
                 owner_id: "owner-123",
                 name: "Yolo",
@@ -1713,7 +1720,6 @@ describe("API Endpoints", () => {
                   is_primary: true,
                   created_at: "2026-01-01T00:00:00.000Z",
                 }],
-              },
             },
           ],
         }) as jest.Mock;
@@ -1745,7 +1751,7 @@ describe("API Endpoints", () => {
       );
       expect(global.fetch).toHaveBeenNthCalledWith(
         3,
-        expect.stringContaining("/rest/v1/tutor_animal_matches?select=compatibility_score,animal:animals("),
+        expect.stringContaining("/rest/v1/tutor_animal_matches?select=animal_id,compatibility_score"),
         expect.objectContaining({
           headers: expect.objectContaining({
             authorization: "Bearer service-key",
@@ -1760,6 +1766,20 @@ describe("API Endpoints", () => {
       expect(global.fetch).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining("limit=3&offset=0"),
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining("/rest/v1/animals?select="),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer service-key",
+          }),
+        }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining("id=in.(animal-123)"),
         expect.any(Object),
       );
     });
@@ -1778,9 +1798,7 @@ describe("API Endpoints", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => [
-            { compatibility_score: 98, animal: null },
-          ],
+          json: async () => [],
         }) as jest.Mock;
 
       const response = await request(app)
