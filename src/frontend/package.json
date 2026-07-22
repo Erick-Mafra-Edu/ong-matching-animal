@@ -34,16 +34,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",
-    "@types/node": "^20.12.12",
+    "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/whatwg-url": "^13.0.0",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "^16.2.9",
-    "postcss": "^8.5.10",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.4.5"
+    "autoprefixer": "^10.5.4",
+    "eslint": "^10.7.0",
+    "eslint-config-next": "^16.2.11",
+    "postcss": "^8.5.22",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
   }
 }
