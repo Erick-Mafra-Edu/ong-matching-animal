@@ -1,0 +1,28 @@
+name: Horusec Analysis
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  horusec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Horusec
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${{ github.workspace }}:/src" \
+            horuszup/horusec-cli:latest \
+            horusec start -p /src -P "${{ github.workspace }}"
