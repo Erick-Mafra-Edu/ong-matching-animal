@@ -30,7 +30,7 @@
     "ong-matching-animal": "file:../..",
     "swagger-ui-express": "^5.0.1",
     "ws": "^8.21.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
